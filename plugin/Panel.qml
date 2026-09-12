@@ -122,21 +122,15 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    contentWidth: Style.space(390)
-    contentHeight: contentCol.implicitHeight + Style.space(32)
+    contentWidth: panel.fittedContentWidth(Style.space(380))
+    contentHeight: panel.fittedContentHeight(contentCol.implicitHeight, Style.space(560))
 
-    Rectangle {
-      anchors.fill: parent
-      color: root.surface
-      radius: 12
-      border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
-      border.width: 1
-
-      ColumnLayout {
-        id: contentCol
-        anchors.fill: parent
-        anchors.margins: Style.space(16)
-        spacing: Style.space(12)
+    ColumnLayout {
+      id: contentCol
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      spacing: Style.space(12)
 
         // Header
         RowLayout {
@@ -350,7 +344,6 @@ Panel {
         }
       }
     }
-  }
 
   Process {
     id: execProc
