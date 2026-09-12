@@ -4,7 +4,8 @@ import QtQuick.Layouts
 
 Item {
   id: root
-  anchors.fill: parent
+  Layout.fillWidth: true
+  Layout.fillHeight: true
 
   ScrollView {
     anchors.fill: parent

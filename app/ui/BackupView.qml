@@ -4,7 +4,8 @@ import QtQuick.Layouts
 
 Item {
   id: root
-  anchors.fill: parent
+  Layout.fillWidth: true
+  Layout.fillHeight: true
 
   property var recentBackups: (backupInfo && backupInfo.recent) || []
   property var scheduleConfig: (backupInfo && backupInfo.schedule) || ({})

@@ -4,7 +4,8 @@ import QtQuick.Layouts
 
 Item {
   id: root
-  anchors.fill: parent
+  Layout.fillWidth: true
+  Layout.fillHeight: true
 
   property var pingResults: []
   property bool probing: false
