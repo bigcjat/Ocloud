@@ -64,7 +64,8 @@ Panel {
     command: ["cat", Quickshell.env("HOME") + "/.config/omarchy/hetzner.json"]
     running: false
     stdout: StdioCollector {
-      onCollected: {
+      waitForEnd: true
+      onStreamFinished: {
         try {
           var cfg = JSON.parse(text);
           if (cfg && cfg.api_token) {
@@ -81,7 +82,8 @@ Panel {
     command: ["mount"]
     running: false
     stdout: StdioCollector {
-      onCollected: {
+      waitForEnd: true
+      onStreamFinished: {
         var isMnt = text.indexOf("/Cloud") !== -1;
         root.storageData.mounted = isMnt;
       }
@@ -258,8 +260,7 @@ Panel {
               enabled: !!root.primaryServer
               onClicked: {
                 if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
-                  execProc.command = ["alacritty", "-e", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "root@" + root.primaryServer.public_net.ipv4.ip];
-                  execProc.running = true;
+                  Quickshell.execDetached(["foot", "-e", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "root@" + root.primaryServer.public_net.ipv4.ip]);
                 }
               }
             }
@@ -270,8 +271,7 @@ Panel {
               onClicked: {
                 if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
                   var ip = root.primaryServer.public_net.ipv4.ip;
-                  execProc.command = ["waypipe", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "root@" + ip, "/usr/local/bin/devilutionx"];
-                  execProc.running = true;
+                  Quickshell.execDetached(["foot", "-e", "ocloud", "vm", "app", "devilutionx"]);
                 }
               }
             }
