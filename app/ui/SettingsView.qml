@@ -305,6 +305,122 @@ Item {
           }
         }
       }
+
+      // Pluggable Provider System & Community Plugins Card
+      Rectangle {
+        Layout.fillWidth: true
+        height: pluginCol.implicitHeight + 40
+        radius: 12
+        color: cardBg
+        border.color: borderSubtle
+
+        ColumnLayout {
+          id: pluginCol
+          anchors.fill: parent
+          anchors.margins: 20
+          spacing: 16
+
+          RowLayout {
+            Layout.fillWidth: true
+            Rectangle {
+              width: 32
+              height: 32
+              radius: 8
+              color: "#1e1b4b"
+              Text { anchors.centerIn: parent; text: "🧩"; font.pixelSize: 16 }
+            }
+            ColumnLayout {
+              spacing: 2
+              Text {
+                text: "Pluggable Cloud & Storage Providers"
+                font.pixelSize: 16
+                font.bold: true
+                color: textPrimary
+              }
+              Text {
+                text: "Extensible plugin engine — anyone can add missing cloud compute or storage backends"
+                font.pixelSize: 11
+                color: textMuted
+              }
+            }
+            Item { Layout.fillWidth: true }
+            Rectangle {
+              height: 24
+              width: 100
+              radius: 6
+              color: "#0c4a6e"
+              Text {
+                anchors.centerIn: parent
+                text: "PLUGINS ACTIVE"
+                font.pixelSize: 10
+                font.bold: true
+                color: accentSky
+              }
+            }
+          }
+
+          Text {
+            text: "Ocloud automatically loads plugins from ~/.config/omarchy/ocloud/providers/ and builtin providers/."
+            font.pixelSize: 12
+            color: textSecondary
+          }
+
+          // Active Plugins Grid
+          GridLayout {
+            Layout.fillWidth: true
+            columns: 3
+            columnSpacing: 12
+            rowSpacing: 12
+
+            Repeater {
+              model: [
+                { name: "Hetzner Cloud", type: "Compute (API)", status: "Active" },
+                { name: "AWS EC2 / Lightsail", type: "Compute (API)", status: "Ready" },
+                { name: "Oracle Cloud (OCI)", type: "Compute (API)", status: "Ready" },
+                { name: "DigitalOcean Droplets", type: "Compute (API)", status: "Ready" },
+                { name: "Vultr Compute", type: "Compute (API)", status: "Ready" },
+                { name: "Bare-Metal / Custom SSH", type: "Compute (Manual)", status: "Active" },
+                { name: "Hetzner Storage Box", type: "Storage (RAID)", status: "Active" },
+                { name: "S3 / Cloudflare R2 / B2", type: "Storage (Object)", status: "Ready" },
+                { name: "Home NAS (SMB/NFS)", type: "Storage (Local)", status: "Active" }
+              ]
+
+              delegate: Rectangle {
+                Layout.fillWidth: true
+                height: 52
+                radius: 8
+                color: "#080e18"
+                border.color: borderSubtle
+
+                RowLayout {
+                  anchors.fill: parent
+                  anchors.margins: 10
+                  spacing: 8
+                  ColumnLayout {
+                    spacing: 1
+                    Text { text: modelData.name; font.pixelSize: 12; font.bold: true; color: textPrimary }
+                    Text { text: modelData.type; font.pixelSize: 10; color: textMuted }
+                  }
+                  Item { Layout.fillWidth: true }
+                  Rectangle {
+                    height: 18
+                    width: 50
+                    radius: 4
+                    color: modelData.status === "Active" ? Qt.rgba(0.06, 0.72, 0.5, 0.15) : Qt.rgba(1, 1, 1, 0.05)
+                    Text {
+                      anchors.centerIn: parent
+                      text: modelData.status
+                      font.pixelSize: 9
+                      font.bold: true
+                      color: modelData.status === "Active" ? homeGreen : textMuted
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

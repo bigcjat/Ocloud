@@ -36,10 +36,11 @@ ApplicationWindow {
   property string activeTab: (typeof initialTab !== "undefined" && initialTab) ? initialTab : "fleet"
 
   Shortcut { sequence: "Alt+1"; onActivated: activeTab = "fleet" }
-  Shortcut { sequence: "Alt+2"; onActivated: activeTab = "storage" }
-  Shortcut { sequence: "Alt+3"; onActivated: activeTab = "apps" }
-  Shortcut { sequence: "Alt+4"; onActivated: activeTab = "backups" }
-  Shortcut { sequence: "Alt+5"; onActivated: activeTab = "settings" }
+  Shortcut { sequence: "Alt+2"; onActivated: activeTab = "workloads" }
+  Shortcut { sequence: "Alt+3"; onActivated: activeTab = "storage" }
+  Shortcut { sequence: "Alt+4"; onActivated: activeTab = "apps" }
+  Shortcut { sequence: "Alt+5"; onActivated: activeTab = "backups" }
+  Shortcut { sequence: "Alt+6"; onActivated: activeTab = "settings" }
 
   function reloadAll() {
     var raw = ocloud.fetchStatus();
@@ -111,7 +112,7 @@ ApplicationWindow {
           color: textPrimary
         }
         Text {
-          text: "Cloud Storage & Compute"
+          text: "Personal Cloud Hypervisor"
           font.pixelSize: 12
           color: textMuted
         }
@@ -119,25 +120,52 @@ ApplicationWindow {
 
       Item { Layout.fillWidth: true }
 
-      // Live Vault Status Badge
-      Rectangle {
-        height: 28
-        width: vaultText.implicitWidth + 24
-        radius: 14
-        color: "#0e2038"
-        border.color: "#1e3a8a"
-        border.width: 1
-
-        RowLayout {
-          anchors.centerIn: parent
-          spacing: 6
-          Text { text: "🔐"; font.pixelSize: 11 }
+      // Hypervisor Cluster Overview Telemetry
+      RowLayout {
+        spacing: 8
+        Rectangle {
+          height: 28
+          width: coresText.implicitWidth + 20
+          radius: 14
+          color: "#0f172a"
+          border.color: "#1e293b"
           Text {
-            id: vaultText
-            text: "Vault Encrypted (AES-256)"
+            id: coresText
+            anchors.centerIn: parent
+            text: "⚡ 12 Cores (14% Load)"
             font.pixelSize: 11
+            color: "#38bdf8"
             font.bold: true
-            color: accentSky
+          }
+        }
+        Rectangle {
+          height: 28
+          width: ramText.implicitWidth + 20
+          radius: 14
+          color: "#0f172a"
+          border.color: "#1e293b"
+          Text {
+            id: ramText
+            anchors.centerIn: parent
+            text: "🧠 RAM 24.3 / 88 GB"
+            font.pixelSize: 11
+            color: "#10b981"
+            font.bold: true
+          }
+        }
+        Rectangle {
+          height: 28
+          width: poolText.implicitWidth + 20
+          radius: 14
+          color: "#0f172a"
+          border.color: "#1e293b"
+          Text {
+            id: poolText
+            anchors.centerIn: parent
+            text: "📦 Pool 1.1 / 3.0 TB"
+            font.pixelSize: 11
+            color: "#f59e0b"
+            font.bold: true
           }
         }
       }
@@ -172,7 +200,7 @@ ApplicationWindow {
     // Left Navigation Sidebar
     Rectangle {
       Layout.fillHeight: true
-      Layout.preferredWidth: 210
+      Layout.preferredWidth: 220
       color: "#070c16"
       border.color: borderSubtle
       border.width: 1
@@ -185,11 +213,12 @@ ApplicationWindow {
         // Nav Buttons
         Repeater {
           model: [
-            { id: "fleet", name: "Compute Fleet", icon: "🌐", count: serverList.length },
-            { id: "storage", name: "Storage & Drives", icon: "💾", count: storageBox.mounted ? 1 : 0 },
-            { id: "apps", name: "Waypipe Apps", icon: "🎮", count: 3 },
-            { id: "backups", name: "Backups", icon: "🔄", count: 0 },
-            { id: "settings", name: "Vault & Latency", icon: "⚙️", count: 0 }
+            { id: "fleet", name: "Compute Nodes", icon: "🌐", count: serverList.length },
+            { id: "workloads", name: "Workloads & Docker", icon: "🐳", count: 3 },
+            { id: "storage", name: "Storage Pools", icon: "💾", count: storageBox.mounted ? 1 : 0 },
+            { id: "apps", name: "App Streaming", icon: "🎮", count: 3 },
+            { id: "backups", name: "Automated Backups", icon: "🔄", count: 0 },
+            { id: "settings", name: "Vault & Plugins", icon: "⚙️", count: 0 }
           ]
 
           delegate: Rectangle {
@@ -285,14 +314,16 @@ ApplicationWindow {
         anchors.fill: parent
         currentIndex: {
           if (activeTab === "fleet") return 0;
-          if (activeTab === "storage") return 1;
-          if (activeTab === "apps") return 2;
-          if (activeTab === "backups") return 3;
-          if (activeTab === "settings") return 4;
+          if (activeTab === "workloads") return 1;
+          if (activeTab === "storage") return 2;
+          if (activeTab === "apps") return 3;
+          if (activeTab === "backups") return 4;
+          if (activeTab === "settings") return 5;
           return 0;
         }
 
         FleetView { id: fleetView }
+        WorkloadsView { id: workloadsView }
         StorageView { id: storageView }
         AppSuiteView { id: appSuiteView }
         BackupView { id: backupView }
