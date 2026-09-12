@@ -122,6 +122,7 @@ Rectangle {
           }
         }
       }
+      }
 
       // Display Name
       ColumnLayout {
