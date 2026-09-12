@@ -304,6 +304,8 @@ Panel {
     function close(): void { root.close() }
     function toggle(): void { root.toggle() }
     function refresh(): string { root.refreshAll(); return "ok" }
+    function showStorage(): string { root.currentTab = "storage"; return "storage" }
+    function showCompute(): string { root.currentTab = "compute"; return "compute" }
   }
 
   onOpenedChanged: if (opened) {
