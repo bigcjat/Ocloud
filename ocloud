@@ -449,15 +449,27 @@ async function cmdVm(subcmd, args, config) {
       console.error('Inspection failed: ' + e.message);
     }
   } else if (subcmd === 'app') {
-    const appCmd = args[1] || '/usr/local/bin/devilutionx';
+    const appCmd = args[1] || 'arcade';
     const keyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
     console.log(`Launching remote app '${appCmd}' on ${server.name}...`);
     try {
       execSync('which waypipe', { stdio: 'ignore' });
-      console.log('Using Waypipe (native Wayland)...');
-      spawn('waypipe', ['ssh', '-i', keyPath, '-o', 'StrictHostKeyChecking=no', `root@${ip}`, appCmd], {
-        stdio: 'inherit',
-      });
+      console.log('Using Waypipe (native Wayland + Hetzner Red window styling)...');
+      spawn(
+        'waypipe',
+        [
+          '--title-prefix', '[☁ Hetzner] ',
+          '--video=h264',
+          '--threads', '4',
+          'ssh',
+          '-i', keyPath,
+          '-o', 'StrictHostKeyChecking=no',
+          '-R', '4713:localhost:4713',
+          `root@${ip}`,
+          `env PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${appCmd}`
+        ],
+        { stdio: 'inherit' }
+      );
     } catch (e) {
       console.log('Using SSH X11 forwarding (-Y)...');
       spawn('ssh', ['-Y', '-i', keyPath, '-o', 'StrictHostKeyChecking=no', `root@${ip}`, appCmd], {

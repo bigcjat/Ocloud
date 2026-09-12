@@ -256,7 +256,18 @@ Panel {
               enabled: !!root.primaryServer
               onClicked: {
                 if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
-                  Quickshell.execDetached(["foot", "-e", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "root@" + root.primaryServer.public_net.ipv4.ip]);
+                  var serverName = root.primaryServer.name || "companion";
+                  var ip = root.primaryServer.public_net.ipv4.ip;
+                  Quickshell.execDetached([
+                    "foot",
+                    "-T", "☁ Ocloud Companion [" + serverName + " · " + ip + "]",
+                    "-o", "colors-dark.background=080e18",
+                    "-o", "colors-dark.foreground=e2e8f0",
+                    "-o", "colors-dark.regular4=38bdf8",
+                    "-o", "colors-dark.cursor=080e18 38bdf8",
+                    "-o", "colors-dark.selection-background=1e293b",
+                    "-e", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "-t", "root@" + ip
+                  ]);
                 }
               }
             }
@@ -266,8 +277,7 @@ Panel {
               enabled: !!root.primaryServer && root.primaryServer.status === "running"
               onClicked: {
                 if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
-                  var ip = root.primaryServer.public_net.ipv4.ip;
-                  Quickshell.execDetached(["foot", "-e", "ocloud", "vm", "app", "devilutionx"]);
+                  Quickshell.execDetached(["foot", "-e", "ocloud", "vm", "app", "arcade"]);
                 }
               }
             }

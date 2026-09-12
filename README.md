@@ -40,7 +40,7 @@ Ocloud is built with a **modular provider architecture**. While **Hetzner** is t
 
 ### 2. Disposable & Always-On Cloud Compute
 * **Offload Builds & Heavy Jobs**: Compile large projects or run batch tasks on beefy multi-core cloud instances while your laptop stays cold and preserves battery.
-* **Native Desktop Window Streaming**: Run graphical apps or games on the remote cloud VM and stream them directly into your local Hyprland workspace via **Waypipe** or X11 forwarding—tiling and resizing like a local app.
+* **Native Desktop Window Streaming**: Run graphical apps or games on the remote cloud VM and stream them directly into your local Hyprland workspace via **Waypipe** or X11 forwarding—tiling and resizing like a local app. *(See [Waypipe Streaming & Audio Reference Guide](file:///Users/christhompson/macos_wrap/docs/WAYPIPE_STREAMING_REFERENCE.md) for full distro comparisons, image/font gotchas, and low-latency tuning).*
 * **Tailscale Mesh Integration**: Automatically enrolls newly spawned cloud VMs into your private Tailnet on first boot using ephemeral auth keys. No open SSH ports on the public internet.
 
 ### 3. Native Omarchy Top-Bar Widget
