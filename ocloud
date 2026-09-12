@@ -338,7 +338,7 @@ async function cmdVm(subcmd, args, config) {
       server = servers.find((s) => s.status === 'running') || servers[0];
       if (target) appCmd = target;
     }
-  } else if (subcmd === 'ssh' || subcmd === 'inspect') {
+  } else if (subcmd === 'ssh' || subcmd === 'inspect' || subcmd === 'mount' || subcmd === 'unmount') {
     if (!target) {
       server = servers.find((s) => s.status === 'running') || servers[0];
     } else {
@@ -513,12 +513,61 @@ async function cmdVm(subcmd, args, config) {
       stdio: 'inherit',
     });
     console.log('Tailscale connected!');
+  } else if (subcmd === 'mount') {
+    const vmMountPoint = path.join(os.homedir(), 'Companion-VM');
+    if (isDriveMounted(vmMountPoint)) {
+      console.log(`VM drive is already mounted at ${vmMountPoint}`);
+      return;
+    }
+    fs.mkdirSync(vmMountPoint, { recursive: true });
+    const keyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
+    console.log(`\x1b[33m⚠️  NOTICE: Mounting EPHEMERAL VM drive from ${server.name} (${ip}) to ${vmMountPoint}...\x1b[0m`);
+    console.log(`\x1b[33m   Any files created here will be destroyed when this VM powers off!\x1b[0m`);
+    const rcloneBin = [
+      path.join(os.homedir(), '.local', 'bin', 'rclone'),
+      '/usr/bin/rclone',
+    ].find((p) => fs.existsSync(p)) || 'rclone';
+
+    // Ensure rclone config has companion-vm remote
+    const rcloneConfPath = path.join(os.homedir(), '.config', 'rclone', 'rclone.conf');
+    fs.mkdirSync(path.dirname(rcloneConfPath), { recursive: true });
+    let rcloneConf = fs.existsSync(rcloneConfPath) ? fs.readFileSync(rcloneConfPath, 'utf8') : '';
+    const remoteBlock = `\n[companion-vm]\ntype = sftp\nhost = ${ip}\nuser = root\nkey_file = ${keyPath}\nshell_type = unix\n`;
+    if (rcloneConf.includes('[companion-vm]')) {
+      rcloneConf = rcloneConf.replace(/\[companion-vm\][\s\S]*?(?=\n\[|$)/, remoteBlock.trim());
+    } else {
+      rcloneConf += remoteBlock;
+    }
+    fs.writeFileSync(rcloneConfPath, rcloneConf, { mode: 0o600 });
+
+    try {
+      execSync(`${rcloneBin} mount companion-vm:/root "${vmMountPoint}" --vfs-cache-mode full --daemon`, { stdio: 'inherit' });
+      console.log(`\x1b[32m✔ Ephemeral VM drive mounted at ${vmMountPoint}\x1b[0m`);
+    } catch (e) {
+      console.error('Failed to mount VM drive: ' + e.message);
+    }
+  } else if (subcmd === 'unmount') {
+    const vmMountPoint = path.join(os.homedir(), 'Companion-VM');
+    if (!isDriveMounted(vmMountPoint)) {
+      console.log(`VM drive is not mounted at ${vmMountPoint}`);
+      return;
+    }
+    try {
+      execSync(`umount "${vmMountPoint}" || fusermount3 -u "${vmMountPoint}" || fusermount -u "${vmMountPoint}"`, { stdio: 'inherit' });
+      console.log(`Unmounted ${vmMountPoint}`);
+    } catch (e) {
+      console.error('Failed to unmount VM drive: ' + e.message);
+    }
   }
 }
 
 function cmdStorage(subcmd, args, config) {
   const sb = config.storage_box || {};
   const mountPoint = sb.mount_point || path.join(os.homedir(), 'Cloud');
+  const rcloneBin = [
+    path.join(os.homedir(), '.local', 'bin', 'rclone'),
+    '/usr/bin/rclone',
+  ].find((p) => fs.existsSync(p)) || 'rclone';
 
   if (subcmd === 'status') {
     console.log(JSON.stringify(getStorageBoxStats(config), null, 2));
@@ -533,12 +582,12 @@ function cmdStorage(subcmd, args, config) {
     fs.mkdirSync(mountPoint, { recursive: true });
     try {
       execSync(
-        `rclone mount :sftp,host=${sb.host},port=${sb.port || 23},user=${sb.username}:/ "${mountPoint}" --vfs-cache-mode full --daemon`,
+        `${rcloneBin} mount storagebox: "${mountPoint}" --vfs-cache-mode full --daemon`,
         { stdio: 'inherit' }
       );
-      console.log(`Mounted to ${mountPoint}`);
+      console.log(`✔ Permanent Storage Box mounted to ${mountPoint}`);
     } catch (e) {
-      console.error('Failed to mount: ensure rclone is installed.');
+      console.error('Failed to mount Storage Box: ' + e.message);
     }
     return;
   }
@@ -549,7 +598,7 @@ function cmdStorage(subcmd, args, config) {
       return;
     }
     try {
-      execSync(`umount "${mountPoint}" || fusermount -u "${mountPoint}"`, { stdio: 'inherit' });
+      execSync(`umount "${mountPoint}" || fusermount3 -u "${mountPoint}" || fusermount -u "${mountPoint}"`, { stdio: 'inherit' });
       console.log(`Unmounted ${mountPoint}`);
     } catch (e) {
       console.error('Failed to unmount: ' + e.message);

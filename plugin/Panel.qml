@@ -80,6 +80,8 @@ Panel {
     }
   }
 
+  property bool vmDriveMounted: false
+
   Process {
     id: mountCheckProc
     command: ["mount"]
@@ -87,8 +89,8 @@ Panel {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        var isMnt = text.indexOf("/Cloud") !== -1;
-        root.storageData.mounted = isMnt;
+        root.storageData.mounted = text.indexOf("/Cloud ") !== -1 || text.indexOf("/Cloud\n") !== -1;
+        root.vmDriveMounted = text.indexOf("/Companion-VM") !== -1;
       }
     }
   }
@@ -193,7 +195,7 @@ Panel {
           RowLayout {
             Layout.fillWidth: true
             Text {
-              text: root.storageData.mounted ? "● Mounted at ~/Cloud" : "○ Drive unmounted"
+              text: root.storageData.mounted ? "● Mounted at ~/Cloud (Permanent 1.0 TB)" : "○ Drive unmounted"
               font.pixelSize: 11
               color: root.storageData.mounted ? root.successColor : root.dim
             }
@@ -202,7 +204,7 @@ Panel {
               text: root.storageData.mounted ? "Unmount" : "Mount Drive"
               onClicked: {
                 if (root.storageData.mounted) {
-                  execProc.command = ["umount", Quickshell.env("HOME") + "/Cloud"];
+                  execProc.command = ["ocloud", "storage", "unmount"];
                 } else {
                   execProc.command = ["ocloud", "storage", "mount"];
                 }
@@ -221,7 +223,7 @@ Panel {
         // Compute (VM) Section
         ColumnLayout {
           Layout.fillWidth: true
-          spacing: 6
+          spacing: 8
 
           RowLayout {
             Layout.fillWidth: true
@@ -244,6 +246,38 @@ Panel {
             text: root.primaryServer ? (root.primaryServer.name + " (" + (root.primaryServer.server_type ? root.primaryServer.server_type.name : "cx23") + " · " + (root.primaryServer.public_net && root.primaryServer.public_net.ipv4 ? root.primaryServer.public_net.ipv4.ip : "no IP") + ")") : "No active companion servers"
             font.pixelSize: 12
             color: root.dim
+          }
+
+          // VM Ephemeral Drive Row
+          RowLayout {
+            Layout.fillWidth: true
+            ColumnLayout {
+              spacing: 1
+              Text {
+                text: root.vmDriveMounted ? "⚡ Mounted at ~/Companion-VM" : "○ VM Drive unmounted"
+                font.pixelSize: 11
+                font.bold: root.vmDriveMounted
+                color: root.vmDriveMounted ? root.warningColor : root.dim
+              }
+              Text {
+                text: root.vmDriveMounted ? "⚠️ Ephemeral: destroyed on VM shutdown" : "Direct access to companion root"
+                font.pixelSize: 10
+                color: root.vmDriveMounted ? root.warningColor : root.dim
+              }
+            }
+            Item { Layout.fillWidth: true }
+            Button {
+              text: root.vmDriveMounted ? "Unmount VM" : "Mount Drive"
+              enabled: (root.primaryServer && root.primaryServer.status === "running") || root.vmDriveMounted
+              onClicked: {
+                if (root.vmDriveMounted) {
+                  execProc.command = ["ocloud", "vm", "unmount"];
+                } else {
+                  execProc.command = ["ocloud", "vm", "mount"];
+                }
+                execProc.running = true;
+              }
+            }
           }
 
           // Action Buttons
