@@ -65,8 +65,15 @@ Panel {
   property bool homeNasBusy: false
   property bool killBusy: false
   property bool showKillModal: false
-  property bool showVmConsent: false
   property string currentTab: "storage" // "storage" | "compute"
+
+  function switchToStorage() {
+    root.currentTab = "storage";
+  }
+
+  function switchToCompute() {
+    root.currentTab = "compute";
+  }
 
   function refreshAll() {
     statusProc.running = true;
