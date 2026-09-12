@@ -13,6 +13,8 @@ Panel {
   ipcTarget: "community.ocloud"
   manageIpc: false
 
+  implicitWidth: button.implicitWidth
+
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color dim: Qt.darker(foreground, 1.55)
   readonly property color surface: Color.popups.background
@@ -103,7 +105,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "☁"
+    text: "󰅟"
     slotSize: Style.bar.iconSlot
     tooltipText: "Ocloud Companion"
     onPressed: function(buttonCode) {
