@@ -33,8 +33,13 @@ ApplicationWindow {
   property var storageBox: ({})
   property var customStorage: []
   property var backupInfo: ({})
-  property bool vmDriveMounted: false
-  property string activeTab: "fleet"
+  property string activeTab: (typeof initialTab !== "undefined" && initialTab) ? initialTab : "fleet"
+
+  Shortcut { sequence: "Alt+1"; onActivated: activeTab = "fleet" }
+  Shortcut { sequence: "Alt+2"; onActivated: activeTab = "storage" }
+  Shortcut { sequence: "Alt+3"; onActivated: activeTab = "apps" }
+  Shortcut { sequence: "Alt+4"; onActivated: activeTab = "backups" }
+  Shortcut { sequence: "Alt+5"; onActivated: activeTab = "settings" }
 
   function reloadAll() {
     var raw = ocloud.fetchStatus();

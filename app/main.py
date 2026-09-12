@@ -167,9 +167,15 @@ def main():
     app.setApplicationName("Ocloud Companion")
     app.setOrganizationName("Omarchy")
 
+    initial_tab = "fleet"
+    for arg in sys.argv[1:]:
+        if arg.startswith('--tab='):
+            initial_tab = arg.split('=')[1]
+
     backend = OcloudBackend()
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("ocloud", backend)
+    engine.rootContext().setContextProperty("initialTab", initial_tab)
 
     qml_file = os.path.join(ROOT_DIR, 'app', 'ui', 'MainWindow.qml')
     engine.load(qml_file)
