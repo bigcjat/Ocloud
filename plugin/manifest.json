@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "Chris Thompson",
   "license": "MIT",
-  "description": "Sovereign cloud storage and on-demand cloud compute companion for Omarchy",
+  "description": "Cloud storage and on-demand cloud compute companion for Omarchy",
   "kinds": ["bar-widget"],
   "activation": "always",
   "entryPoints": {

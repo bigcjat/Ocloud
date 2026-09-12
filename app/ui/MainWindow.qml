@@ -9,7 +9,7 @@ ApplicationWindow {
   height: 740
   minimumWidth: 960
   minimumHeight: 640
-  title: "Ocloud Companion — Sovereign Cloud & Home Fleet"
+  title: "Ocloud — Cloud Storage & Compute Manager"
   color: "#080e18"
 
   // Global Design Tokens
@@ -111,7 +111,7 @@ ApplicationWindow {
           color: textPrimary
         }
         Text {
-          text: "Sovereign Companion"
+          text: "Cloud Storage & Compute"
           font.pixelSize: 12
           color: textMuted
         }

@@ -141,7 +141,7 @@ async function cmdStatus(args) {
     return;
   }
 
-  console.log('\n\x1b[1;36m☁  Ocloud Sovereign Companion (Omarchy)\x1b[0m');
+  console.log('\n\x1b[1;36m☁  Ocloud - Cloud Storage & Compute\x1b[0m');
   console.log('━'.repeat(60));
 
   // Storage Section
@@ -443,8 +443,17 @@ async function cmdVm(subcmd, args) {
     fs.writeFileSync(rcloneConfPath, rcloneConf, { mode: 0o600 });
 
     try {
-      execSync(`${rcloneBin} mount companion-vm:/root "${vmMountPoint}" --vfs-cache-mode full --daemon`, { stdio: 'inherit' });
+      execSync(`${rcloneBin} mount companion-vm:/root "${vmMountPoint}" --vfs-cache-mode full --daemon </dev/null >/dev/null 2>&1 || true`);
+      for (let i = 0; i < 16; i++) {
+        if (isDriveMounted(vmMountPoint)) break;
+        execSync('sleep 0.5');
+      }
       console.log(`\x1b[32m✔ Ephemeral VM drive mounted at ${vmMountPoint}\x1b[0m`);
+      if (!args.includes('--no-open') && isDriveMounted(vmMountPoint)) {
+        try {
+          spawn('xdg-open', [vmMountPoint], { detached: true, stdio: 'ignore' }).unref();
+        } catch (e) {}
+      }
     } catch (e) {
       console.error('Failed to mount VM drive: ' + e.message);
     }
@@ -520,11 +529,21 @@ async function cmdStorage(subcmd, args) {
     return;
   }
 
+  if (subcmd === 'open') {
+    const sb = hetznerStorage.getConfig();
+    const mountPoint = resolveMountPath(sb.mount_point);
+    console.log(`Opening file manager at ${mountPoint}...`);
+    spawn('xdg-open', [mountPoint], { detached: true, stdio: 'ignore' }).unref();
+    return;
+  }
+
   if (subcmd === 'mount') {
     const target = args[0];
+    const noOpen = args.includes('--no-open');
     if (!target || target === 'box' || target === 'storagebox') {
-      await hetznerStorage.mount();
-      console.log('✔ Storage Box mount initiated.');
+      const res = await hetznerStorage.mount(null, !noOpen);
+      console.log(`✔ Storage Box mounted at ${res.mount_point}`);
+      if (!noOpen) console.log('📂 Opened file manager.');
     } else {
       await customStorage.mount(target);
       console.log(`✔ Custom storage ${target} mounted.`);

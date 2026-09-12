@@ -27,7 +27,7 @@ Item {
           color: textPrimary
         }
         Text {
-          text: "Permanent sovereign Storage Boxes, Ephemeral VM root filesystems, and Home NAS"
+          text: "Permanent RAID Storage Boxes, temporary VM root filesystems, and local storage"
           font.pixelSize: 13
           color: textSecondary
         }

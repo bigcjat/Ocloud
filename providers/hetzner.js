@@ -195,9 +195,16 @@ class HetznerStorageBoxProvider extends StorageProvider {
     }
   }
 
+function resolveMountPath(p) {
+  if (!p) return path.join(os.homedir(), 'Cloud');
+  if (p.startsWith('~/')) return path.join(os.homedir(), p.slice(2));
+  if (p === '~') return os.homedir();
+  return path.resolve(p);
+}
+
   async getStats() {
     const sb = this.getConfig();
-    const mountPoint = sb.mount_point || path.join(os.homedir(), 'Cloud');
+    const mountPoint = resolveMountPath(sb.mount_point);
     const mounted = this.isMounted(mountPoint);
     const configured = Boolean(sb.username && sb.host);
 
@@ -205,29 +212,19 @@ class HetznerStorageBoxProvider extends StorageProvider {
     let usedBytes = 0;
     let usedPercent = 0.0;
 
-    if (configured && sb.password) {
+    if (configured) {
       try {
-        const expScript = `
-          set timeout 5
-          spawn ssh -p ${sb.port || 23} -o StrictHostKeyChecking=no ${sb.username}@${sb.host} "df -B1"
-          expect {
-            "password:" {
-              send "${sb.password}\\r"
-              exp_continue
-            }
-            eof
-          }
-        `;
-        const out = execSync(`expect -c '${expScript}'`, { encoding: 'utf8', timeout: 7000 });
-        for (const line of out.split('\n')) {
-          const parts = line.trim().split(/\s+/);
-          if (parts.length >= 6 && (parts[0] === sb.username || parts[parts.length - 1] === '/home')) {
-            totalBytes = parseInt(parts[1], 10) || 0;
-            usedBytes = parseInt(parts[2], 10) || 0;
-            if (totalBytes > 0) {
-              usedPercent = Number(((usedBytes / totalBytes) * 100).toFixed(2));
-            }
-            break;
+        const rcloneBin = [
+          path.join(os.homedir(), '.local', 'bin', 'rclone'),
+          '/usr/bin/rclone'
+        ].find((p) => fs.existsSync(p)) || 'rclone';
+        const out = execSync(`${rcloneBin} about storagebox: --json 2>/dev/null`, { encoding: 'utf8', timeout: 5000 });
+        const parsed = JSON.parse(out);
+        if (parsed && typeof parsed.total === 'number') {
+          totalBytes = parsed.total;
+          usedBytes = parsed.used || 0;
+          if (totalBytes > 0) {
+            usedPercent = Number(((usedBytes / totalBytes) * 100).toFixed(2));
           }
         }
       } catch (e) {}
@@ -254,30 +251,41 @@ class HetznerStorageBoxProvider extends StorageProvider {
     };
   }
 
-  async mount(customMountPoint = null) {
+  async mount(customMountPoint = null, openFileManager = true) {
     const sb = this.getConfig();
-    const mountPoint = customMountPoint || sb.mount_point || path.join(os.homedir(), 'Cloud');
-    if (this.isMounted(mountPoint)) {
-      return { success: true, message: `Already mounted at ${mountPoint}` };
-    }
-    fs.mkdirSync(mountPoint, { recursive: true });
-    const rcloneBin = [
-      path.join(os.homedir(), '.local', 'bin', 'rclone'),
-      '/usr/bin/rclone'
-    ].find((p) => fs.existsSync(p)) || 'rclone';
+    const mountPoint = resolveMountPath(customMountPoint || sb.mount_point);
+    if (!this.isMounted(mountPoint)) {
+      fs.mkdirSync(mountPoint, { recursive: true });
+      const rcloneBin = [
+        path.join(os.homedir(), '.local', 'bin', 'rclone'),
+        '/usr/bin/rclone'
+      ].find((p) => fs.existsSync(p)) || 'rclone';
 
-    execSync(`${rcloneBin} mount storagebox: "${mountPoint}" --vfs-cache-mode full --daemon`, { stdio: 'inherit' });
-    return { success: true, mount_point: mountPoint };
+      execSync(`${rcloneBin} mount storagebox: "${mountPoint}" --vfs-cache-mode full --daemon </dev/null >/dev/null 2>&1 || true`);
+      for (let i = 0; i < 16; i++) {
+        if (this.isMounted(mountPoint)) break;
+        execSync('sleep 0.5');
+      }
+    }
+
+    if (openFileManager && this.isMounted(mountPoint)) {
+      try {
+        const { spawn } = require('child_process');
+        spawn('xdg-open', [mountPoint], { detached: true, stdio: 'ignore' }).unref();
+      } catch (e) {}
+    }
+
+    return { success: true, mount_point: mountPoint, mounted: this.isMounted(mountPoint) };
   }
 
   async unmount(customMountPoint = null) {
     const sb = this.getConfig();
-    const mountPoint = customMountPoint || sb.mount_point || path.join(os.homedir(), 'Cloud');
+    const mountPoint = resolveMountPath(customMountPoint || sb.mount_point);
     if (!this.isMounted(mountPoint)) {
       return { success: true, message: `${mountPoint} is not mounted.` };
     }
-    execSync(`umount "${mountPoint}" || fusermount3 -u "${mountPoint}" || fusermount -u "${mountPoint}"`, { stdio: 'inherit' });
-    return { success: true, unmounted: mountPoint };
+    execSync(`fusermount3 -u "${mountPoint}" || fusermount -u "${mountPoint}" || umount "${mountPoint}" || true`);
+    return { success: true, unmounted: mountPoint, mounted: false };
   }
 }
 

@@ -73,7 +73,7 @@ Item {
           ColumnLayout {
             spacing: 2
             Text {
-              text: "Zero-Injection Sovereign Branding Active"
+              text: "Native Window Integration Active"
               font.pixelSize: 12
               font.bold: true
               color: accentSky
