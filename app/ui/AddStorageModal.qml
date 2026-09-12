@@ -65,17 +65,27 @@ Rectangle {
         Layout.fillWidth: true
         spacing: 4
         Text { text: "Storage Provider Type"; font.pixelSize: 11; font.bold: true; color: textSecondary }
-        ComboBox {
-          id: providerTypeCombo
+        RowLayout {
           Layout.fillWidth: true
-          model: [
-            "📦 Hetzner Storage Box (WebDAV / SFTP RAID)",
-            "🪣 S3 Object Store (AWS S3 / Cloudflare R2 / B2)",
-            "🏠 Home NAS (SMB / NFS Network Share)",
-            "☁ Nextcloud / ownCloud (WebDAV)",
-            "📁 Google Drive",
-            "💧 Dropbox"
-          ]
+          spacing: 8
+          Image {
+            width: 28
+            height: 28
+            source: providerTypeCombo.currentIndex === 0 ? Qt.resolvedUrl("icons/hetzner.svg") : (providerTypeCombo.currentIndex === 1 ? Qt.resolvedUrl("icons/cloudflare.svg") : (providerTypeCombo.currentIndex === 2 ? Qt.resolvedUrl("icons/nas.svg") : (providerTypeCombo.currentIndex === 4 ? Qt.resolvedUrl("icons/gcp.svg") : Qt.resolvedUrl("icons/hetzner.svg"))))
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+          }
+          ComboBox {
+            id: providerTypeCombo
+            Layout.fillWidth: true
+            model: [
+              "Hetzner Storage Box (WebDAV / SFTP RAID)",
+              "S3 Object Store (AWS S3 / Cloudflare R2 / B2)",
+              "Home NAS (SMB / NFS Network Share)",
+              "Nextcloud / ownCloud (WebDAV)",
+              "Google Drive",
+              "Dropbox"
+            ]
           onCurrentIndexChanged: {
             if (currentIndex === 0) { // Hetzner Box
               mountPointField.text = "~/Cloud";

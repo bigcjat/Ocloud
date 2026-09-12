@@ -73,12 +73,12 @@ Item {
 
           RowLayout {
             Layout.fillWidth: true
-            Rectangle {
+            Image {
               width: 32
               height: 32
-              radius: 8
-              color: "#0c4a6e"
-              Text { anchors.centerIn: parent; text: "📦"; font.pixelSize: 16 }
+              source: Qt.resolvedUrl("icons/hetzner.svg")
+              fillMode: Image.PreserveAspectFit
+              smooth: true
             }
             ColumnLayout {
               spacing: 2
@@ -204,12 +204,12 @@ Item {
 
           RowLayout {
             Layout.fillWidth: true
-            Rectangle {
+            Image {
               width: 32
               height: 32
-              radius: 8
-              color: "#451a03"
-              Text { anchors.centerIn: parent; text: "⚡"; font.pixelSize: 16 }
+              source: Qt.resolvedUrl("icons/hetzner.svg")
+              fillMode: Image.PreserveAspectFit
+              smooth: true
             }
             ColumnLayout {
               spacing: 2
@@ -332,12 +332,12 @@ Item {
 
           RowLayout {
             Layout.fillWidth: true
-            Rectangle {
+            Image {
               width: 32
               height: 32
-              radius: 8
-              color: "#064e3b"
-              Text { anchors.centerIn: parent; text: "🏠"; font.pixelSize: 16 }
+              source: Qt.resolvedUrl("icons/nas.svg")
+              fillMode: Image.PreserveAspectFit
+              smooth: true
             }
             ColumnLayout {
               spacing: 2

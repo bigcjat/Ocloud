@@ -440,21 +440,41 @@ Panel {
                 anchors.margins: Style.space(10)
                 spacing: Style.space(8)
 
-                // Title row: Storage Box (Name) [used / total]
+                // Title row: [Hetzner Logo] Name [used / total]
                 Row {
                   width: parent.width
-                  Text {
-                    text: "Storage Box (" + root.storageBoxData.name + ")"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    font.bold: true
-                    color: root.foreground
+                  spacing: Style.space(8)
+
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+
+                    Image {
+                      anchors.verticalCenter: parent.verticalCenter
+                      source: Qt.resolvedUrl("icons/hetzner.svg")
+                      width: 18
+                      height: 18
+                      fillMode: Image.PreserveAspectFit
+                      smooth: true
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: root.storageBoxData.name || "Primary Box"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                      color: root.foreground
+                    }
                   }
+
                   Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth)
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth - parent.spacing * 2)
                     height: 1
                   }
+
                   Text {
+                    anchors.verticalCenter: parent.verticalCenter
                     text: root.storageBoxData.used_gb + " / " + root.storageBoxData.total_gb + " GB (" + root.storageBoxData.percent + "%)"
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
@@ -554,21 +574,41 @@ Panel {
                 anchors.margins: Style.space(10)
                 spacing: Style.space(8)
 
-                // Title row: Home NAS (Name) [used / total]
+                // Title row: [Home NAS Logo] Name [used / total]
                 Row {
                   width: parent.width
-                  Text {
-                    text: "Home NAS (Home Storage)"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    font.bold: true
-                    color: root.foreground
+                  spacing: Style.space(8)
+
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+
+                    Image {
+                      anchors.verticalCenter: parent.verticalCenter
+                      source: Qt.resolvedUrl("icons/nas.svg")
+                      width: 18
+                      height: 18
+                      fillMode: Image.PreserveAspectFit
+                      smooth: true
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "Home Storage"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                      color: root.foreground
+                    }
                   }
+
                   Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth)
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth - parent.spacing * 2)
                     height: 1
                   }
+
                   Text {
+                    anchors.verticalCenter: parent.verticalCenter
                     text: root.homeNasMounted ? "120 GB / 2000 GB (6%)" : "Ready / Standby"
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
@@ -667,20 +707,41 @@ Panel {
                 anchors.margins: Style.space(10)
                 spacing: Style.space(8)
 
+                // Title row: [Cloudflare Logo] Name [used / total]
                 Row {
                   width: parent.width
-                  Text {
-                    text: "S3 Object Store (Cloudflare R2)"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    font.bold: true
-                    color: root.foreground
+                  spacing: Style.space(8)
+
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+
+                    Image {
+                      anchors.verticalCenter: parent.verticalCenter
+                      source: Qt.resolvedUrl("icons/cloudflare.svg")
+                      width: 18
+                      height: 18
+                      fillMode: Image.PreserveAspectFit
+                      smooth: true
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "R2 Object Store"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                      color: root.foreground
+                    }
                   }
+
                   Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth)
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth - parent.spacing * 2)
                     height: 1
                   }
+
                   Text {
+                    anchors.verticalCenter: parent.verticalCenter
                     text: "14.5 / 500 GB (3%)"
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
@@ -778,29 +839,45 @@ Panel {
                 anchors.margins: Style.space(10)
                 spacing: Style.space(8)
 
-                // Header line: Provider (Name) (Time running) (Running Cost)
+                // Header line: [Hetzner Logo] Name (Time running) (Running Cost)
                 Row {
                   width: parent.width
-                  spacing: Style.space(6)
+                  spacing: Style.space(8)
 
-                  Text {
-                    text: "Hetzner Cloud (" + (root.primaryVm ? root.primaryVm.name : "omarchy-companion") + ")"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    font.bold: true
-                    color: root.foreground
-                  }
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
 
-                  Text {
-                    text: "(" + root.vmMetrics.uptime_str + ") (" + root.vmMetrics.running_cost + ")"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    color: root.accentColor
-                    font.bold: true
+                    Image {
+                      anchors.verticalCenter: parent.verticalCenter
+                      source: Qt.resolvedUrl("icons/hetzner.svg")
+                      width: 18
+                      height: 18
+                      fillMode: Image.PreserveAspectFit
+                      smooth: true
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: (root.primaryVm ? root.primaryVm.name : "omarchy-companion")
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                      color: root.foreground
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "(" + root.vmMetrics.uptime_str + ") (" + root.vmMetrics.running_cost + ")"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.accentColor
+                      font.bold: true
+                    }
                   }
 
                   Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[1].implicitWidth - vmStatusPill.implicitWidth - parent.spacing * 2)
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - vmStatusPill.implicitWidth - parent.spacing)
                     height: 1
                   }
 
@@ -1061,26 +1138,44 @@ Panel {
                 anchors.margins: Style.space(10)
                 spacing: Style.space(8)
 
-                // Header line: Hetzner Server (Primary-Host) (32d) (€39/mo)
+                // Header line: [Hetzner Logo] Name (32d) (€39/mo)
                 Row {
                   width: parent.width
-                  spacing: Style.space(6)
+                  spacing: Style.space(8)
 
-                  Text {
-                    text: "Hetzner Server (Primary-Host)"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    font.bold: true
-                    color: root.foreground
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+
+                    Image {
+                      anchors.verticalCenter: parent.verticalCenter
+                      source: Qt.resolvedUrl("icons/hetzner.svg")
+                      width: 18
+                      height: 18
+                      fillMode: Image.PreserveAspectFit
+                      smooth: true
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "Primary-Host"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                      color: root.foreground
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "(32d) (€39/mo)"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.dim
+                    }
                   }
-                  Text {
-                    text: "(32d) (€39/mo)"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    color: root.dim
-                  }
+
                   Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[1].implicitWidth - auctionPill.implicitWidth - parent.spacing * 2)
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - auctionPill.implicitWidth - parent.spacing)
                     height: 1
                   }
                   BorderSurface {
@@ -1198,26 +1293,45 @@ Panel {
                 anchors.margins: Style.space(10)
                 spacing: Style.space(8)
 
+                // Header line: [Oracle Logo] Name (18d) (Free)
                 Row {
                   width: parent.width
-                  spacing: Style.space(6)
+                  spacing: Style.space(8)
 
-                  Text {
-                    text: "Oracle Cloud (ARM-Node)"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    font.bold: true
-                    color: root.foreground
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+
+                    Image {
+                      anchors.verticalCenter: parent.verticalCenter
+                      source: Qt.resolvedUrl("icons/oracle.svg")
+                      width: 18
+                      height: 18
+                      fillMode: Image.PreserveAspectFit
+                      smooth: true
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "ARM-Node"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                      color: root.foreground
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "(18d) (€0/mo · Free)"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.successColor
+                      font.bold: true
+                    }
                   }
-                  Text {
-                    text: "(18d) (€0/mo · Free)"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    color: root.successColor
-                    font.bold: true
-                  }
+
                   Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[1].implicitWidth - ociPill.implicitWidth - parent.spacing * 2)
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - ociPill.implicitWidth - parent.spacing)
                     height: 1
                   }
                   BorderSurface {
@@ -1334,17 +1448,44 @@ Panel {
                 anchors.margins: Style.space(10)
                 spacing: Style.space(8)
 
+                // Header line: [Home Logo] Name (Local Node) ... [LOCAL]
                 Row {
                   width: parent.width
-                  Text {
-                    text: "Home System (Workstation)"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                    font.bold: true
-                    color: root.foreground
+                  spacing: Style.space(8)
+
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+
+                    Image {
+                      anchors.verticalCenter: parent.verticalCenter
+                      source: Qt.resolvedUrl("icons/nas.svg")
+                      width: 18
+                      height: 18
+                      fillMode: Image.PreserveAspectFit
+                      smooth: true
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "Workstation"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                      color: root.foreground
+                    }
+
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "(Local Node)"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.dim
+                    }
                   }
+
                   Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - homePill.implicitWidth)
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - homePill.implicitWidth - parent.spacing)
                     height: 1
                   }
                   BorderSurface {

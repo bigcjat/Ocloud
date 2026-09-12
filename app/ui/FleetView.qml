@@ -134,30 +134,13 @@ Item {
               Layout.fillWidth: true
               spacing: 12
 
-              // Type Tag Badge
-              Rectangle {
-                height: 24
-                width: tagText.implicitWidth + 16
-                radius: 6
-                color: modelData.isHomeWorkstation ? "#064e3b" : "#0c4a6e"
-                border.color: modelData.isHomeWorkstation ? "#059669" : "#0284c7"
-                border.width: 1
-
-                RowLayout {
-                  anchors.centerIn: parent
-                  spacing: 4
-                  Text {
-                    text: modelData.isHomeWorkstation ? "🏠" : "☁"
-                    font.pixelSize: 11
-                  }
-                  Text {
-                    id: tagText
-                    text: modelData.isHomeWorkstation ? "Home Workstation" : "Hetzner Cloud"
-                    font.pixelSize: 11
-                    font.bold: true
-                    color: modelData.isHomeWorkstation ? "#34d399" : "#38bdf8"
-                  }
-                }
+              // Provider Brand Logo
+              Image {
+                width: 22
+                height: 22
+                source: modelData.isHomeWorkstation ? Qt.resolvedUrl("icons/nas.svg") : (modelData.provider === "oracle" ? Qt.resolvedUrl("icons/oracle.svg") : (modelData.provider === "aws" ? Qt.resolvedUrl("icons/aws.svg") : (modelData.provider === "digitalocean" ? Qt.resolvedUrl("icons/digitalocean.svg") : (modelData.provider === "vultr" ? Qt.resolvedUrl("icons/vultr.svg") : Qt.resolvedUrl("icons/hetzner.svg")))))
+                fillMode: Image.PreserveAspectFit
+                smooth: true
               }
 
               Text {

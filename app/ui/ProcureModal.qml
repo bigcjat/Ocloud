@@ -61,16 +61,26 @@ Rectangle {
         Layout.fillWidth: true
         spacing: 4
         Text { text: "Cloud Provider (API)"; font.pixelSize: 11; font.bold: true; color: textSecondary }
-        ComboBox {
-          id: providerCombo
+        RowLayout {
           Layout.fillWidth: true
-          model: [
-            "☁ Hetzner Cloud (Standard & ARM)",
-            "🟧 Amazon Web Services (AWS Lightsail)",
-            "🔴 Oracle Cloud (OCI Always-Free)",
-            "🌊 DigitalOcean Droplets",
-            "⚡ Vultr Compute"
-          ]
+          spacing: 8
+          Image {
+            width: 28
+            height: 28
+            source: providerCombo.currentIndex === 0 ? Qt.resolvedUrl("icons/hetzner.svg") : (providerCombo.currentIndex === 1 ? Qt.resolvedUrl("icons/aws.svg") : (providerCombo.currentIndex === 2 ? Qt.resolvedUrl("icons/oracle.svg") : (providerCombo.currentIndex === 3 ? Qt.resolvedUrl("icons/digitalocean.svg") : Qt.resolvedUrl("icons/vultr.svg"))))
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+          }
+          ComboBox {
+            id: providerCombo
+            Layout.fillWidth: true
+            model: [
+              "Hetzner Cloud (Standard & ARM)",
+              "Amazon Web Services (AWS Lightsail)",
+              "Oracle Cloud (OCI Always-Free)",
+              "DigitalOcean Droplets",
+              "Vultr Compute"
+            ]
           onCurrentIndexChanged: {
             if (currentIndex === 0) { // Hetzner
               typeCombo.model = ["cx23 (Intel 2 vCPU / 4 GB RAM · €3.79/mo)", "cax11 (Ampere ARM 2 vCPU / 4 GB RAM · €3.29/mo)", "cpx21 (AMD 3 vCPU / 4 GB RAM · €6.90/mo)"];
