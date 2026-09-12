@@ -167,6 +167,8 @@ class HetznerCloudProvider extends CloudProvider {
     data.top_processes = procs;
     return data;
   }
+}
+
 function resolveMountPath(p) {
   if (!p) return path.join(os.homedir(), 'Cloud');
   if (p.startsWith('~/')) return path.join(os.homedir(), p.slice(2));
