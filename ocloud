@@ -320,18 +320,44 @@ async function cmdVm(subcmd, args, config) {
     return;
   }
 
-  const target = args[0];
-  if (!target) {
-    console.log(`Usage: ocloud vm ${subcmd} <server-id-or-name>`);
-    return;
+  const listData = await apiRequest(token, 'GET', '/servers');
+  const servers = listData.servers || [];
+
+  let target = args[0];
+  let appCmd = 'arcade';
+  let server = null;
+
+  if (subcmd === 'app') {
+    const matched = servers.find(
+      (s) => String(s.id) === String(target) || s.name === target
+    );
+    if (matched) {
+      server = matched;
+      appCmd = args[1] || 'arcade';
+    } else {
+      server = servers.find((s) => s.status === 'running') || servers[0];
+      if (target) appCmd = target;
+    }
+  } else if (subcmd === 'ssh' || subcmd === 'inspect') {
+    if (!target) {
+      server = servers.find((s) => s.status === 'running') || servers[0];
+    } else {
+      server = servers.find(
+        (s) => String(s.id) === String(target) || s.name === target
+      );
+    }
+  } else {
+    if (!target) {
+      console.log(`Usage: ocloud vm ${subcmd} <server-id-or-name>`);
+      return;
+    }
+    server = servers.find(
+      (s) => String(s.id) === String(target) || s.name === target
+    );
   }
 
-  const listData = await apiRequest(token, 'GET', '/servers');
-  const server = (listData.servers || []).find(
-    (s) => String(s.id) === String(target) || s.name === target
-  );
   if (!server) {
-    console.error(`Error: Server '${target}' not found.`);
+    console.error(`Error: No active server found.`);
     process.exit(1);
   }
 
@@ -449,33 +475,31 @@ async function cmdVm(subcmd, args, config) {
       console.error('Inspection failed: ' + e.message);
     }
   } else if (subcmd === 'app') {
-    const appCmd = args[1] || 'arcade';
     const keyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
     console.log(`Launching remote app '${appCmd}' on ${server.name}...`);
-    try {
-      execSync('which waypipe', { stdio: 'ignore' });
-      console.log('Using Waypipe (native Wayland + Hetzner Red window styling)...');
-      spawn(
-        'waypipe',
-        [
-          '--title-prefix', '[☁ Hetzner] ',
-          '--video=h264',
-          '--threads', '4',
-          'ssh',
-          '-i', keyPath,
-          '-o', 'StrictHostKeyChecking=no',
-          '-R', '4713:localhost:4713',
-          `root@${ip}`,
-          `env PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${appCmd}`
-        ],
-        { stdio: 'inherit' }
-      );
-    } catch (e) {
-      console.log('Using SSH X11 forwarding (-Y)...');
-      spawn('ssh', ['-Y', '-i', keyPath, '-o', 'StrictHostKeyChecking=no', `root@${ip}`, appCmd], {
-        stdio: 'inherit',
-      });
-    }
+    const localWaypipe = [
+      path.join(os.homedir(), '.local', 'bin', 'waypipe'),
+      '/usr/bin/waypipe',
+      '/usr/local/bin/waypipe'
+    ].find((p) => fs.existsSync(p)) || 'waypipe';
+
+    console.log(`Using Waypipe at ${localWaypipe} (native Wayland + Hetzner Cloud window styling)...`);
+    const remoteExec = `env PATH=/root/.local/bin:/usr/local/bin:/usr/bin:$PATH PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${appCmd}`;
+    spawn(
+      localWaypipe,
+      [
+        '--title-prefix', '[☁ Hetzner Cloud] ',
+        '--video=h264',
+        '--threads', '4',
+        'ssh',
+        '-i', keyPath,
+        '-o', 'StrictHostKeyChecking=no',
+        '-R', '4713:localhost:4713',
+        `root@${ip}`,
+        remoteExec
+      ],
+      { stdio: 'inherit' }
+    );
   } else if (subcmd === 'tailscale') {
     const tsKey = args[1] || config.tailscale_auth_key;
     if (!tsKey) {
