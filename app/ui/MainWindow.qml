@@ -64,6 +64,8 @@ ApplicationWindow {
       taskManagerModal.openForServer(srv);
     } else if (typeof openModalOnStart !== "undefined" && openModalOnStart === "procure") {
       procureModal.openModal();
+    } else if (typeof openModalOnStart !== "undefined" && openModalOnStart === "consent") {
+      consentModal.openForServer("omarchy-companion", "165572435");
     }
   }
 
