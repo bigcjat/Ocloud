@@ -68,7 +68,14 @@ Item {
               height: 32
               radius: 8
               color: "#0c4a6e"
-              Text { anchors.centerIn: parent; text: "🔐"; font.pixelSize: 16 }
+              Image {
+                anchors.centerIn: parent
+                width: 18
+                height: 18
+                source: Qt.resolvedUrl("icons/shield.svg")
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+              }
             }
             ColumnLayout {
               spacing: 2
@@ -334,7 +341,14 @@ Item {
               height: 32
               radius: 8
               color: "#1e1b4b"
-              Text { anchors.centerIn: parent; text: "🧩"; font.pixelSize: 16 }
+              Image {
+                anchors.centerIn: parent
+                width: 18
+                height: 18
+                source: Qt.resolvedUrl("icons/box.svg")
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+              }
             }
             ColumnLayout {
               spacing: 2

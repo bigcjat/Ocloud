@@ -213,14 +213,18 @@ def main():
     app.setOrganizationName("Omarchy")
 
     initial_tab = "fleet"
+    modal_arg = ""
     for arg in sys.argv[1:]:
         if arg.startswith('--tab='):
             initial_tab = arg.split('=')[1]
+        elif arg.startswith('--modal='):
+            modal_arg = arg.split('=')[1]
 
     backend = OcloudBackend()
     engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("ocloud", backend)
     engine.rootContext().setContextProperty("initialTab", initial_tab)
+    engine.rootContext().setContextProperty("openModalOnStart", modal_arg)
 
     qml_file = os.path.join(ROOT_DIR, 'app', 'ui', 'MainWindow.qml')
     engine.load(qml_file)

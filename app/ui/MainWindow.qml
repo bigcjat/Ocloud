@@ -58,6 +58,12 @@ ApplicationWindow {
 
   Component.onCompleted: {
     reloadAll();
+    if (typeof openModalOnStart !== "undefined" && openModalOnStart === "taskManager") {
+      var srv = (serverList && serverList.length > 0) ? serverList[0] : { name: "omarchy-companion", ipv4: "167.233.151.104", provider: "hetzner", status: "running", id: 165572435 };
+      taskManagerModal.openForServer(srv);
+    } else if (typeof openModalOnStart !== "undefined" && openModalOnStart === "procure") {
+      procureModal.openModal();
+    }
   }
 
   Connections {
