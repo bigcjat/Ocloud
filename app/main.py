@@ -21,12 +21,17 @@ class OcloudBackend(QObject):
     statusUpdated = Signal(str)
     pingUpdated = Signal(str)
     actionCompleted = Signal(str, bool, str)
+    busyChanged = Signal(bool, str)
+    inspectFinished = Signal(str, str)
+    dockerContainersUpdated = Signal(str)
 
     def __init__(self):
         super().__init__()
         self._cached_status = "{}"
         self._cached_ping = "[]"
         self._is_fetching = False
+        self._is_busy = False
+        self._busy_text = ""
 
         # Load instant cache if available
         cache_path = os.path.expanduser('~/.config/omarchy/status_cache.json')
@@ -38,6 +43,23 @@ class OcloudBackend(QObject):
                         self._cached_status = content
             except Exception:
                 pass
+
+    def _set_busy(self, busy, text=""):
+        self._is_busy = busy
+        self._busy_text = text
+        self.busyChanged.emit(busy, text)
+
+    def _run_async_action(self, action_name, busy_msg, args, timeout=60, post_refresh=True):
+        self._set_busy(True, busy_msg)
+        def _worker():
+            try:
+                out, ok, err = self._run_cli(args, timeout=timeout)
+                self.actionCompleted.emit(action_name, ok, out if ok else err)
+                if post_refresh:
+                    self.refreshStatusAsync()
+            finally:
+                self._set_busy(False, "")
+        threading.Thread(target=_worker, daemon=True).start()
 
     def _run_cli(self, args, timeout=30):
         node_candidates = [
@@ -58,7 +80,6 @@ class OcloudBackend(QObject):
 
     @Slot(result=str)
     def fetchStatus(self):
-        # Trigger background refresh asynchronously, return cached instantly
         self.refreshStatusAsync()
         return self._cached_status
 
@@ -86,14 +107,14 @@ class OcloudBackend(QObject):
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    @Slot(result=str)
-    def fetchPing(self):
-        out, ok, err = self._run_cli(['ping', '--json'], timeout=20)
-        if ok and out:
-            self._cached_ping = out
-            self.pingUpdated.emit(out)
-            return out
-        return self._cached_ping
+    @Slot()
+    def fetchPingAsync(self):
+        def _worker():
+            out, ok, err = self._run_cli(['ping', '--json'], timeout=20)
+            if ok and out:
+                self._cached_ping = out
+                self.pingUpdated.emit(out)
+        threading.Thread(target=_worker, daemon=True).start()
 
     @Slot(str, str)
     def launchApp(self, server_id, app_cmd):
@@ -104,15 +125,22 @@ class OcloudBackend(QObject):
         except Exception as e:
             self.actionCompleted.emit("launchApp", False, str(e))
 
+    @Slot(str)
+    def inspectMachineAsync(self, server_id):
+        def _worker():
+            out, ok, err = self._run_cli(['vm', 'inspect', server_id, '--json'], timeout=15)
+            self.inspectFinished.emit(server_id, out if ok and out else "{}")
+        threading.Thread(target=_worker, daemon=True).start()
+
     @Slot(str, result=str)
     def inspectMachine(self, server_id):
-        out, ok, err = self._run_cli(['vm', 'inspect', server_id, '--json'])
-        return out if ok else "{}"
+        # Trigger async inspect and return immediate fallback
+        self.inspectMachineAsync(server_id)
+        return "{}"
 
     @Slot(str, str)
     def killProcess(self, server_id, pid):
-        out, ok, err = self._run_cli(['vm', 'kill-proc', server_id, pid])
-        self.actionCompleted.emit("killProcess", ok, out if ok else err)
+        self._run_async_action("killProcess", f"Terminating PID {pid}...", ['vm', 'kill-proc', server_id, pid])
 
     @Slot(str, str)
     def openTerminal(self, server_name, server_ip):
@@ -133,68 +161,64 @@ class OcloudBackend(QObject):
 
     @Slot(str, str)
     def serverAction(self, action, server_id):
-        out, ok, err = self._run_cli(['vm', action, server_id])
-        self.actionCompleted.emit(action, ok, out if ok else err)
-        self.fetchStatus()
+        self._run_async_action(action, f"{action.capitalize()}ing server...", ['vm', action, server_id])
 
     @Slot()
     def mountStorageBox(self):
-        out, ok, err = self._run_cli(['storage', 'mount', 'box'])
-        self.actionCompleted.emit("mountStorageBox", ok, out if ok else err)
-        self.fetchStatus()
+        self._run_async_action("mountStorageBox", "Mounting Storage Box to ~/Cloud...", ['storage', 'mount', 'box'])
 
     @Slot()
     def unmountStorageBox(self):
-        out, ok, err = self._run_cli(['storage', 'unmount', 'box'])
-        self.actionCompleted.emit("unmountStorageBox", ok, out if ok else err)
-        self.fetchStatus()
+        self._run_async_action("unmountStorageBox", "Unmounting Storage Box...", ['storage', 'unmount', 'box'])
 
     @Slot(str)
     def mountEphemeralVm(self, server_id):
-        out, ok, err = self._run_cli(['vm', 'mount', server_id, '--yes'])
-        self.actionCompleted.emit("mountEphemeralVm", ok, out if ok else err)
-        self.fetchStatus()
+        self._run_async_action("mountEphemeralVm", "Mounting VM root filesystem to ~/Companion-VM...", ['vm', 'mount', server_id, '--yes'])
 
     @Slot()
     def unmountEphemeralVm(self):
-        out, ok, err = self._run_cli(['vm', 'unmount'])
-        self.actionCompleted.emit("unmountEphemeralVm", ok, out if ok else err)
-        self.fetchStatus()
+        self._run_async_action("unmountEphemeralVm", "Unmounting ~/Companion-VM...", ['vm', 'unmount'])
 
     @Slot(str, str, str, str)
     def procureServer(self, name, srv_type, location, tailscale_key):
         args = ['vm', 'create', name, srv_type, location]
-        out, ok, err = self._run_cli(args, timeout=60)
-        self.actionCompleted.emit("procureServer", ok, out if ok else err)
-        self.fetchStatus()
+        self._run_async_action("procureServer", f"Deploying {name} ({srv_type})...", args, timeout=90)
 
     @Slot(str, str, bool, str, int)
     def addCustomNode(self, name, host, is_home, user, port):
         args = ['node', 'add', name, host, f'--user={user}', f'--port={port}']
         if is_home:
             args.append('--home')
-        out, ok, err = self._run_cli(args)
-        self.actionCompleted.emit("addCustomNode", ok, out if ok else err)
-        self.fetchStatus()
+        self._run_async_action("addCustomNode", f"Adding node {name}...", args)
 
     @Slot(str)
     def removeNode(self, node_id):
-        out, ok, err = self._run_cli(['node', 'remove', node_id])
-        self.actionCompleted.emit("removeNode", ok, out if ok else err)
-        self.fetchStatus()
+        self._run_async_action("removeNode", "Removing node...", ['node', 'remove', node_id])
+
+    @Slot(str)
+    def fetchDockerContainers(self, server_id):
+        def _worker():
+            out, ok, err = self._run_cli(['vm', 'exec', server_id, 'docker ps --format "{{json .}}"'], timeout=12)
+            containers = []
+            if ok and out:
+                for line in out.strip().split('\n'):
+                    line = line.strip()
+                    if line:
+                        try:
+                            containers.append(json.loads(line))
+                        except Exception:
+                            pass
+            self.dockerContainersUpdated.emit(json.dumps(containers))
+        threading.Thread(target=_worker, daemon=True).start()
 
     @Slot()
     def runBackup(self):
-        out, ok, err = self._run_cli(['backup', 'run'], timeout=180)
-        self.actionCompleted.emit("runBackup", ok, out if ok else err)
-        self.fetchStatus()
+        self._run_async_action("runBackup", "Running backup snapshot...", ['backup', 'run'], timeout=180)
 
     @Slot(bool, str)
     def setBackupSchedule(self, enabled, interval):
         arg = '--enable' if enabled else '--disable'
-        out, ok, err = self._run_cli(['backup', 'schedule', arg, f'--interval={interval}'])
-        self.actionCompleted.emit("setBackupSchedule", ok, out if ok else err)
-        self.fetchStatus()
+        self._run_async_action("setBackupSchedule", "Updating backup schedule...", ['backup', 'schedule', arg, f'--interval={interval}'])
 
     @Slot(str, str)
     def setVaultSecret(self, key, value):

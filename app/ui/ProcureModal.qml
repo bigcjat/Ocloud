@@ -23,7 +23,7 @@ Rectangle {
 
   Rectangle {
     width: 480
-    height: modalCol.implicitHeight + 48
+    implicitHeight: modalCol.implicitHeight + 48
     radius: 16
     color: cardBg
     border.color: borderSubtle
@@ -32,7 +32,9 @@ Rectangle {
 
     ColumnLayout {
       id: modalCol
-      anchors.fill: parent
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
       anchors.margins: 24
       spacing: 16
 
@@ -214,19 +216,22 @@ Rectangle {
 
         Button {
           id: deployBtn
-          text: "󰐊 Deploy Instance"
           Layout.fillWidth: true
+          implicitHeight: 36
           background: Rectangle {
             radius: 6
             color: deployBtn.hovered ? "#0284c7" : "#0369a1"
           }
-          contentItem: Text {
-            text: deployBtn.text
-            color: "#ffffff"
-            font.bold: true
-            font.pixelSize: 12
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
+          contentItem: Row {
+            anchors.centerIn: parent
+            spacing: 8
+            Text { text: "󰐊"; font.pixelSize: 13; color: "#ffffff" }
+            Text {
+              text: "Deploy Instance"
+              color: "#ffffff"
+              font.bold: true
+              font.pixelSize: 12
+            }
           }
           onClicked: {
             modal.visible = false;

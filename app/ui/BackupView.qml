@@ -42,7 +42,8 @@ Item {
 
         Button {
           id: runNowBtn
-          text: "󰑐 Take Snapshot Now"
+          implicitWidth: runNowRow.implicitWidth + 24
+          implicitHeight: 34
           background: Rectangle {
             radius: 8
             gradient: Gradient {
@@ -50,13 +51,17 @@ Item {
               GradientStop { position: 1.0; color: runNowBtn.hovered ? "#047857" : "#065f46" }
             }
           }
-          contentItem: Text {
-            text: runNowBtn.text
-            color: "#ffffff"
-            font.pixelSize: 12
-            font.bold: true
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
+          contentItem: Row {
+            id: runNowRow
+            anchors.centerIn: parent
+            spacing: 8
+            Text { text: "󰑐"; font.pixelSize: 13; color: "#ffffff" }
+            Text {
+              text: "Take Snapshot Now"
+              color: "#ffffff"
+              font.pixelSize: 12
+              font.bold: true
+            }
           }
           onClicked: ocloud.runBackup()
         }
@@ -65,14 +70,16 @@ Item {
       // Schedule Configuration Card
       Rectangle {
         Layout.fillWidth: true
-        height: schedCol.implicitHeight + 40
+        implicitHeight: schedCol.implicitHeight + 40
         radius: 12
         color: cardBg
         border.color: borderSubtle
 
         ColumnLayout {
           id: schedCol
-          anchors.fill: parent
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
           anchors.margins: 20
           spacing: 16
 
@@ -148,14 +155,16 @@ Item {
       // History Timeline Table Card
       Rectangle {
         Layout.fillWidth: true
-        height: histCol.implicitHeight + 40
+        implicitHeight: histCol.implicitHeight + 40
         radius: 12
         color: cardBg
         border.color: borderSubtle
 
         ColumnLayout {
           id: histCol
-          anchors.fill: parent
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
           anchors.margins: 20
           spacing: 14
 

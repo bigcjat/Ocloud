@@ -216,78 +216,102 @@ Item {
 
               Button {
                 id: tmBtn
-                text: "󰄛 Task Manager"
+                implicitWidth: tmRow.implicitWidth + 24
+                implicitHeight: 32
                 background: Rectangle {
                   radius: 6
                   color: tmBtn.hovered ? "#0284c7" : "#0369a1"
                 }
-                contentItem: Text {
-                  text: tmBtn.text
-                  color: "#ffffff"
-                  font.pixelSize: 11
-                  font.bold: true
-                  horizontalAlignment: Text.AlignHCenter
-                  verticalAlignment: Text.AlignVCenter
+                contentItem: Row {
+                  id: tmRow
+                  anchors.centerIn: parent
+                  spacing: 8
+                  Text { text: "󰄛"; font.pixelSize: 13; color: "#ffffff" }
+                  Text { text: "Task Manager"; color: "#ffffff"; font.pixelSize: 11; font.bold: true }
                 }
                 onClicked: taskManagerModal.openForServer(modelData)
               }
 
               Button {
                 id: termBtn
-                text: "󰆍 SSH Terminal"
+                implicitWidth: termRow.implicitWidth + 24
+                implicitHeight: 32
                 background: Rectangle {
                   radius: 6
                   color: termBtn.hovered ? "#1e293b" : "#0f172a"
                   border.color: borderSubtle
                 }
-                contentItem: Text {
-                  text: termBtn.text
-                  color: textPrimary
-                  font.pixelSize: 11
-                  font.bold: true
-                  horizontalAlignment: Text.AlignHCenter
-                  verticalAlignment: Text.AlignVCenter
+                contentItem: Row {
+                  id: termRow
+                  anchors.centerIn: parent
+                  spacing: 8
+                  Text { text: "󰆍"; font.pixelSize: 13; color: textPrimary }
+                  Text { text: "SSH Terminal"; color: textPrimary; font.pixelSize: 11; font.bold: true }
                 }
                 onClicked: ocloud.openTerminal(modelData.name, modelData.ipv4)
               }
 
               Button {
                 id: mountVmBtn
-                text: "󰋊 Mount Drive"
                 enabled: modelData.status === "running"
+                implicitWidth: mountVmRow.implicitWidth + 24
+                implicitHeight: 32
                 background: Rectangle {
                   radius: 6
-                  color: mountVmBtn.hovered ? "#332200" : "#1e170a"
-                  border.color: warningAmber
+                  color: modelData.is_drive_mounted ? (mountVmBtn.hovered ? "#3b1114" : "#240d10") : (mountVmBtn.hovered ? "#332200" : "#1e170a")
+                  border.color: modelData.is_drive_mounted ? dangerRed : warningAmber
                 }
-                contentItem: Text {
-                  text: mountVmBtn.text
-                  color: warningAmber
-                  font.pixelSize: 11
-                  font.bold: true
-                  horizontalAlignment: Text.AlignHCenter
-                  verticalAlignment: Text.AlignVCenter
+                contentItem: Row {
+                  id: mountVmRow
+                  anchors.centerIn: parent
+                  spacing: 8
+                  Text {
+                    text: modelData.is_drive_mounted ? "󰅟" : "󰋊"
+                    font.pixelSize: 13
+                    color: modelData.is_drive_mounted ? dangerRed : warningAmber
+                  }
+                  Text {
+                    text: modelData.is_drive_mounted ? "Unmount Drive" : "Mount Drive"
+                    color: modelData.is_drive_mounted ? dangerRed : warningAmber
+                    font.pixelSize: 11
+                    font.bold: true
+                  }
                 }
-                onClicked: consentModal.openForServer(modelData.name, String(modelData.id))
+                onClicked: {
+                  if (modelData.is_drive_mounted) {
+                    ocloud.unmountEphemeralVm();
+                  } else {
+                    consentModal.openForServer(modelData.name, String(modelData.id));
+                  }
+                }
               }
 
               Item { Layout.fillWidth: true }
 
               Button {
                 id: pwrBtn
-                text: modelData.status === "running" ? "󰐥 Power Off" : "󰐥 Power On"
+                implicitWidth: pwrRow.implicitWidth + 20
+                implicitHeight: 32
                 background: Rectangle {
                   radius: 6
                   color: pwrBtn.hovered ? "#1e293b" : "#0f172a"
                   border.color: borderSubtle
                 }
-                contentItem: Text {
-                  text: pwrBtn.text
-                  color: modelData.status === "running" ? dangerRed : homeGreen
-                  font.pixelSize: 11
-                  font.bold: true
-                  horizontalAlignment: Text.AlignHCenter
-                  verticalAlignment: Text.AlignVCenter
+                contentItem: Row {
+                  id: pwrRow
+                  anchors.centerIn: parent
+                  spacing: 8
+                  Text {
+                    text: "󰐥"
+                    font.pixelSize: 13
+                    color: modelData.status === "running" ? dangerRed : homeGreen
+                  }
+                  Text {
+                    text: modelData.status === "running" ? "Power Off" : "Power On"
+                    color: modelData.status === "running" ? dangerRed : homeGreen
+                    font.pixelSize: 11
+                    font.bold: true
+                  }
                 }
                 onClicked: {
                   var act = modelData.status === "running" ? "stop" : "start";
@@ -297,37 +321,39 @@ Item {
 
               Button {
                 id: rebootBtn
-                text: "󰑐 Reboot"
                 enabled: modelData.status === "running"
+                implicitWidth: rebootRow.implicitWidth + 20
+                implicitHeight: 32
                 background: Rectangle {
                   radius: 6
                   color: rebootBtn.hovered ? "#1e293b" : "#0f172a"
                   border.color: borderSubtle
                 }
-                contentItem: Text {
-                  text: rebootBtn.text
-                  color: textSecondary
-                  font.pixelSize: 11
-                  horizontalAlignment: Text.AlignHCenter
-                  verticalAlignment: Text.AlignVCenter
+                contentItem: Row {
+                  id: rebootRow
+                  anchors.centerIn: parent
+                  spacing: 8
+                  Text { text: "󰑐"; font.pixelSize: 13; color: textSecondary }
+                  Text { text: "Reboot"; color: textSecondary; font.pixelSize: 11 }
                 }
                 onClicked: ocloud.serverAction("reboot", String(modelData.id))
               }
 
               Button {
                 id: delBtn
-                text: "󰅙 Delete"
+                implicitWidth: delRow.implicitWidth + 20
+                implicitHeight: 32
                 background: Rectangle {
                   radius: 6
                   color: delBtn.hovered ? "#3b0d0d" : "#1e0f0f"
                   border.color: "#7f1d1d"
                 }
-                contentItem: Text {
-                  text: delBtn.text
-                  color: dangerRed
-                  font.pixelSize: 11
-                  horizontalAlignment: Text.AlignHCenter
-                  verticalAlignment: Text.AlignVCenter
+                contentItem: Row {
+                  id: delRow
+                  anchors.centerIn: parent
+                  spacing: 8
+                  Text { text: "󰅙"; font.pixelSize: 13; color: dangerRed }
+                  Text { text: "Delete"; color: dangerRed; font.pixelSize: 11; font.bold: true }
                 }
                 onClicked: {
                   if (modelData.provider === "custom") {

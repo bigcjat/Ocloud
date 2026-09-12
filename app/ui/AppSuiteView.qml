@@ -120,7 +120,7 @@ Item {
                 height: 36
                 radius: 8
                 color: "#1e1b4b"
-                Text { anchors.centerIn: parent; text: "🕹"; font.pixelSize: 18 }
+                Text { anchors.centerIn: parent; text: "󰊴"; font.pixelSize: 18; color: accentSky }
               }
               Item { Layout.fillWidth: true }
               Rectangle {
@@ -151,8 +151,8 @@ Item {
 
             Button {
               id: launchArcadeBtn
-              text: "󰐊 Launch Arcade"
               Layout.fillWidth: true
+              implicitHeight: 34
               background: Rectangle {
                 radius: 6
                 gradient: Gradient {
@@ -160,13 +160,16 @@ Item {
                   GradientStop { position: 1.0; color: launchArcadeBtn.hovered ? "#0369a1" : "#075985" }
                 }
               }
-              contentItem: Text {
-                text: launchArcadeBtn.text
-                color: "#ffffff"
-                font.pixelSize: 12
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+              contentItem: Row {
+                anchors.centerIn: parent
+                spacing: 8
+                Text { text: "󰐊"; font.pixelSize: 13; color: "#ffffff" }
+                Text {
+                  text: "Launch Arcade"
+                  color: "#ffffff"
+                  font.pixelSize: 12
+                  font.bold: true
+                }
               }
               onClicked: ocloud.launchApp(root.selectedServerId, "arcade")
             }
@@ -192,7 +195,7 @@ Item {
                 height: 36
                 radius: 8
                 color: "#3b1d06"
-                Text { anchors.centerIn: parent; text: "🔢"; font.pixelSize: 18 }
+                Text { anchors.centerIn: parent; text: "󰎠"; font.pixelSize: 18; color: "#f59e0b" }
               }
               Item { Layout.fillWidth: true }
             }
@@ -255,7 +258,7 @@ Item {
                 height: 36
                 radius: 8
                 color: "#1c1917"
-                Text { anchors.centerIn: parent; text: "💣"; font.pixelSize: 18 }
+                Text { anchors.centerIn: parent; text: "󰮚"; font.pixelSize: 18; color: "#ef4444" }
               }
               Item { Layout.fillWidth: true }
             }
@@ -303,22 +306,32 @@ Item {
       // Custom Command Runner Card
       Rectangle {
         Layout.fillWidth: true
-        height: customAppCol.implicitHeight + 36
+        implicitHeight: customAppCol.implicitHeight + 36
         radius: 12
         color: cardBg
         border.color: borderSubtle
 
         ColumnLayout {
           id: customAppCol
-          anchors.fill: parent
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
           anchors.margins: 18
           spacing: 12
 
-          Text {
-            text: "󰆍 Run Any Custom Linux App over Waypipe"
-            font.pixelSize: 14
-            font.bold: true
-            color: textPrimary
+          Row {
+            spacing: 8
+            Text {
+              text: "󰆍"
+              font.pixelSize: 14
+              color: accentSky
+            }
+            Text {
+              text: "Run Any Custom Linux App over Waypipe"
+              font.pixelSize: 14
+              font.bold: true
+              color: textPrimary
+            }
           }
 
           Text {

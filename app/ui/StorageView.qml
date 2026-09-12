@@ -59,7 +59,7 @@ Item {
       // 1. Permanent Storage Box Card
       Rectangle {
         Layout.fillWidth: true
-        height: sbCol.implicitHeight + 40
+        implicitHeight: sbCol.implicitHeight + 40
         radius: 12
         color: cardBg
         border.color: borderSubtle
@@ -67,7 +67,9 @@ Item {
 
         ColumnLayout {
           id: sbCol
-          anchors.fill: parent
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
           anchors.margins: 20
           spacing: 16
 
@@ -96,13 +98,14 @@ Item {
             }
             Item { Layout.fillWidth: true }
             Rectangle {
-              height: 24
-              width: sbStatusText.implicitWidth + 16
+              Layout.preferredWidth: sbStatusRow.implicitWidth + 24
+              Layout.preferredHeight: 26
               radius: 6
               color: storageBox.mounted ? "#064e3b" : "#1e293b"
-              RowLayout {
+              Row {
+                id: sbStatusRow
                 anchors.centerIn: parent
-                spacing: 4
+                spacing: 6
                 Text { text: storageBox.mounted ? "●" : "○"; font.pixelSize: 10; color: storageBox.mounted ? homeGreen : textMuted }
                 Text {
                   id: sbStatusText
@@ -165,18 +168,27 @@ Item {
             Item { Layout.fillWidth: true }
             Button {
               id: sbMountBtn
-              text: storageBox.mounted ? "Unmount Storage Box" : "Mount to ~/Cloud"
+              implicitWidth: sbMountRow.implicitWidth + 24
+              implicitHeight: 32
               background: Rectangle {
                 radius: 6
                 color: storageBox.mounted ? (sbMountBtn.hovered ? "#334155" : "#1e293b") : (sbMountBtn.hovered ? "#0284c7" : "#0369a1")
               }
-              contentItem: Text {
-                text: sbMountBtn.text
-                color: "#ffffff"
-                font.pixelSize: 11
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+              contentItem: Row {
+                id: sbMountRow
+                anchors.centerIn: parent
+                spacing: 8
+                Text {
+                  text: storageBox.mounted ? "󰅟" : "󰋊"
+                  font.pixelSize: 13
+                  color: "#ffffff"
+                }
+                Text {
+                  text: storageBox.mounted ? "Unmount Storage Box" : "Mount to ~/Cloud"
+                  color: "#ffffff"
+                  font.pixelSize: 11
+                  font.bold: true
+                }
               }
               onClicked: {
                 if (storageBox.mounted) ocloud.unmountStorageBox();
@@ -190,7 +202,7 @@ Item {
       // 2. Ephemeral Compute Drives Section (With loud Safety Warning!)
       Rectangle {
         Layout.fillWidth: true
-        height: ephCol.implicitHeight + 40
+        implicitHeight: ephCol.implicitHeight + 40
         radius: 12
         color: "#181206"
         border.color: "#78350f"
@@ -198,7 +210,9 @@ Item {
 
         ColumnLayout {
           id: ephCol
-          anchors.fill: parent
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
           anchors.margins: 20
           spacing: 14
 
@@ -254,14 +268,18 @@ Item {
           // Safety Alert Banner
           Rectangle {
             Layout.fillWidth: true
-            height: 48
+            Layout.preferredHeight: warnRow.implicitHeight + 20
+            implicitHeight: warnRow.implicitHeight + 20
             radius: 8
             color: "#291804"
             border.color: "#78350f"
 
             RowLayout {
-              anchors.fill: parent
-              anchors.margins: 12
+              id: warnRow
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              anchors.margins: 10
               spacing: 10
               Image {
                 width: 18
@@ -281,54 +299,74 @@ Item {
           }
 
           // Active VM Rows
-          Repeater {
-            model: serverList.filter(function(s) { return s.status === "running"; })
+          ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 8
 
-            delegate: Rectangle {
-              Layout.fillWidth: true
-              height: 52
-              radius: 8
-              color: "#1c1407"
-              border.color: "#78350f"
+            Repeater {
+              model: serverList.filter(function(s) { return s.status === "running"; })
 
-              RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: 14
-                spacing: 12
+              delegate: Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 52
+                radius: 8
+                color: "#1c1407"
+                border.color: "#78350f"
 
-                Image {
-                  width: 16
-                  height: 16
-                  source: Qt.resolvedUrl("icons/server.svg")
-                  fillMode: Image.PreserveAspectFit
-                  smooth: true
-                }
-                Text {
-                  text: modelData.name + " (" + modelData.ipv4 + ")"
-                  font.pixelSize: 13
-                  font.bold: true
-                  color: textPrimary
-                }
-                Item { Layout.fillWidth: true }
+                RowLayout {
+                  anchors.fill: parent
+                  anchors.leftMargin: 14
+                  anchors.rightMargin: 14
+                  spacing: 12
 
-                Button {
-                  id: ephMountBtn
-                  text: "Mount Ephemeral Drive"
-                  background: Rectangle {
-                    radius: 6
-                    color: ephMountBtn.hovered ? "#451a03" : "#291804"
-                    border.color: warningAmber
+                  Image {
+                    width: 16
+                    height: 16
+                    source: Qt.resolvedUrl("icons/server.svg")
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
                   }
-                  contentItem: Text {
-                    text: ephMountBtn.text
-                    color: warningAmber
-                    font.pixelSize: 11
+                  Text {
+                    text: modelData.name + " (" + modelData.ipv4 + ")"
+                    font.pixelSize: 13
                     font.bold: true
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
+                    color: textPrimary
                   }
-                  onClicked: consentModal.openForServer(modelData.name, String(modelData.id))
+                  Item { Layout.fillWidth: true }
+
+                  Button {
+                    id: ephMountBtn
+                    implicitWidth: ephMountRow.implicitWidth + 24
+                    implicitHeight: 32
+                    background: Rectangle {
+                      radius: 6
+                      color: modelData.is_drive_mounted ? (ephMountBtn.hovered ? "#3b1114" : "#240d10") : (ephMountBtn.hovered ? "#451a03" : "#291804")
+                      border.color: modelData.is_drive_mounted ? dangerRed : warningAmber
+                    }
+                    contentItem: Row {
+                      id: ephMountRow
+                      anchors.centerIn: parent
+                      spacing: 8
+                      Text {
+                        text: modelData.is_drive_mounted ? "󰅟" : "󰋊"
+                        font.pixelSize: 13
+                        color: modelData.is_drive_mounted ? dangerRed : warningAmber
+                      }
+                      Text {
+                        text: modelData.is_drive_mounted ? "Unmount Ephemeral Drive" : "Mount Ephemeral Drive"
+                        color: modelData.is_drive_mounted ? dangerRed : warningAmber
+                        font.pixelSize: 11
+                        font.bold: true
+                      }
+                    }
+                    onClicked: {
+                      if (modelData.is_drive_mounted) {
+                        ocloud.unmountEphemeralVm();
+                      } else {
+                        consentModal.openForServer(modelData.name, String(modelData.id));
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -339,7 +377,7 @@ Item {
       // 3. Custom Storage / Home NAS Section
       Rectangle {
         Layout.fillWidth: true
-        height: customCol.implicitHeight + 40
+        implicitHeight: customCol.implicitHeight + 40
         radius: 12
         color: cardBg
         border.color: borderSubtle
@@ -347,7 +385,9 @@ Item {
 
         ColumnLayout {
           id: customCol
-          anchors.fill: parent
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
           anchors.margins: 20
           spacing: 16
 
@@ -389,7 +429,7 @@ Item {
 
             delegate: Rectangle {
               Layout.fillWidth: true
-              height: 48
+              implicitHeight: 48
               radius: 8
               color: "#0f172a"
               border.color: borderSubtle
@@ -410,6 +450,8 @@ Item {
                 Text { text: modelData.name + " (" + modelData.host + ")"; font.pixelSize: 12; font.bold: true; color: textPrimary }
                 Item { Layout.fillWidth: true }
                 Button {
+                  implicitWidth: 80
+                  implicitHeight: 28
                   text: modelData.mounted ? "Unmount" : "Mount"
                   onClicked: {
                     if (modelData.mounted) ocloud.unmountStorageTarget(modelData.id);

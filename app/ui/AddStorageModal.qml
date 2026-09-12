@@ -27,7 +27,7 @@ Rectangle {
 
   Rectangle {
     width: 500
-    height: modalCol.implicitHeight + 48
+    implicitHeight: modalCol.implicitHeight + 48
     radius: 16
     color: cardBg
     border.color: borderSubtle
@@ -36,7 +36,9 @@ Rectangle {
 
     ColumnLayout {
       id: modalCol
-      anchors.fill: parent
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
       anchors.margins: 24
       spacing: 16
 
@@ -210,12 +212,22 @@ Rectangle {
 
         Button {
           Layout.fillWidth: true
-          text: "󰐊 Save & Setup Target"
+          implicitHeight: 36
           background: Rectangle {
             radius: 6
             color: "#0284c7"
           }
-          contentItem: Text { text: "󰐊 Save & Setup Target"; color: "#ffffff"; font.pixelSize: 12; font.bold: true; horizontalAlignment: Text.AlignHCenter }
+          contentItem: Row {
+            anchors.centerIn: parent
+            spacing: 8
+            Text { text: "󰐊"; font.pixelSize: 13; color: "#ffffff" }
+            Text {
+              text: "Save & Setup Target"
+              color: "#ffffff"
+              font.pixelSize: 12
+              font.bold: true
+            }
+          }
           onClicked: {
             if (storageNameField.text.trim()) {
               if (ocloud.setVaultSecret) {

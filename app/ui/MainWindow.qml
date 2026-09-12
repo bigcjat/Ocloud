@@ -34,6 +34,8 @@ ApplicationWindow {
   property var customStorage: []
   property var backupInfo: ({})
   property string activeTab: (typeof initialTab !== "undefined" && initialTab) ? initialTab : "fleet"
+  property bool isBusy: false
+  property string busyMessage: ""
 
   Shortcut { sequence: "Alt+1"; onActivated: activeTab = "fleet" }
   Shortcut { sequence: "Alt+2"; onActivated: activeTab = "workloads" }
@@ -43,6 +45,10 @@ ApplicationWindow {
   Shortcut { sequence: "Alt+6"; onActivated: activeTab = "settings" }
 
   function reloadAll() {
+    ocloud.refreshStatusAsync();
+  }
+
+  Component.onCompleted: {
     var raw = ocloud.fetchStatus();
     try {
       var data = JSON.parse(raw);
@@ -51,13 +57,8 @@ ApplicationWindow {
       storageBox = (data.storage && data.storage.storage_box) || {};
       customStorage = (data.storage && data.storage.custom_storage) || [];
       backupInfo = data.backups || {};
-    } catch (e) {
-      console.log("Error parsing status data: " + e);
-    }
-  }
+    } catch (e) {}
 
-  Component.onCompleted: {
-    reloadAll();
     if (typeof openModalOnStart !== "undefined" && openModalOnStart === "taskManager") {
       var srv = (serverList && serverList.length > 0) ? serverList[0] : { name: "omarchy-companion", ipv4: "167.233.151.104", provider: "hetzner", status: "running", id: 165572435 };
       taskManagerModal.openForServer(srv);
@@ -77,6 +78,10 @@ ApplicationWindow {
         customStorage = (data.storage && data.storage.custom_storage) || [];
         backupInfo = data.backups || {};
       } catch (e) {}
+    }
+    function onBusyChanged(busy, text) {
+      window.isBusy = busy;
+      window.busyMessage = text;
     }
   }
 
@@ -123,6 +128,41 @@ ApplicationWindow {
           text: "Personal Cloud Hypervisor"
           font.pixelSize: 12
           color: textMuted
+        }
+      }
+
+      // Live Busy Indicator Pill
+      Rectangle {
+        visible: window.isBusy
+        height: 28
+        width: busyRow.implicitWidth + 20
+        radius: 14
+        color: Qt.rgba(0.02, 0.52, 0.78, 0.25)
+        border.color: accentSky
+        border.width: 1
+
+        Row {
+          id: busyRow
+          anchors.centerIn: parent
+          spacing: 8
+          Text {
+            text: "󰑐"
+            font.pixelSize: 13
+            color: accentSky
+            RotationAnimator on rotation {
+              from: 0
+              to: 360
+              duration: 900
+              loops: Animation.Infinite
+              running: window.isBusy
+            }
+          }
+          Text {
+            text: window.busyMessage || "Processing..."
+            font.pixelSize: 11
+            font.bold: true
+            color: "#f8fafc"
+          }
         }
       }
 
@@ -181,19 +221,29 @@ ApplicationWindow {
       // Refresh Button
       Button {
         id: refreshBtn
-        text: "󰑐 Refresh Fleet"
+        enabled: !window.isBusy
+        implicitWidth: refreshRow.implicitWidth + 24
+        implicitHeight: 32
         background: Rectangle {
           radius: 6
           color: refreshBtn.hovered ? "#1e293b" : "#0f172a"
           border.color: borderSubtle
         }
-        contentItem: Text {
-          text: refreshBtn.text
-          color: textPrimary
-          font.pixelSize: 12
-          font.bold: true
-          horizontalAlignment: Text.AlignHCenter
-          verticalAlignment: Text.AlignVCenter
+        contentItem: Row {
+          id: refreshRow
+          anchors.centerIn: parent
+          spacing: 8
+          Text {
+            text: "󰑐"
+            font.pixelSize: 13
+            color: textPrimary
+          }
+          Text {
+            text: "Refresh Fleet"
+            color: textPrimary
+            font.pixelSize: 12
+            font.bold: true
+          }
         }
         onClicked: reloadAll()
       }

@@ -39,25 +39,27 @@ Rectangle {
   function refreshData() {
     if (!serverData || !serverData.id) return;
     isLoading = true;
-    // Call backend inspect
-    var raw = ocloud.inspectMachine ? ocloud.inspectMachine(String(serverData.id)) : "";
-    if (raw) {
-      try {
-        var parsed = JSON.parse(raw);
-        if (parsed && parsed.ram_total) {
-          telemetry = parsed;
-        }
-      } catch (e) {}
-    }
+    ocloud.inspectMachineAsync(String(serverData.id));
     isLoading = false;
+  }
+
+  Connections {
+    target: ocloud
+    function onInspectFinished(srvId, jsonStr) {
+      if (serverData && String(serverData.id) === String(srvId)) {
+        try {
+          var parsed = JSON.parse(jsonStr);
+          if (parsed && parsed.ram_total) {
+            telemetry = parsed;
+          }
+        } catch (e) {}
+      }
+    }
   }
 
   function killProc(pid) {
     if (!serverData || !serverData.id) return;
-    if (ocloud.killProcess) {
-      ocloud.killProcess(String(serverData.id), String(pid));
-      refreshData();
-    }
+    ocloud.killProcess(String(serverData.id), String(pid));
   }
 
   MouseArea {
@@ -136,16 +138,32 @@ Rectangle {
         Item { Layout.fillWidth: true }
 
         Button {
-          text: "󰑐 Refresh"
-          background: Rectangle { radius: 6; color: "#1e293b" }
-          contentItem: Text { text: "󰑐 Refresh"; color: "#f8fafc"; font.pixelSize: 11; font.bold: true }
+          id: tmRefreshBtn
+          implicitWidth: tmRefreshRow.implicitWidth + 24
+          implicitHeight: 32
+          background: Rectangle { radius: 6; color: tmRefreshBtn.hovered ? "#334155" : "#1e293b" }
+          contentItem: Row {
+            id: tmRefreshRow
+            anchors.centerIn: parent
+            spacing: 8
+            Text { text: "󰑐"; font.pixelSize: 13; color: "#f8fafc" }
+            Text { text: "Refresh"; color: "#f8fafc"; font.pixelSize: 11; font.bold: true }
+          }
           onClicked: refreshData()
         }
 
         Button {
-          text: "󰅙 Close"
-          background: Rectangle { radius: 6; color: "#1e293b" }
-          contentItem: Text { text: "󰅙 Close"; color: "#94a3b8"; font.pixelSize: 11; font.bold: true }
+          id: tmCloseBtn
+          implicitWidth: tmCloseRow.implicitWidth + 24
+          implicitHeight: 32
+          background: Rectangle { radius: 6; color: tmCloseBtn.hovered ? "#334155" : "#1e293b" }
+          contentItem: Row {
+            id: tmCloseRow
+            anchors.centerIn: parent
+            spacing: 8
+            Text { text: "󰅙"; font.pixelSize: 13; color: "#94a3b8" }
+            Text { text: "Close"; color: "#94a3b8"; font.pixelSize: 11; font.bold: true }
+          }
           onClicked: taskManagerModal.visible = false
         }
       }
@@ -314,35 +332,85 @@ Rectangle {
         spacing: 8
 
         Button {
-          text: "󰋊 Mount Drive"
-          background: Rectangle { radius: 6; color: "#1e293b"; border.color: "#334155" }
-          contentItem: Text { text: "󰋊 Mount Drive"; color: "#f59e0b"; font.pixelSize: 11; font.bold: true }
+          id: tmMountBtn
+          implicitWidth: tmMountRow.implicitWidth + 24
+          implicitHeight: 32
+          background: Rectangle {
+            radius: 6
+            color: serverData.is_drive_mounted ? (tmMountBtn.hovered ? "#3b1114" : "#240d10") : (tmMountBtn.hovered ? "#332200" : "#1e170a")
+            border.color: serverData.is_drive_mounted ? "#ef4444" : "#f59e0b"
+          }
+          contentItem: Row {
+            id: tmMountRow
+            anchors.centerIn: parent
+            spacing: 8
+            Text {
+              text: serverData.is_drive_mounted ? "󰅟" : "󰋊"
+              font.pixelSize: 13
+              color: serverData.is_drive_mounted ? "#ef4444" : "#f59e0b"
+            }
+            Text {
+              text: serverData.is_drive_mounted ? "Unmount Drive" : "Mount Drive"
+              color: serverData.is_drive_mounted ? "#ef4444" : "#f59e0b"
+              font.pixelSize: 11
+              font.bold: true
+            }
+          }
           onClicked: {
-            taskManagerModal.visible = false;
-            consentModal.openForServer(serverData.name, String(serverData.id));
+            if (serverData.is_drive_mounted) {
+              ocloud.unmountEphemeralVm();
+              serverData.is_drive_mounted = false;
+            } else {
+              taskManagerModal.visible = false;
+              consentModal.openForServer(serverData.name, String(serverData.id));
+            }
           }
         }
 
         Button {
-          text: "󰆍 SSH Terminal"
-          background: Rectangle { radius: 6; color: "#1e293b"; border.color: "#334155" }
-          contentItem: Text { text: "󰆍 SSH Terminal"; color: "#38bdf8"; font.pixelSize: 11; font.bold: true }
+          id: tmTermBtn
+          implicitWidth: tmTermRow.implicitWidth + 24
+          implicitHeight: 32
+          background: Rectangle { radius: 6; color: tmTermBtn.hovered ? "#334155" : "#1e293b"; border.color: "#334155" }
+          contentItem: Row {
+            id: tmTermRow
+            anchors.centerIn: parent
+            spacing: 8
+            Text { text: "󰆍"; font.pixelSize: 13; color: "#38bdf8" }
+            Text { text: "SSH Terminal"; color: "#38bdf8"; font.pixelSize: 11; font.bold: true }
+          }
           onClicked: ocloud.openTerminal(serverData.name, serverData.ipv4)
         }
 
         Item { Layout.fillWidth: true }
 
         Button {
-          text: "󰑐 Reboot Node"
-          background: Rectangle { radius: 6; color: "#1e293b" }
-          contentItem: Text { text: "󰑐 Reboot"; color: "#94a3b8"; font.pixelSize: 11 }
+          id: tmRebootBtn
+          implicitWidth: tmRebootRow.implicitWidth + 20
+          implicitHeight: 32
+          background: Rectangle { radius: 6; color: tmRebootBtn.hovered ? "#334155" : "#1e293b" }
+          contentItem: Row {
+            id: tmRebootRow
+            anchors.centerIn: parent
+            spacing: 8
+            Text { text: "󰑐"; font.pixelSize: 13; color: "#94a3b8" }
+            Text { text: "Reboot"; color: "#94a3b8"; font.pixelSize: 11 }
+          }
           onClicked: ocloud.serverAction("reboot", String(serverData.id))
         }
 
         Button {
-          text: "󰅙 Kill / Power Off"
-          background: Rectangle { radius: 6; color: "#3b0d0d"; border.color: "#7f1d1d" }
-          contentItem: Text { text: "󰅙 Stop Server"; color: "#ef4444"; font.pixelSize: 11; font.bold: true }
+          id: tmStopBtn
+          implicitWidth: tmStopRow.implicitWidth + 20
+          implicitHeight: 32
+          background: Rectangle { radius: 6; color: tmStopBtn.hovered ? "#501212" : "#3b0d0d"; border.color: "#7f1d1d" }
+          contentItem: Row {
+            id: tmStopRow
+            anchors.centerIn: parent
+            spacing: 8
+            Text { text: "󰅙"; font.pixelSize: 13; color: "#ef4444" }
+            Text { text: "Stop Server"; color: "#ef4444"; font.pixelSize: 11; font.bold: true }
+          }
           onClicked: {
             ocloud.serverAction("stop", String(serverData.id));
             taskManagerModal.visible = false;
@@ -389,11 +457,12 @@ Rectangle {
               anchors.fill: parent
               anchors.leftMargin: 16
               anchors.rightMargin: 16
-              Text { text: "PID"; width: 60; font.pixelSize: 10; font.bold: true; color: "#94a3b8" }
-              Text { text: "% CPU"; width: 70; font.pixelSize: 10; font.bold: true; color: "#94a3b8" }
-              Text { text: "% MEM"; width: 70; font.pixelSize: 10; font.bold: true; color: "#94a3b8" }
+              spacing: 12
+              Text { text: "PID"; Layout.preferredWidth: 64; Layout.minimumWidth: 64; Layout.maximumWidth: 64; font.pixelSize: 10; font.bold: true; color: "#94a3b8" }
+              Text { text: "% CPU"; Layout.preferredWidth: 64; Layout.minimumWidth: 64; Layout.maximumWidth: 64; font.pixelSize: 10; font.bold: true; color: "#94a3b8" }
+              Text { text: "% MEM"; Layout.preferredWidth: 64; Layout.minimumWidth: 64; Layout.maximumWidth: 64; font.pixelSize: 10; font.bold: true; color: "#94a3b8" }
               Text { text: "COMMAND / PROCESS NAME"; Layout.fillWidth: true; font.pixelSize: 10; font.bold: true; color: "#94a3b8" }
-              Text { text: "ACTION"; width: 70; font.pixelSize: 10; font.bold: true; color: "#94a3b8"; horizontalAlignment: Text.AlignRight }
+              Text { text: "ACTION"; Layout.preferredWidth: 64; Layout.minimumWidth: 64; Layout.maximumWidth: 64; font.pixelSize: 10; font.bold: true; color: "#94a3b8"; horizontalAlignment: Text.AlignRight }
             }
           }
 
@@ -412,10 +481,13 @@ Rectangle {
                 anchors.fill: parent
                 anchors.leftMargin: 16
                 anchors.rightMargin: 16
+                spacing: 12
 
                 Text {
                   text: modelData.pid || "-"
-                  width: 60
+                  Layout.preferredWidth: 64
+                  Layout.minimumWidth: 64
+                  Layout.maximumWidth: 64
                   font.pixelSize: 11
                   color: "#64748b"
                   font.family: "monospace"
@@ -423,7 +495,9 @@ Rectangle {
 
                 Text {
                   text: (modelData.cpu || "0.0") + "%"
-                  width: 70
+                  Layout.preferredWidth: 64
+                  Layout.minimumWidth: 64
+                  Layout.maximumWidth: 64
                   font.pixelSize: 11
                   font.bold: true
                   color: parseFloat(modelData.cpu || 0) > 10 ? "#ef4444" : "#f8fafc"
@@ -431,7 +505,9 @@ Rectangle {
 
                 Text {
                   text: (modelData.mem || "0.0") + "%"
-                  width: 70
+                  Layout.preferredWidth: 64
+                  Layout.minimumWidth: 64
+                  Layout.maximumWidth: 64
                   font.pixelSize: 11
                   color: "#94a3b8"
                 }
@@ -446,12 +522,14 @@ Rectangle {
                 }
 
                 Button {
-                  text: "Kill"
-                  width: 54
-                  height: 24
+                  id: killProcBtn
+                  Layout.preferredWidth: 64
+                  Layout.minimumWidth: 64
+                  Layout.maximumWidth: 64
+                  implicitHeight: 24
                   background: Rectangle {
                     radius: 4
-                    color: "#2a1215"
+                    color: killProcBtn.hovered ? "#451216" : "#2a1215"
                     border.color: "#7f1d1d"
                   }
                   contentItem: Text {

@@ -50,14 +50,16 @@ Item {
       // Vault Credentials Card
       Rectangle {
         Layout.fillWidth: true
-        height: vaultCol.implicitHeight + 40
+        implicitHeight: vaultCol.implicitHeight + 40
         radius: 12
         color: cardBg
         border.color: borderSubtle
 
         ColumnLayout {
           id: vaultCol
-          anchors.fill: parent
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
           anchors.margins: 20
           spacing: 16
 
@@ -178,14 +180,16 @@ Item {
       // Latency Prober Card
       Rectangle {
         Layout.fillWidth: true
-        height: probeCol.implicitHeight + 40
+        implicitHeight: probeCol.implicitHeight + 40
         radius: 12
         color: cardBg
         border.color: borderSubtle
 
         ColumnLayout {
           id: probeCol
-          anchors.fill: parent
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
           anchors.margins: 20
           spacing: 16
 
@@ -222,19 +226,24 @@ Item {
             Item { Layout.fillWidth: true }
             Button {
               id: probeBtn
-              text: probing ? "Probing..." : "󰑐 Run Latency Test"
               enabled: !probing
+              implicitWidth: probeRow.implicitWidth + 24
+              implicitHeight: 32
               background: Rectangle {
                 radius: 6
                 color: probeBtn.hovered ? "#0284c7" : "#0369a1"
               }
-              contentItem: Text {
-                text: probeBtn.text
-                color: "#ffffff"
-                font.pixelSize: 11
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+              contentItem: Row {
+                id: probeRow
+                anchors.centerIn: parent
+                spacing: 8
+                Text { text: "󰑐"; font.pixelSize: 13; color: "#ffffff" }
+                Text {
+                  text: probing ? "Probing..." : "Run Latency Test"
+                  color: "#ffffff"
+                  font.pixelSize: 11
+                  font.bold: true
+                }
               }
               onClicked: runProber()
             }
@@ -323,14 +332,16 @@ Item {
       // Pluggable Provider System & Community Plugins Card
       Rectangle {
         Layout.fillWidth: true
-        height: pluginCol.implicitHeight + 40
+        implicitHeight: pluginCol.implicitHeight + 40
         radius: 12
         color: cardBg
         border.color: borderSubtle
 
         ColumnLayout {
           id: pluginCol
-          anchors.fill: parent
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
           anchors.margins: 20
           spacing: 16
 

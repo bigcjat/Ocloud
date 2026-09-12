@@ -26,8 +26,9 @@ Rectangle {
   }
 
   Rectangle {
-    width: 520
-    height: modalCol.implicitHeight + 48
+    id: modalDialog
+    width: 540
+    implicitHeight: modalCol.implicitHeight + 48
     radius: 16
     color: "#181206"
     border.color: warningAmber
@@ -36,7 +37,9 @@ Rectangle {
 
     ColumnLayout {
       id: modalCol
-      anchors.fill: parent
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
       anchors.margins: 24
       spacing: 16
 
@@ -76,15 +79,18 @@ Rectangle {
       // Warning Content Box
       Rectangle {
         Layout.fillWidth: true
-        height: warnText.implicitHeight + 24
+        Layout.preferredHeight: warnText.implicitHeight + 28
+        implicitHeight: warnText.implicitHeight + 28
         radius: 8
         color: "#291804"
         border.color: "#78350f"
 
         Text {
           id: warnText
-          anchors.fill: parent
-          anchors.margins: 12
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.margins: 14
           text: "You are about to mount the EPHEMERAL root filesystem of server '" + modal.targetServerName + "' to ~/Companion-VM.\n\n" +
                 "THIS IS NOT A STORAGE BOX!\n\n" +
                 "The storage is hosted on the cloud VM's local ephemeral virtual disk. When this VM powers off, reboots, or is destroyed, ALL FILES SAVED ON THIS DRIVE WILL BE PERMANENTLY ERASED.\n\n" +
@@ -92,6 +98,7 @@ Rectangle {
           font.pixelSize: 11
           color: "#fde68a"
           wrapMode: Text.WordWrap
+          lineHeight: 1.3
         }
       }
 
@@ -120,6 +127,7 @@ Rectangle {
         Button {
           text: "Cancel"
           Layout.fillWidth: true
+          implicitHeight: 36
           background: Rectangle {
             radius: 6
             color: "#1e293b"
@@ -137,20 +145,27 @@ Rectangle {
 
         Button {
           id: agreeBtn
-          text: "󰋊 I Understand, Mount Drive"
           enabled: ackCheck.checked
           Layout.fillWidth: true
+          implicitHeight: 36
           background: Rectangle {
             radius: 6
             color: agreeBtn.enabled ? (agreeBtn.hovered ? "#b45309" : warningAmber) : "#332200"
           }
-          contentItem: Text {
-            text: agreeBtn.text
-            color: agreeBtn.enabled ? "#000000" : textMuted
-            font.bold: true
-            font.pixelSize: 12
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
+          contentItem: Row {
+            anchors.centerIn: parent
+            spacing: 8
+            Text {
+              text: "󰋊"
+              font.pixelSize: 13
+              color: agreeBtn.enabled ? "#000000" : textMuted
+            }
+            Text {
+              text: "I Understand, Mount Drive"
+              color: agreeBtn.enabled ? "#000000" : textMuted
+              font.bold: true
+              font.pixelSize: 12
+            }
           }
           onClicked: {
             modal.visible = false;
