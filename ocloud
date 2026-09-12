@@ -647,8 +647,15 @@ function cmdGui() {
     console.error(`Desktop app entry point not found at ${appPath}`);
     process.exit(1);
   }
-  console.log('Launching Ocloud Desktop GUI...');
-  spawn('python3', [appPath], { stdio: 'inherit' });
+  const pythonCandidates = [
+    path.join(os.homedir(), '.local', 'share', 'omarchy-arcade', 'venv', 'bin', 'python'),
+    path.join(os.homedir(), '.venv', 'bin', 'python'),
+    '/usr/bin/python3',
+    'python3'
+  ];
+  const pyBin = pythonCandidates.find((p) => fs.existsSync(p)) || 'python3';
+  console.log(`Launching Ocloud Desktop GUI with ${pyBin}...`);
+  spawn(pyBin, [appPath], { stdio: 'inherit', detached: true }).unref();
 }
 
 // ------------------------------------------------------------------ Main Entry

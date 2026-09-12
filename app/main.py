@@ -26,9 +26,18 @@ class OcloudBackend(QObject):
         self._cached_ping = "[]"
 
     def _run_cli(self, args, timeout=30):
-        cmd = ['node', OCLOUD_BIN] + args
+        node_candidates = [
+            os.path.expanduser('~/.local/share/mise/shims/node'),
+            '/usr/local/bin/node',
+            '/usr/bin/node',
+            'node'
+        ]
+        node_bin = next((p for p in node_candidates if os.path.exists(p)), 'node')
+        cmd = [node_bin, OCLOUD_BIN] + args
+        env = dict(os.environ)
+        env['PATH'] = f"{os.path.expanduser('~/.local/share/mise/shims')}:{os.path.expanduser('~/.local/bin')}:{env.get('PATH', '')}"
         try:
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout, env=env)
             return res.stdout.strip(), res.returncode == 0, res.stderr.strip()
         except Exception as e:
             return "", False, str(e)
