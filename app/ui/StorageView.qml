@@ -232,12 +232,21 @@ Item {
               radius: 6
               color: "#451a03"
               border.color: warningAmber
-              Text {
+              RowLayout {
                 anchors.centerIn: parent
-                text: "⚠️ HIGH RISK"
-                font.pixelSize: 10
-                font.bold: true
-                color: warningAmber
+                spacing: 4
+                Image {
+                  width: 12
+                  height: 12
+                  source: Qt.resolvedUrl("icons/alert-triangle.svg")
+                  fillMode: Image.PreserveAspectFit
+                }
+                Text {
+                  text: "EPHEMERAL"
+                  font.pixelSize: 10
+                  font.bold: true
+                  color: warningAmber
+                }
               }
             }
           }
@@ -254,7 +263,13 @@ Item {
               anchors.fill: parent
               anchors.margins: 12
               spacing: 10
-              Text { text: "⚠️"; font.pixelSize: 16 }
+              Image {
+                width: 18
+                height: 18
+                source: Qt.resolvedUrl("icons/alert-triangle.svg")
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+              }
               Text {
                 text: "DATA-LOSS WARNING: Files created on companion VMs are stored on ephemeral local NVMe disks. When you power off or terminate the VM, ALL DATA IS WIPED. Do not use for long-term storage!"
                 font.pixelSize: 11
@@ -282,7 +297,13 @@ Item {
                 anchors.rightMargin: 14
                 spacing: 12
 
-                Text { text: "🖥"; font.pixelSize: 14 }
+                Image {
+                  width: 16
+                  height: 16
+                  source: Qt.resolvedUrl("icons/server.svg")
+                  fillMode: Image.PreserveAspectFit
+                  smooth: true
+                }
                 Text {
                   text: modelData.name + " (" + modelData.ipv4 + ")"
                   font.pixelSize: 13
@@ -379,7 +400,13 @@ Item {
                 anchors.rightMargin: 12
                 spacing: 12
 
-                Text { text: "📁"; font.pixelSize: 14 }
+                Image {
+                  width: 16
+                  height: 16
+                  source: Qt.resolvedUrl("icons/hard-drive.svg")
+                  fillMode: Image.PreserveAspectFit
+                  smooth: true
+                }
                 Text { text: modelData.name + " (" + modelData.host + ")"; font.pixelSize: 12; font.bold: true; color: textPrimary }
                 Item { Layout.fillWidth: true }
                 Button {

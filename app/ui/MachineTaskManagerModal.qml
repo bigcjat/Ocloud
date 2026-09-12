@@ -91,10 +91,13 @@ Rectangle {
           height: 40
           radius: 10
           color: serverData.isHomeWorkstation ? "#064e3b" : "#0c4a6e"
-          Text {
+          Image {
             anchors.centerIn: parent
-            text: serverData.isHomeWorkstation ? "🏠" : "☁"
-            font.pixelSize: 20
+            width: 22
+            height: 22
+            source: serverData.isHomeWorkstation ? Qt.resolvedUrl("icons/nas.svg") : (serverData.provider === "oracle" ? Qt.resolvedUrl("icons/oracle.svg") : (serverData.provider === "aws" ? Qt.resolvedUrl("icons/aws.svg") : Qt.resolvedUrl("icons/hetzner.svg")))
+            fillMode: Image.PreserveAspectFit
+            smooth: true
           }
         }
 
@@ -133,16 +136,16 @@ Rectangle {
         Item { Layout.fillWidth: true }
 
         Button {
-          text: "↻ Refresh"
+          text: "󰑐 Refresh"
           background: Rectangle { radius: 6; color: "#1e293b" }
-          contentItem: Text { text: "↻ Refresh"; color: "#f8fafc"; font.pixelSize: 11; font.bold: true }
+          contentItem: Text { text: "󰑐 Refresh"; color: "#f8fafc"; font.pixelSize: 11; font.bold: true }
           onClicked: refreshData()
         }
 
         Button {
-          text: "✕ Close"
+          text: "󰅙 Close"
           background: Rectangle { radius: 6; color: "#1e293b" }
-          contentItem: Text { text: "✕ Close"; color: "#94a3b8"; font.pixelSize: 11; font.bold: true }
+          contentItem: Text { text: "󰅙 Close"; color: "#94a3b8"; font.pixelSize: 11; font.bold: true }
           onClicked: taskManagerModal.visible = false
         }
       }
@@ -311,9 +314,9 @@ Rectangle {
         spacing: 8
 
         Button {
-          text: "⚡ Mount Machine Drive"
+          text: "󰋊 Mount Drive"
           background: Rectangle { radius: 6; color: "#1e293b"; border.color: "#334155" }
-          contentItem: Text { text: "⚡ Mount Drive"; color: "#f59e0b"; font.pixelSize: 11; font.bold: true }
+          contentItem: Text { text: "󰋊 Mount Drive"; color: "#f59e0b"; font.pixelSize: 11; font.bold: true }
           onClicked: {
             taskManagerModal.visible = false;
             consentModal.openForServer(serverData.name, String(serverData.id));
@@ -321,32 +324,25 @@ Rectangle {
         }
 
         Button {
-          text: ">_ Open SSH Terminal"
+          text: "󰆍 SSH Terminal"
           background: Rectangle { radius: 6; color: "#1e293b"; border.color: "#334155" }
-          contentItem: Text { text: ">_ SSH Terminal"; color: "#38bdf8"; font.pixelSize: 11; font.bold: true }
+          contentItem: Text { text: "󰆍 SSH Terminal"; color: "#38bdf8"; font.pixelSize: 11; font.bold: true }
           onClicked: ocloud.openTerminal(serverData.name, serverData.ipv4)
-        }
-
-        Button {
-          text: "🎮 Stream Arcade App"
-          background: Rectangle { radius: 6; color: "#1e293b"; border.color: "#334155" }
-          contentItem: Text { text: "🎮 Arcade App"; color: "#a855f7"; font.pixelSize: 11; font.bold: true }
-          onClicked: ocloud.launchApp(String(serverData.id), "arcade")
         }
 
         Item { Layout.fillWidth: true }
 
         Button {
-          text: "Reboot Node"
+          text: "󰑐 Reboot Node"
           background: Rectangle { radius: 6; color: "#1e293b" }
-          contentItem: Text { text: "Reboot"; color: "#94a3b8"; font.pixelSize: 11 }
+          contentItem: Text { text: "󰑐 Reboot"; color: "#94a3b8"; font.pixelSize: 11 }
           onClicked: ocloud.serverAction("reboot", String(serverData.id))
         }
 
         Button {
-          text: "✕ Kill / Power Off"
+          text: "󰅙 Kill / Power Off"
           background: Rectangle { radius: 6; color: "#3b0d0d"; border.color: "#7f1d1d" }
-          contentItem: Text { text: "✕ Stop Server"; color: "#ef4444"; font.pixelSize: 11; font.bold: true }
+          contentItem: Text { text: "󰅙 Stop Server"; color: "#ef4444"; font.pixelSize: 11; font.bold: true }
           onClicked: {
             ocloud.serverAction("stop", String(serverData.id));
             taskManagerModal.visible = false;

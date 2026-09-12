@@ -46,7 +46,7 @@ Item {
           ComboBox {
             id: targetCombo
             model: serverList.map(function(s) {
-              return s.name + (s.isHomeWorkstation ? " [🏠 Home]" : " [☁ Cloud]");
+              return s.name + (s.isHomeWorkstation ? " [Home]" : " [Cloud]");
             })
             onCurrentIndexChanged: {
               if (currentIndex >= 0 && currentIndex < serverList.length) {
@@ -69,7 +69,13 @@ Item {
           anchors.fill: parent
           anchors.margins: 14
           spacing: 12
-          Text { text: "🛡️"; font.pixelSize: 20 }
+          Image {
+            width: 20
+            height: 20
+            source: Qt.resolvedUrl("icons/shield.svg")
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+          }
           ColumnLayout {
             spacing: 2
             Text {
@@ -145,7 +151,7 @@ Item {
 
             Button {
               id: launchArcadeBtn
-              text: "🚀 Launch Arcade"
+              text: "󰐊 Launch Arcade"
               Layout.fillWidth: true
               background: Rectangle {
                 radius: 6
@@ -309,7 +315,7 @@ Item {
           spacing: 12
 
           Text {
-            text: "⚡ Run Any Custom Linux App over Waypipe"
+            text: "󰆍 Run Any Custom Linux App over Waypipe"
             font.pixelSize: 14
             font.bold: true
             color: textPrimary

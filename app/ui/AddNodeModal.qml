@@ -43,7 +43,13 @@ Rectangle {
       // Title
       RowLayout {
         spacing: 10
-        Text { text: "🖥"; font.pixelSize: 22 }
+        Image {
+          width: 22
+          height: 22
+          source: Qt.resolvedUrl("icons/server.svg")
+          fillMode: Image.PreserveAspectFit
+          smooth: true
+        }
         ColumnLayout {
           spacing: 2
           Text {
@@ -129,18 +135,28 @@ Rectangle {
         CheckBox {
           id: homeCheck
         }
-        ColumnLayout {
-          spacing: 1
-          Text {
-            text: "🏠 Mark as Home Workstation / Rig"
-            font.pixelSize: 12
-            font.bold: true
-            color: homeGreen
+        RowLayout {
+          spacing: 6
+          Image {
+            width: 16
+            height: 16
+            source: Qt.resolvedUrl("icons/nas.svg")
+            fillMode: Image.PreserveAspectFit
+            smooth: true
           }
-          Text {
-            text: "Enables Home Green (#10b981) styling and Waypipe mobile streaming"
-            font.pixelSize: 10
-            color: textMuted
+          ColumnLayout {
+            spacing: 1
+            Text {
+              text: "Mark as Home Workstation / Rig"
+              font.pixelSize: 12
+              font.bold: true
+              color: homeGreen
+            }
+            Text {
+              text: "Enables Home Green styling and local low-latency routing"
+              font.pixelSize: 10
+              color: textMuted
+            }
           }
         }
       }
@@ -167,7 +183,7 @@ Rectangle {
 
         Button {
           id: addBtn
-          text: "Add to Fleet"
+          text: "󰐊 Add to Fleet"
           Layout.fillWidth: true
           background: Rectangle {
             radius: 6

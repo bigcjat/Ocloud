@@ -90,9 +90,11 @@ Item {
         ColumnLayout {
           anchors.centerIn: parent
           spacing: 12
-          Text {
-            text: "🌐"
-            font.pixelSize: 36
+          Image {
+            width: 36
+            height: 36
+            source: Qt.resolvedUrl("icons/server.svg")
+            fillMode: Image.PreserveAspectFit
             Layout.alignment: Qt.AlignHCenter
           }
           Text {
@@ -214,7 +216,7 @@ Item {
 
               Button {
                 id: tmBtn
-                text: "📊 Task Manager"
+                text: "󰄛 Task Manager"
                 background: Rectangle {
                   radius: 6
                   color: tmBtn.hovered ? "#0284c7" : "#0369a1"
@@ -231,27 +233,8 @@ Item {
               }
 
               Button {
-                id: streamBtn
-                text: "🎮 Launch App Stream"
-                enabled: modelData.status === "running"
-                background: Rectangle {
-                  radius: 6
-                  color: streamBtn.enabled ? (streamBtn.hovered ? "#0284c7" : "#0369a1") : "#1e293b"
-                }
-                contentItem: Text {
-                  text: streamBtn.text
-                  color: streamBtn.enabled ? "#ffffff" : textMuted
-                  font.pixelSize: 11
-                  font.bold: true
-                  horizontalAlignment: Text.AlignHCenter
-                  verticalAlignment: Text.AlignVCenter
-                }
-                onClicked: ocloud.launchApp(String(modelData.id), "arcade")
-              }
-
-              Button {
                 id: termBtn
-                text: ">_ SSH Terminal"
+                text: "󰆍 SSH Terminal"
                 background: Rectangle {
                   radius: 6
                   color: termBtn.hovered ? "#1e293b" : "#0f172a"
@@ -270,7 +253,7 @@ Item {
 
               Button {
                 id: mountVmBtn
-                text: "⚡ Mount Drive"
+                text: "󰋊 Mount Drive"
                 enabled: modelData.status === "running"
                 background: Rectangle {
                   radius: 6
@@ -292,7 +275,7 @@ Item {
 
               Button {
                 id: pwrBtn
-                text: modelData.status === "running" ? "Power Off" : "Power On"
+                text: modelData.status === "running" ? "󰐥 Power Off" : "󰐥 Power On"
                 background: Rectangle {
                   radius: 6
                   color: pwrBtn.hovered ? "#1e293b" : "#0f172a"
@@ -314,7 +297,7 @@ Item {
 
               Button {
                 id: rebootBtn
-                text: "Reboot"
+                text: "󰑐 Reboot"
                 enabled: modelData.status === "running"
                 background: Rectangle {
                   radius: 6
@@ -333,7 +316,7 @@ Item {
 
               Button {
                 id: delBtn
-                text: "🗑 Delete"
+                text: "󰅙 Delete"
                 background: Rectangle {
                   radius: 6
                   color: delBtn.hovered ? "#3b0d0d" : "#1e0f0f"

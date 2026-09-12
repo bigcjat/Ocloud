@@ -42,7 +42,7 @@ Item {
 
         Button {
           id: runNowBtn
-          text: "⚡ Take Snapshot Now"
+          text: "󰑐 Take Snapshot Now"
           background: Rectangle {
             radius: 8
             gradient: Gradient {
@@ -83,7 +83,14 @@ Item {
               height: 32
               radius: 8
               color: "#064e3b"
-              Text { anchors.centerIn: parent; text: "⏰"; font.pixelSize: 16 }
+              Image {
+                anchors.centerIn: parent
+                width: 18
+                height: 18
+                source: Qt.resolvedUrl("icons/archive.svg")
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+              }
             }
             ColumnLayout {
               spacing: 2

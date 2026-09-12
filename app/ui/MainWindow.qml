@@ -175,7 +175,7 @@ ApplicationWindow {
       // Refresh Button
       Button {
         id: refreshBtn
-        text: "↻ Refresh Fleet"
+        text: "󰑐 Refresh Fleet"
         background: Rectangle {
           radius: 6
           color: refreshBtn.hovered ? "#1e293b" : "#0f172a"
@@ -296,7 +296,14 @@ ApplicationWindow {
             anchors.margins: 10
             spacing: 2
             RowLayout {
-              Text { text: "💻"; font.pixelSize: 12 }
+              spacing: 6
+              Image {
+                width: 14
+                height: 14
+                source: Qt.resolvedUrl("icons/nas.svg")
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+              }
               Text { text: "Local Machine"; font.pixelSize: 11; font.bold: true; color: textPrimary }
             }
             Text {

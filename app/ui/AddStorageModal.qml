@@ -209,12 +209,12 @@ Rectangle {
 
         Button {
           Layout.fillWidth: true
-          text: "Save & Setup Target"
+          text: "󰐊 Save & Setup Target"
           background: Rectangle {
             radius: 6
             color: "#0284c7"
           }
-          contentItem: Text { text: "Save & Setup Target"; color: "#ffffff"; font.pixelSize: 12; font.bold: true; horizontalAlignment: Text.AlignHCenter }
+          contentItem: Text { text: "󰐊 Save & Setup Target"; color: "#ffffff"; font.pixelSize: 12; font.bold: true; horizontalAlignment: Text.AlignHCenter }
           onClicked: {
             if (storageNameField.text.trim()) {
               if (ocloud.setVaultSecret) {

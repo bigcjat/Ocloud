@@ -189,7 +189,14 @@ Item {
               height: 32
               radius: 8
               color: "#1e1b4b"
-              Text { anchors.centerIn: parent; text: "🌐"; font.pixelSize: 16 }
+              Image {
+                anchors.centerIn: parent
+                width: 18
+                height: 18
+                source: Qt.resolvedUrl("icons/activity.svg")
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+              }
             }
             ColumnLayout {
               spacing: 2
@@ -208,7 +215,7 @@ Item {
             Item { Layout.fillWidth: true }
             Button {
               id: probeBtn
-              text: probing ? "Probing..." : "⚡ Run Latency Test"
+              text: probing ? "Probing..." : "󰑐 Run Latency Test"
               enabled: !probing
               background: Rectangle {
                 radius: 6

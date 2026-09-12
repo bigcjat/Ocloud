@@ -90,19 +90,19 @@ Rectangle {
           onCurrentIndexChanged: {
             if (currentIndex === 0) { // Hetzner
               typeCombo.model = ["cx23 (Intel 2 vCPU / 4 GB RAM · €3.79/mo)", "cax11 (Ampere ARM 2 vCPU / 4 GB RAM · €3.29/mo)", "cpx21 (AMD 3 vCPU / 4 GB RAM · €6.90/mo)"];
-              locCombo.model = ["nbg1 (Nuremberg, Germany 🇩🇪)", "fsn1 (Falkenstein, Germany 🇩🇪)", "hel1 (Helsinki, Finland 🇫🇮)", "ash (Ashburn, VA, USA 🇺🇸)", "hil (Hillsboro, OR, USA 🇺🇸)"];
+              locCombo.model = ["nbg1 (Nuremberg, Germany [EU])", "fsn1 (Falkenstein, Germany [EU])", "hel1 (Helsinki, Finland [EU])", "ash (Ashburn, VA, USA [US])", "hil (Hillsboro, OR, USA [US])"];
             } else if (currentIndex === 1) { // AWS
               typeCombo.model = ["nano (1 vCPU / 512 MB · $3.50/mo)", "micro (1 vCPU / 1 GB · $5.00/mo)", "small (2 vCPU / 2 GB · $10.00/mo)"];
-              locCombo.model = ["us-east-1 (N. Virginia 🇺🇸)", "us-west-2 (Oregon 🇺🇸)", "eu-central-1 (Frankfurt 🇩🇪)", "ap-northeast-1 (Tokyo 🇯🇵)"];
+              locCombo.model = ["us-east-1 (N. Virginia [US])", "us-west-2 (Oregon [US])", "eu-central-1 (Frankfurt [EU])", "ap-northeast-1 (Tokyo [JP])"];
             } else if (currentIndex === 2) { // Oracle
               typeCombo.model = ["VM.Standard.A1.Flex (4 OCPU / 24 GB RAM · €0 Always Free)", "VM.Standard.E2.1.Micro (1 OCPU / 1 GB RAM · €0 Free)"];
-              locCombo.model = ["eu-frankfurt-1 (Germany 🇩🇪)", "us-ashburn-1 (USA 🇺🇸)", "ap-tokyo-1 (Japan 🇯🇵)"];
+              locCombo.model = ["eu-frankfurt-1 (Germany [EU])", "us-ashburn-1 (USA [US])", "ap-tokyo-1 (Japan [JP])"];
             } else if (currentIndex === 3) { // DigitalOcean
               typeCombo.model = ["s-1vcpu-1gb (Basic · $6.00/mo)", "s-1vcpu-2gb (Basic · $12.00/mo)", "s-2vcpu-4gb (Basic · $24.00/mo)"];
-              locCombo.model = ["nyc1 (New York 🇺🇸)", "sfo3 (San Francisco 🇺🇸)", "fra1 (Frankfurt 🇩🇪)", "sgp1 (Singapore 🇸🇬)"];
+              locCombo.model = ["nyc1 (New York [US])", "sfo3 (San Francisco [US])", "fra1 (Frankfurt [EU])", "sgp1 (Singapore [AP])"];
             } else { // Vultr
               typeCombo.model = ["vc2-1c-1gb (Regular · $5.00/mo)", "vc2-1c-2gb (Regular · $10.00/mo)", "vc2-2c-4gb (High Perf · $24.00/mo)"];
-              locCombo.model = ["ewr (New Jersey 🇺🇸)", "ord (Chicago 🇺🇸)", "fra (Frankfurt 🇩🇪)", "nrt (Tokyo 🇯🇵)"];
+              locCombo.model = ["ewr (New Jersey [US])", "ord (Chicago [US])", "fra (Frankfurt [EU])", "nrt (Tokyo [JP])"];
             }
           }
         }
@@ -121,6 +121,33 @@ Rectangle {
         }
       }
 
+      // OS Template Distribution Selector
+      ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 4
+        Text { text: "OS Distribution Template"; font.pixelSize: 11; font.bold: true; color: textSecondary }
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: 8
+          Image {
+            width: 22
+            height: 22
+            source: osCombo.currentIndex === 0 ? Qt.resolvedUrl("icons/alpine.svg") : (osCombo.currentIndex === 1 ? Qt.resolvedUrl("icons/arch.svg") : Qt.resolvedUrl("icons/server.svg"))
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+          }
+          ComboBox {
+            id: osCombo
+            Layout.fillWidth: true
+            model: [
+              "Alpine Linux 3.20 (Ultra-minimal 130MB · Fastest boot)",
+              "Arch Linux (Rolling release · Latest kernel & pacman)",
+              "Ubuntu Minimal 24.04 LTS (Standard Debian/Ubuntu ecosystem)"
+            ]
+          }
+        }
+      }
+
       // Server Type
       ColumnLayout {
         Layout.fillWidth: true
@@ -133,7 +160,7 @@ Rectangle {
         }
       }
 
-      // Location (with ping note)
+      // Location
       ColumnLayout {
         Layout.fillWidth: true
         spacing: 4
@@ -142,12 +169,12 @@ Rectangle {
           id: locCombo
           Layout.fillWidth: true
           model: [
-            "nbg1 (Nuremberg, Germany 🇩🇪 - Low Latency)",
-            "fsn1 (Falkenstein, Germany 🇩🇪)",
-            "hel1 (Helsinki, Finland 🇫🇮)",
-            "sin (Singapore 🇸🇬)",
-            "ash (Ashburn, VA, USA 🇺🇸)",
-            "hil (Hillsboro, OR, USA 🇺🇸)"
+            "nbg1 (Nuremberg, Germany [EU] - Lowest Latency)",
+            "fsn1 (Falkenstein, Germany [EU])",
+            "hel1 (Helsinki, Finland [EU])",
+            "sin (Singapore [AP])",
+            "ash (Ashburn, VA, USA [US])",
+            "hil (Hillsboro, OR, USA [US])"
           ]
         }
       }
@@ -186,7 +213,7 @@ Rectangle {
 
         Button {
           id: deployBtn
-          text: "Deploy Instance"
+          text: "󰐊 Deploy Instance"
           Layout.fillWidth: true
           background: Rectangle {
             radius: 6
@@ -206,7 +233,8 @@ Rectangle {
             var locs = ["nbg1", "fsn1", "hel1", "sin", "ash", "hil"];
             var chosenType = srvTypes[typeCombo.currentIndex] || "cx23";
             var chosenLoc = locs[locCombo.currentIndex] || "nbg1";
-            ocloud.procureServer(nameField.text.trim(), chosenType, chosenLoc, tsCheck.checked ? "auto" : "");
+            var chosenOs = osCombo.currentIndex === 0 ? "alpine" : (osCombo.currentIndex === 1 ? "arch" : "ubuntu");
+            ocloud.procureServer(nameField.text.trim(), chosenType, chosenLoc, tsCheck.checked ? "auto" : "", chosenOs);
             modal.serverProcured();
           }
         }

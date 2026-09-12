@@ -77,7 +77,7 @@ Item {
 
         Button {
           id: offloadBtn
-          text: "⚡ Offload Local Container to Cloud"
+          text: "󰐊 Offload Container to Cloud"
           background: Rectangle {
             radius: 8
             gradient: Gradient {
@@ -119,7 +119,14 @@ Item {
               height: 32
               radius: 8
               color: "#0c4a6e"
-              Text { anchors.centerIn: parent; text: "🚀"; font.pixelSize: 16 }
+              Image {
+                anchors.centerIn: parent
+                width: 18
+                height: 18
+                source: Qt.resolvedUrl("icons/docker.svg")
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+              }
             }
             ColumnLayout {
               spacing: 2
@@ -278,22 +285,22 @@ Item {
               Button {
                 text: ">_ Exec Shell"
                 background: Rectangle { radius: 6; color: "#1e293b" }
-                contentItem: Text { text: ">_ Exec Shell"; color: accentSky; font.pixelSize: 11; font.bold: true }
+                contentItem: Text { text: "󰆍 Exec Shell"; color: accentSky; font.pixelSize: 11; font.bold: true }
                 onClicked: ocloud.openTerminal(modelData.name, "116.203.42.18")
               }
 
               Item { Layout.fillWidth: true }
 
               Button {
-                text: "Restart"
+                text: "󰑐 Restart"
                 background: Rectangle { radius: 6; color: "#1e293b" }
-                contentItem: Text { text: "Restart"; color: textSecondary; font.pixelSize: 11 }
+                contentItem: Text { text: "󰑐 Restart"; color: textSecondary; font.pixelSize: 11 }
               }
 
               Button {
-                text: "✕ Stop"
+                text: "󰅙 Stop"
                 background: Rectangle { radius: 6; color: "#3b0d0d"; border.color: "#7f1d1d" }
-                contentItem: Text { text: "✕ Stop"; color: dangerRed; font.pixelSize: 11; font.bold: true }
+                contentItem: Text { text: "󰅙 Stop"; color: dangerRed; font.pixelSize: 11; font.bold: true }
               }
             }
           }
@@ -333,7 +340,13 @@ Item {
 
         RowLayout {
           spacing: 10
-          Text { text: "⚡"; font.pixelSize: 22 }
+          Image {
+            width: 22
+            height: 22
+            source: Qt.resolvedUrl("icons/docker.svg")
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+          }
           ColumnLayout {
             spacing: 2
             Text {
@@ -423,9 +436,9 @@ Item {
 
           Button {
             Layout.fillWidth: true
-            text: "🚀 Deploy & Run Workload"
+            text: "󰐊 Deploy & Run Workload"
             background: Rectangle { radius: 6; color: "#0284c7" }
-            contentItem: Text { text: "🚀 Deploy & Run Workload"; color: "#ffffff"; font.pixelSize: 11; font.bold: true; horizontalAlignment: Text.AlignHCenter }
+            contentItem: Text { text: "󰐊 Deploy & Run Workload"; color: "#ffffff"; font.pixelSize: 11; font.bold: true; horizontalAlignment: Text.AlignHCenter }
             onClicked: {
               offloadModal.visible = false;
               if (ocloud.procureServer) {

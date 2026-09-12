@@ -73,7 +73,7 @@ class ProviderRegistry {
         id: 'hetzner',
         name: 'Hetzner Cloud',
         type: 'api',
-        logo: '☁',
+        logoSvg: 'icons/hetzner.svg',
         description: 'Cost-effective high-performance European & US cloud compute',
         authFields: [{ key: 'api_token', label: 'Hetzner API Token', type: 'password' }],
         serverTypes: ['cx23', 'cx33', 'cpx31', 'cpx41', 'cax11'],
@@ -83,7 +83,7 @@ class ProviderRegistry {
         id: 'aws',
         name: 'Amazon Web Services (Lightsail / EC2)',
         type: 'api',
-        logo: '🟧',
+        logoSvg: 'icons/aws.svg',
         description: 'Industry standard compute with global availability',
         authFields: [
           { key: 'aws_access_key', label: 'Access Key ID', type: 'text' },
@@ -97,7 +97,7 @@ class ProviderRegistry {
         id: 'oracle',
         name: 'Oracle Cloud Infrastructure (OCI)',
         type: 'api',
-        logo: '🔴',
+        logoSvg: 'icons/oracle.svg',
         description: 'Generous Always-Free tier (up to 4 ARM cores, 24GB RAM)',
         authFields: [
           { key: 'oci_tenancy', label: 'Tenancy OCID', type: 'text' },
@@ -111,7 +111,7 @@ class ProviderRegistry {
         id: 'digitalocean',
         name: 'DigitalOcean',
         type: 'api',
-        logo: '🌊',
+        logoSvg: 'icons/digitalocean.svg',
         description: 'Developer cloud with turnkey Droplets and predictable pricing',
         authFields: [{ key: 'do_api_token', label: 'Personal Access Token', type: 'password' }],
         serverTypes: ['s-1vcpu-1gb', 's-1vcpu-2gb', 's-2vcpu-4gb'],
@@ -121,7 +121,7 @@ class ProviderRegistry {
         id: 'vultr',
         name: 'Vultr',
         type: 'api',
-        logo: '⚡',
+        logoSvg: 'icons/vultr.svg',
         description: 'Worldwide cloud compute and bare-metal nodes across 32 datacenters',
         authFields: [{ key: 'vultr_api_key', label: 'Vultr API Key', type: 'password' }],
         serverTypes: ['vc2-1c-1gb', 'vc2-1c-2gb', 'vc2-2c-4gb'],
@@ -131,7 +131,7 @@ class ProviderRegistry {
         id: 'custom',
         name: 'Bare-Metal / Custom SSH Server',
         type: 'manual',
-        logo: '🖥',
+        logoSvg: 'icons/server.svg',
         description: 'Connect any existing Linux box, home lab, or unmanaged VPS via SSH',
         authFields: [
           { key: 'host', label: 'Hostname / IP Address', type: 'text' },
@@ -149,7 +149,7 @@ class ProviderRegistry {
         id: 'hetzner_box',
         name: 'Hetzner Storage Box',
         protocol: 'webdav/sftp',
-        logo: '📦',
+        logoSvg: 'icons/hetzner.svg',
         description: 'High-capacity RAID storage with WebDAV, SFTP, and snapshot capabilities',
         defaultMount: '~/Cloud',
         fields: [
@@ -162,7 +162,7 @@ class ProviderRegistry {
         id: 's3_generic',
         name: 'S3 / Cloudflare R2 / Backblaze B2 / Wasabi',
         protocol: 's3',
-        logo: '🪣',
+        logoSvg: 'icons/cloudflare.svg',
         description: 'Universal S3-compatible object storage mount with zero/low egress',
         defaultMount: '~/S3-Storage',
         fields: [
@@ -176,7 +176,7 @@ class ProviderRegistry {
         id: 'webdav_generic',
         name: 'Nextcloud / ownCloud / WebDAV',
         protocol: 'webdav',
-        logo: '☁',
+        logoSvg: 'icons/hard-drive.svg',
         description: 'Mount any self-hosted Nextcloud, ownCloud, or standard WebDAV share',
         defaultMount: '~/Nextcloud',
         fields: [
@@ -189,7 +189,7 @@ class ProviderRegistry {
         id: 'google_drive',
         name: 'Google Drive',
         protocol: 'rest_api',
-        logo: '📁',
+        logoSvg: 'icons/gcp.svg',
         description: 'Mount Google Drive personal or workspace storage',
         defaultMount: '~/Google-Drive',
         fields: [
@@ -201,7 +201,7 @@ class ProviderRegistry {
         id: 'dropbox',
         name: 'Dropbox',
         protocol: 'rest_api',
-        logo: '💧',
+        logoSvg: 'icons/hard-drive.svg',
         description: 'Mount Dropbox cloud files with automated syncing',
         defaultMount: '~/Dropbox-Cloud',
         fields: [
@@ -212,7 +212,7 @@ class ProviderRegistry {
         id: 'home_nas',
         name: 'Home NAS (SMB / NFS / Local)',
         protocol: 'smb_nfs',
-        logo: '🏠',
+        logoSvg: 'icons/nas.svg',
         description: 'Local network attached storage (Synology, TrueNAS, Unraid, Raspberry Pi)',
         defaultMount: '~/Home-NAS',
         fields: [

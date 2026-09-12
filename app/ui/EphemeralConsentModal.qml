@@ -48,7 +48,14 @@ Rectangle {
           height: 40
           radius: 10
           color: "#451a03"
-          Text { anchors.centerIn: parent; text: "⚠️"; font.pixelSize: 20 }
+          Image {
+            anchors.centerIn: parent
+            width: 22
+            height: 22
+            source: Qt.resolvedUrl("icons/alert-triangle.svg")
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+          }
         }
         ColumnLayout {
           spacing: 2
@@ -130,7 +137,7 @@ Rectangle {
 
         Button {
           id: agreeBtn
-          text: "I Understand, Mount Drive"
+          text: "󰋊 I Understand, Mount Drive"
           enabled: ackCheck.checked
           Layout.fillWidth: true
           background: Rectangle {
