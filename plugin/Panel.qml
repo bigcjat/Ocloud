@@ -202,7 +202,6 @@ Panel {
             Item { Layout.fillWidth: true }
             Button {
               text: root.storageData.mounted ? "Unmount" : "Mount Drive"
-              font.pixelSize: 11
               onClicked: {
                 if (root.storageData.mounted) {
                   execProc.command = ["umount", Quickshell.env("HOME") + "/Cloud"];
