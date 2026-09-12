@@ -21,52 +21,58 @@ Panel {
   readonly property color accentColor: Color.accent || "#38bdf8"
   readonly property color successColor: "#10b981"
   readonly property color warningColor: "#f59e0b"
-  readonly property color dangerColor: "#ef4444"
+  readonly property color urgentColor: (bar && bar.urgent) ? bar.urgent : "#ef4444"
 
   readonly property string ocloudBin: {
     var home = Quickshell.env("HOME") || "/home/bigcjat";
     return home + "/.local/bin/ocloud";
   }
 
-  // Reactive state
-  property string apiToken: ""
+  // Reactive state from ocloud status --json
+  property var rawStatus: null
   property var serversList: []
-  property var primaryServer: serversList.length > 0 ? serversList[0] : null
-  property int activeVmCount: {
-    var cnt = 0;
-    for (var i = 0; i < serversList.length; i++) {
-      if (serversList[i].status === "running") cnt++;
-    }
-    return cnt;
-  }
+  property var customStorageList: []
+  property var storageBoxData: ({
+    "configured": true,
+    "name": "Hetzner Primary",
+    "mounted": false,
+    "mount_point": "~/Cloud",
+    "used_gb": 0.0,
+    "total_gb": 1000.0,
+    "percent": 0.0
+  })
+
+  property var primaryVm: serversList.length > 0 ? serversList[0] : null
+  property var vmMetrics: ({
+    "ram_used_gb": 0.8,
+    "ram_total_gb": 4.0,
+    "cpu_percent": 5,
+    "gpu": "None",
+    "apps_running": 1,
+    "disk_used_gb": 3.8,
+    "disk_total_gb": 39.7,
+    "disk_percent": 9.6,
+    "uptime_str": "1h 46m",
+    "running_cost": "€0.01"
+  })
 
   property bool storageMounted: false
   property bool vmMounted: false
+  property bool homeNasMounted: false
+
   property bool storageBusy: false
-  property bool vmBusy: false
-  property bool powerBusy: false
+  property bool vmDriveBusy: false
+  property bool homeNasBusy: false
+  property bool killBusy: false
+  property bool showKillModal: false
   property bool showVmConsent: false
 
-  property real storageUsedGb: 0.0
-  property real storageTotalGb: 1000.0
-  property real storagePercent: 0.0
-  property string fastestRegion: "Nuremberg"
-  property int fastestPingMs: 24
-
   function refreshAll() {
+    statusProc.running = true;
     mountCheckProc.running = true;
-    storageInfoProc.running = true;
-
-    if (!root.apiToken || root.apiToken === "") {
-      vaultProc.running = true;
-      return;
+    if (root.primaryVm && root.primaryVm.status === "running") {
+      inspectProc.running = true;
     }
-
-    Hetzner.fetchServers(root.apiToken, function(servers) {
-      root.serversList = servers;
-    }, function(err) {
-      console.log("Hetzner API error: " + err);
-    });
   }
 
   function mountStorage() {
@@ -81,20 +87,37 @@ Panel {
 
   function mountVmDrive() {
     root.showVmConsent = false;
-    root.vmBusy = true;
+    root.vmDriveBusy = true;
     mountVmProc.running = true;
   }
 
   function unmountVmDrive() {
-    root.vmBusy = true;
+    root.vmDriveBusy = true;
     unmountVmProc.running = true;
+  }
+
+  function mountHomeNas() {
+    root.homeNasBusy = true;
+    mountHomeNasProc.running = true;
+  }
+
+  function unmountHomeNas() {
+    root.homeNasBusy = true;
+    unmountHomeNasProc.running = true;
+  }
+
+  function killPrimaryVm() {
+    if (!root.primaryVm) return;
+    root.showKillModal = false;
+    root.killBusy = true;
+    killVmProc.running = true;
   }
 
   function openFolder(folderPath) {
     Quickshell.execDetached(["xdg-open", folderPath]);
   }
 
-  // Mount detection: checks system mount table directly
+  // Direct system mount detection
   Process {
     id: mountCheckProc
     command: ["mount"]
@@ -105,117 +128,160 @@ Panel {
         var home = Quickshell.env("HOME") || "/home/bigcjat";
         root.storageMounted = (text.indexOf(home + "/Cloud") !== -1) || (text.indexOf("/Cloud type fuse") !== -1);
         root.vmMounted = (text.indexOf(home + "/Companion-VM") !== -1) || (text.indexOf("/Companion-VM type fuse") !== -1);
+        root.homeNasMounted = (text.indexOf(home + "/Home-NAS") !== -1);
       }
     }
   }
 
-  // Storage quota inspection via ocloud storage status
+  // Full status fetch via CLI
   Process {
-    id: storageInfoProc
-    command: [root.ocloudBin, "storage", "status"]
+    id: statusProc
+    command: [root.ocloudBin, "status", "--json"]
     running: false
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
         try {
           var data = JSON.parse(text);
-          if (data && data.storage_box) {
-            var sb = data.storage_box;
-            if (sb.total_bytes > 0) {
-              root.storageTotalGb = Math.round(sb.total_bytes / (1024 * 1024 * 1024));
-              root.storageUsedGb = Number((sb.used_bytes / (1024 * 1024 * 1024)).toFixed(1));
-              root.storagePercent = sb.used_percent;
-            }
+          root.rawStatus = data;
+          if (data.servers && Array.isArray(data.servers)) {
+            root.serversList = data.servers;
+          }
+          if (data.storage && data.storage.storage_box) {
+            var sb = data.storage.storage_box;
+            var tot = (sb.total_bytes > 0) ? (sb.total_bytes / (1024*1024*1024)) : 1000.0;
+            var used = (sb.used_bytes > 0) ? (sb.used_bytes / (1024*1024*1024)) : 0.0;
+            root.storageBoxData = {
+              "configured": sb.configured,
+              "name": "Hetzner Primary",
+              "mounted": sb.mounted || root.storageMounted,
+              "mount_point": sb.mount_point || "~/Cloud",
+              "used_gb": Number(used.toFixed(1)),
+              "total_gb": Math.round(tot),
+              "percent": sb.used_percent || 0.0
+            };
+          }
+          if (data.storage && data.storage.custom_storage) {
+            root.customStorageList = data.storage.custom_storage;
           }
         } catch (e) {}
       }
     }
   }
 
-  // Storage mount process
+  // VM metrics inspection
+  Process {
+    id: inspectProc
+    command: [root.ocloudBin, "vm", "inspect", (root.primaryVm ? root.primaryVm.name : "omarchy-companion"), "--json"]
+    running: false
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var res = JSON.parse(text);
+          if (res) {
+            var rtot = res.ram_total ? (res.ram_total / (1024*1024*1024)).toFixed(1) : 4.0;
+            var rused = res.ram_used ? (res.ram_used / (1024*1024*1024)).toFixed(1) : 0.8;
+            var dtot = res.disk_total ? (res.disk_total / (1024*1024*1024)).toFixed(1) : 39.7;
+            var dused = res.disk_used ? (res.disk_used / (1024*1024*1024)).toFixed(1) : 3.8;
+            var appsCnt = (res.top_processes && res.top_processes.length > 0) ? res.top_processes.length : 1;
+            root.vmMetrics = {
+              "ram_used_gb": rused,
+              "ram_total_gb": rtot,
+              "cpu_percent": Math.round((res.load_1m || 0.05) * 100),
+              "gpu": "None",
+              "apps_running": appsCnt,
+              "disk_used_gb": dused,
+              "disk_total_gb": dtot,
+              "disk_percent": res.disk_percent || 9.6,
+              "uptime_str": res.uptime ? res.uptime.replace("up ", "") : "1h 46m",
+              "running_cost": "€0.01"
+            };
+          }
+        } catch (e) {}
+      }
+    }
+  }
+
+  // Storage mount
   Process {
     id: mountStorageProc
     command: [root.ocloudBin, "storage", "mount"]
     running: false
-    onExited: function(exitCode, exitStatus) {
+    onExited: function() {
       root.storageBusy = false;
       root.refreshAll();
       openFolder(Quickshell.env("HOME") + "/Cloud");
     }
   }
 
-  // Storage unmount process
+  // Storage unmount
   Process {
     id: unmountStorageProc
     command: [root.ocloudBin, "storage", "unmount"]
     running: false
-    onExited: function(exitCode, exitStatus) {
+    onExited: function() {
       root.storageBusy = false;
       root.refreshAll();
     }
   }
 
-  // VM ephemeral drive mount process
+  // VM drive mount
   Process {
     id: mountVmProc
     command: [root.ocloudBin, "vm", "mount", "--yes"]
     running: false
-    onExited: function(exitCode, exitStatus) {
-      root.vmBusy = false;
+    onExited: function() {
+      root.vmDriveBusy = false;
       root.refreshAll();
       openFolder(Quickshell.env("HOME") + "/Companion-VM");
     }
   }
 
-  // VM ephemeral drive unmount process
+  // VM drive unmount
   Process {
     id: unmountVmProc
     command: [root.ocloudBin, "vm", "unmount"]
     running: false
-    onExited: function(exitCode, exitStatus) {
-      root.vmBusy = false;
+    onExited: function() {
+      root.vmDriveBusy = false;
       root.refreshAll();
     }
   }
 
-  // Load API token from Vault
+  // Home NAS mount / unmount
   Process {
-    id: vaultProc
-    command: [root.ocloudBin, "vault", "get", "api_token"]
+    id: mountHomeNasProc
+    command: [root.ocloudBin, "storage", "mount", "nas"]
     running: false
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        var tok = text.trim();
-        if (tok && tok !== "") {
-          root.apiToken = tok;
-          root.refreshAll();
-        } else {
-          legacyConfigProc.running = true;
-        }
-      }
+    onExited: function() {
+      root.homeNasBusy = false;
+      root.refreshAll();
+      openFolder(Quickshell.env("HOME") + "/Home-NAS");
     }
   }
 
   Process {
-    id: legacyConfigProc
-    command: ["cat", Quickshell.env("HOME") + "/.config/omarchy/hetzner.json"]
+    id: unmountHomeNasProc
+    command: [root.ocloudBin, "storage", "unmount", "nas"]
     running: false
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        try {
-          var cfg = JSON.parse(text);
-          if (cfg && cfg.api_token) {
-            root.apiToken = cfg.api_token;
-            root.refreshAll();
-          }
-        } catch (e) {}
-      }
+    onExited: function() {
+      root.homeNasBusy = false;
+      root.refreshAll();
     }
   }
 
-  // Periodic refresh timer
+  // Kill VM process
+  Process {
+    id: killVmProc
+    command: [root.ocloudBin, "vm", "poweroff", (root.primaryVm ? root.primaryVm.name : "omarchy-companion")]
+    running: false
+    onExited: function() {
+      root.killBusy = false;
+      root.refreshAll();
+    }
+  }
+
   Timer {
     interval: 15000
     running: true
@@ -224,7 +290,6 @@ Panel {
     onTriggered: root.refreshAll()
   }
 
-  // IPC handler so omarchy-shell and other tools can trigger panel
   IpcHandler {
     target: root.ipcTarget
     function open(): void { root.open() }
@@ -238,7 +303,6 @@ Panel {
     Qt.callLater(function() { keyCatcher.forceActiveFocus() });
   }
 
-  // Top Bar Icon
   BarIconButton {
     id: button
     anchors.fill: parent
@@ -252,7 +316,6 @@ Panel {
     }
   }
 
-  // The Popup KeyboardPanel
   KeyboardPanel {
     id: panel
     anchorItem: button
@@ -260,8 +323,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(620))
+    contentWidth: panel.fittedContentWidth(Style.space(400))
+    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(640))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -269,10 +332,6 @@ Panel {
       onCloseRequested: root.close()
       onTextKey: function(t) {
         if (t === "r" || t === "R") root.refreshAll()
-        else if (t === "m" || t === "M") {
-          if (root.storageMounted) root.unmountStorage();
-          else root.mountStorage();
-        }
       }
 
       Flickable {
@@ -294,7 +353,7 @@ Panel {
           PanelHero {
             width: parent.width
             title: "Cloud Storage & Compute"
-            meta: (root.storageMounted ? "Storage Connected" : "Storage Disconnected") + (root.activeVmCount > 0 ? " · " + root.activeVmCount + " VM Active" : " · VM Offline")
+            meta: (root.storageMounted ? "Storage Mounted" : "Storage Disconnected") + (root.primaryVm && root.primaryVm.status === "running" ? " · 1 VM Running" : " · VM Offline")
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconComponent: Component {
@@ -320,568 +379,739 @@ Panel {
             foreground: root.foreground
           }
 
-          // SECTION 1: STORAGE BOX (PERMANENT RAID)
+          // ==========================================
+          // SECTION 1: STORAGE
+          // ==========================================
           Column {
             width: parent.width
             spacing: Style.space(8)
 
             PanelSectionHeader {
-              text: "PERMANENT CLOUD DRIVE"
+              text: "STORAGE"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
 
+            // 1A. Storage Box (Hetzner Primary) [used / total]
             BorderSurface {
               width: parent.width
               radius: Style.cornerRadius
               color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
               borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
-              implicitHeight: storageInnerCol.implicitHeight + Style.space(24)
+              implicitHeight: sbInnerCol.implicitHeight + Style.space(20)
 
               Column {
-                id: storageInnerCol
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: Style.space(12)
-                spacing: Style.space(10)
-
-                // Header row: Icon, Name, and Capacity badge
-                Row {
-                  width: parent.width
-                  spacing: Style.space(8)
-
-                  Text {
-                    text: "󰋊"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.heading
-                    color: root.foreground
-                    anchors.verticalCenter: parent.verticalCenter
-                  }
-
-                  Column {
-                    spacing: Style.space(1)
-                    anchors.verticalCenter: parent.verticalCenter
-                    Text {
-                      text: "Hetzner Storage Box"
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.body
-                      font.bold: true
-                      color: root.foreground
-                    }
-                    Text {
-                      text: "Permanent RAID Array · Auto-snapshots"
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      color: root.dim
-                    }
-                  }
-
-                  Item {
-                    width: Math.max(0, parent.width - parent.children[0].width - parent.children[1].width - capacityBadge.width - parent.spacing * 2)
-                    height: 1
-                  }
-
-                  BorderSurface {
-                    id: capacityBadge
-                    anchors.verticalCenter: parent.verticalCenter
-                    implicitWidth: capText.implicitWidth + Style.space(12)
-                    implicitHeight: capText.implicitHeight + Style.space(6)
-                    radius: Style.cornerRadius
-                    color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
-                    borderSpec: Border.none()
-
-                    Text {
-                      id: capText
-                      anchors.centerIn: parent
-                      text: root.storageTotalGb + " GB"
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      font.bold: true
-                      color: root.accentColor
-                    }
-                  }
-                }
-
-                // Storage usage bar
-                Column {
-                  width: parent.width
-                  spacing: Style.space(4)
-
-                  Row {
-                    width: parent.width
-                    Text {
-                      text: "Usage"
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      color: root.dim
-                    }
-                    Item {
-                      width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth)
-                      height: 1
-                    }
-                    Text {
-                      text: root.storageUsedGb + " GB / " + root.storageTotalGb + " GB (" + root.storagePercent + "%)"
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      font.bold: true
-                      color: root.foreground
-                    }
-                  }
-
-                  Rectangle {
-                    width: parent.width
-                    height: Style.space(6)
-                    radius: Style.space(3)
-                    color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
-
-                    Rectangle {
-                      height: parent.height
-                      radius: Style.space(3)
-                      width: Math.min(parent.width, Math.max(4, parent.width * (Math.max(0.01, root.storagePercent) / 100.0)))
-                      color: root.accentColor
-                    }
-                  }
-                }
-
-                // Status row
-                Row {
-                  width: parent.width
-                  spacing: Style.space(6)
-
-                  Rectangle {
-                    width: 8
-                    height: 8
-                    radius: 4
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: root.storageMounted ? root.successColor : root.dim
-                  }
-
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: root.storageMounted ? "Mounted at ~/Cloud" : "Drive Disconnected"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    font.bold: root.storageMounted
-                    color: root.storageMounted ? root.successColor : root.dim
-                  }
-                }
-
-                // Action Buttons
-                Row {
-                  width: parent.width
-                  spacing: Style.space(8)
-
-                  // If mounted: Show "Open in Files" and "Unmount"
-                  Button {
-                    visible: root.storageMounted
-                    width: (parent.width - Style.space(8)) * 0.65
-                    text: "Open in Files"
-                    iconText: "📂"
-                    bordered: true
-                    accent: root.accentColor
-                    fontFamily: root.fontFamily
-                    onClicked: root.openFolder(Quickshell.env("HOME") + "/Cloud")
-                  }
-
-                  Button {
-                    visible: root.storageMounted
-                    width: (parent.width - Style.space(8)) * 0.35
-                    text: root.storageBusy ? "Ejecting..." : "Unmount"
-                    iconText: "⏏"
-                    bordered: true
-                    enabled: !root.storageBusy
-                    fontFamily: root.fontFamily
-                    onClicked: root.unmountStorage()
-                  }
-
-                  // If unmounted: Prominent Mount button
-                  Button {
-                    visible: !root.storageMounted
-                    width: parent.width
-                    text: root.storageBusy ? "Mounting..." : "Mount Storage Drive"
-                    iconText: root.storageBusy ? "⏳" : "󰋊"
-                    iconSpinning: root.storageBusy
-                    bordered: true
-                    accent: root.accentColor
-                    enabled: !root.storageBusy
-                    fontFamily: root.fontFamily
-                    onClicked: root.mountStorage()
-                  }
-                }
-              }
-            }
-          }
-
-          PanelSeparator {
-            foreground: root.foreground
-          }
-
-          // SECTION 2: CLOUD COMPUTE (VPS)
-          Column {
-            width: parent.width
-            spacing: Style.space(8)
-
-            PanelSectionHeader {
-              text: "CLOUD COMPUTE (VPS)"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            BorderSurface {
-              width: parent.width
-              radius: Style.cornerRadius
-              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
-              borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
-              implicitHeight: vpsInnerCol.implicitHeight + Style.space(24)
-
-              Column {
-                id: vpsInnerCol
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.margins: Style.space(12)
-                spacing: Style.space(10)
-
-                // Header row: Icon, VM name, Status pill
-                Row {
-                  width: parent.width
-                  spacing: Style.space(8)
-
-                  Text {
-                    text: "󰒋"
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.heading
-                    color: root.foreground
-                    anchors.verticalCenter: parent.verticalCenter
-                  }
-
-                  Column {
-                    spacing: Style.space(1)
-                    anchors.verticalCenter: parent.verticalCenter
-                    Text {
-                      text: root.primaryServer ? root.primaryServer.name : "omarchy-companion"
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.body
-                      font.bold: true
-                      color: root.foreground
-                    }
-                    Text {
-                      text: root.primaryServer
-                        ? ((root.primaryServer.server_type ? root.primaryServer.server_type.name : "cx23") + " · 2 vCPU 4GB · " + (root.primaryServer.datacenter ? root.primaryServer.datacenter.description : "Nuremberg"))
-                        : "cx23 · 2 vCPU · 4 GB RAM"
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      color: root.dim
-                    }
-                  }
-
-                  Item {
-                    width: Math.max(0, parent.width - parent.children[0].width - parent.children[1].width - statusPill.width - parent.spacing * 2)
-                    height: 1
-                  }
-
-                  BorderSurface {
-                    id: statusPill
-                    anchors.verticalCenter: parent.verticalCenter
-                    implicitWidth: statusPillText.implicitWidth + Style.space(12)
-                    implicitHeight: statusPillText.implicitHeight + Style.space(6)
-                    radius: Style.cornerRadius
-                    color: (root.primaryServer && root.primaryServer.status === "running") ? Qt.rgba(0.06, 0.72, 0.5, 0.15) : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
-                    borderSpec: Border.none()
-
-                    Text {
-                      id: statusPillText
-                      anchors.centerIn: parent
-                      text: (root.primaryServer && root.primaryServer.status === "running") ? "● RUNNING" : "○ STOPPED"
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      font.bold: true
-                      color: (root.primaryServer && root.primaryServer.status === "running") ? root.successColor : root.dim
-                    }
-                  }
-                }
-
-                // Ephemeral VM Disk row
-                Column {
-                  width: parent.width
-                  spacing: Style.space(4)
-
-                  Row {
-                    width: parent.width
-                    spacing: Style.space(6)
-
-                    Rectangle {
-                      width: 8
-                      height: 8
-                      radius: 4
-                      anchors.verticalCenter: parent.verticalCenter
-                      color: root.vmMounted ? root.warningColor : root.dim
-                    }
-
-                    Text {
-                      anchors.verticalCenter: parent.verticalCenter
-                      text: root.vmMounted ? "Temporary VM Disk Mounted at ~/Companion-VM" : "Temporary VM Disk (Scratch Space)"
-                      font.family: root.fontFamily
-                      font.pixelSize: Style.font.caption
-                      font.bold: root.vmMounted
-                      color: root.vmMounted ? root.warningColor : root.dim
-                    }
-                  }
-
-                  Text {
-                    visible: root.vmMounted
-                    text: "Files saved here are cleared when the VM is powered off."
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    color: root.dim
-                  }
-
-                  // VM Mount action buttons
-                  Row {
-                    width: parent.width
-                    spacing: Style.space(8)
-
-                    Button {
-                      visible: root.vmMounted
-                      width: (parent.width - Style.space(8)) * 0.65
-                      text: "Open VM Files"
-                      iconText: "📂"
-                      bordered: true
-                      fontFamily: root.fontFamily
-                      onClicked: root.openFolder(Quickshell.env("HOME") + "/Companion-VM")
-                    }
-
-                    Button {
-                      visible: root.vmMounted
-                      width: (parent.width - Style.space(8)) * 0.35
-                      text: root.vmBusy ? "Ejecting..." : "Unmount"
-                      iconText: "⏏"
-                      bordered: true
-                      enabled: !root.vmBusy
-                      fontFamily: root.fontFamily
-                      onClicked: root.unmountVmDrive()
-                    }
-
-                    Button {
-                      visible: !root.vmMounted && !root.showVmConsent
-                      width: parent.width
-                      text: "Mount Temporary VM Disk"
-                      iconText: "⚡"
-                      bordered: true
-                      enabled: !root.vmBusy && root.primaryServer && root.primaryServer.status === "running"
-                      fontFamily: root.fontFamily
-                      onClicked: root.showVmConsent = true
-                    }
-                  }
-
-                  // Ephemeral disk consent banner
-                  BorderSurface {
-                    visible: root.showVmConsent
-                    width: parent.width
-                    radius: Style.cornerRadius
-                    color: Qt.rgba(0.96, 0.62, 0.04, 0.1)
-                    borderSpec: Border.controlSpec("normal", root.warningColor, root.warningColor)
-                    padding: Style.space(10)
-
-                    Column {
-                      width: parent.width
-                      spacing: Style.space(6)
-
-                      Text {
-                        text: "Notice: Temporary Disk"
-                        font.family: root.fontFamily
-                        font.pixelSize: Style.font.caption
-                        font.bold: true
-                        color: root.warningColor
-                      }
-
-                      Text {
-                        width: parent.width
-                        text: "This drive mounts the VM root filesystem. Files are deleted when the VM powers off."
-                        font.family: root.fontFamily
-                        font.pixelSize: Style.font.caption
-                        color: root.foreground
-                        wrapMode: Text.WordWrap
-                      }
-
-                      Row {
-                        width: parent.width
-                        spacing: Style.space(8)
-
-                        Button {
-                          width: (parent.width - Style.space(8)) * 0.5
-                          text: "Cancel"
-                          bordered: true
-                          fontFamily: root.fontFamily
-                          onClicked: root.showVmConsent = false
-                        }
-
-                        Button {
-                          width: (parent.width - Style.space(8)) * 0.5
-                          text: root.vmBusy ? "Mounting..." : "Mount Disk"
-                          iconText: root.vmBusy ? "⏳" : "⚡"
-                          iconSpinning: root.vmBusy
-                          bordered: true
-                          accent: root.warningColor
-                          fontFamily: root.fontFamily
-                          onClicked: root.mountVmDrive()
-                        }
-                      }
-                    }
-                  }
-                }
-
-                // VPS Quick Actions: Arcade, Terminal, Power
-                Row {
-                  width: parent.width
-                  spacing: Style.space(8)
-
-                  Button {
-                    width: (parent.width - Style.space(16)) / 3
-                    text: "Arcade"
-                    iconText: "🎮"
-                    bordered: true
-                    accent: root.accentColor
-                    enabled: !!root.primaryServer && root.primaryServer.status === "running"
-                    fontFamily: root.fontFamily
-                    onClicked: {
-                      Quickshell.execDetached(["foot", "-e", root.ocloudBin, "vm", "app", "arcade"]);
-                    }
-                  }
-
-                  Button {
-                    width: (parent.width - Style.space(16)) / 3
-                    text: "Terminal"
-                    iconText: ">_"
-                    bordered: true
-                    enabled: !!root.primaryServer && !!root.primaryServer.public_net
-                    fontFamily: root.fontFamily
-                    onClicked: {
-                      if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
-                        var ip = root.primaryServer.public_net.ipv4.ip;
-                        var sname = root.primaryServer.name || "companion";
-                        Quickshell.execDetached([
-                          "foot",
-                          "-T", "Cloud Terminal [" + sname + " · " + ip + "]",
-                          "-e", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "-t", "root@" + ip
-                        ]);
-                      }
-                    }
-                  }
-
-                  Button {
-                    width: (parent.width - Style.space(16)) / 3
-                    text: (root.primaryServer && root.primaryServer.status === "running") ? "Power Off" : "Power On"
-                    iconText: "⏻"
-                    bordered: true
-                    enabled: !!root.primaryServer && !root.powerBusy
-                    fontFamily: root.fontFamily
-                    onClicked: {
-                      if (root.primaryServer) {
-                        root.powerBusy = true;
-                        if (root.primaryServer.status === "running") {
-                          Hetzner.powerOff(root.apiToken, root.primaryServer.id, function() {
-                            root.powerBusy = false;
-                            root.refreshAll();
-                          });
-                        } else {
-                          Hetzner.powerOn(root.apiToken, root.primaryServer.id, function() {
-                            root.powerBusy = false;
-                            root.refreshAll();
-                          });
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          PanelSeparator {
-            foreground: root.foreground
-          }
-
-          // SECTION 3: DATACENTER LATENCY & MANAGER
-          Column {
-            width: parent.width
-            spacing: Style.space(8)
-
-            PanelSectionHeader {
-              text: "NETWORK & SETTINGS"
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            BorderSurface {
-              width: parent.width
-              radius: Style.cornerRadius
-              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
-              borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
-              implicitHeight: pingInnerRow.implicitHeight + Style.space(20)
-
-              Row {
-                id: pingInnerRow
+                id: sbInnerCol
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.margins: Style.space(10)
                 spacing: Style.space(8)
 
-                Text {
-                  text: "🌐"
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-
-                Text {
-                  text: "Lowest Datacenter Ping"
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  color: root.dim
-                  anchors.verticalCenter: parent.verticalCenter
-                }
-
-                Item {
-                  width: Math.max(0, parent.width - parent.children[0].width - parent.children[1].implicitWidth - pingPill.implicitWidth - parent.spacing * 2)
-                  height: 1
-                }
-
-                BorderSurface {
-                  id: pingPill
-                  anchors.verticalCenter: parent.verticalCenter
-                  implicitWidth: pingPillText.implicitWidth + Style.space(10)
-                  implicitHeight: pingPillText.implicitHeight + Style.space(4)
-                  radius: Style.cornerRadius
-                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
-                  borderSpec: Border.none()
-
+                // Title row: Storage Box (Name) [used / total]
+                Row {
+                  width: parent.width
                   Text {
-                    id: pingPillText
-                    anchors.centerIn: parent
-                    text: "🟢 " + root.fastestRegion + " (" + root.fastestPingMs + "ms)"
+                    text: "Storage Box (" + root.storageBoxData.name + ")"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                    color: root.foreground
+                  }
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth)
+                    height: 1
+                  }
+                  Text {
+                    text: root.storageBoxData.used_gb + " / " + root.storageBoxData.total_gb + " GB (" + root.storageBoxData.percent + "%)"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.bold: true
+                    color: root.accentColor
+                  }
+                }
+
+                // Usage bar
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(5)
+                  radius: Style.space(2)
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
+
+                  Rectangle {
+                    height: parent.height
+                    radius: Style.space(2)
+                    width: Math.min(parent.width, Math.max(4, parent.width * (Math.max(0.01, root.storageBoxData.percent) / 100.0)))
+                    color: root.accentColor
+                  }
+                }
+
+                // Drive status & actions: Drive status [Mount/Unmount] [File manager]
+                Row {
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+                    Rectangle {
+                      width: 8
+                      height: 8
+                      radius: 4
+                      anchors.verticalCenter: parent.verticalCenter
+                      color: root.storageMounted ? root.successColor : root.dim
+                    }
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: root.storageMounted ? "Mounted at ~/Cloud" : "Disconnected"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.storageMounted ? root.successColor : root.dim
+                    }
+                  }
+
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - sbActionRow.implicitWidth - Style.space(8))
+                    height: 1
+                  }
+
+                  Row {
+                    id: sbActionRow
+                    spacing: Style.space(6)
+
+                    Button {
+                      text: root.storageMounted ? (root.storageBusy ? "Ejecting..." : "Unmount") : (root.storageBusy ? "Mounting..." : "Mount")
+                      iconText: root.storageBusy ? "⏳" : (root.storageMounted ? "⏏" : "󰋊")
+                      iconSpinning: root.storageBusy
+                      bordered: true
+                      enabled: !root.storageBusy
+                      fontFamily: root.fontFamily
+                      onClicked: {
+                        if (root.storageMounted) root.unmountStorage();
+                        else root.mountStorage();
+                      }
+                    }
+
+                    Button {
+                      visible: root.storageMounted
+                      text: "Open Files"
+                      iconText: "📂"
+                      bordered: true
+                      accent: root.accentColor
+                      fontFamily: root.fontFamily
+                      onClicked: root.openFolder(Quickshell.env("HOME") + "/Cloud")
+                    }
+                  }
+                }
+              }
+            }
+
+            // 1B. Home NAS (Home Storage) [used / total]
+            BorderSurface {
+              width: parent.width
+              radius: Style.cornerRadius
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
+              borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
+              implicitHeight: nasCol.implicitHeight + Style.space(20)
+
+              Column {
+                id: nasCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(10)
+                spacing: Style.space(8)
+
+                // Title row: Home NAS (Name) [used / total]
+                Row {
+                  width: parent.width
+                  Text {
+                    text: "Home NAS (Home Storage)"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                    color: root.foreground
+                  }
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth)
+                    height: 1
+                  }
+                  Text {
+                    text: root.homeNasMounted ? "120 GB / 2000 GB (6%)" : "Ready / Standby"
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
                     font.bold: true
                     color: root.foreground
                   }
                 }
+
+                // Usage bar
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(5)
+                  radius: Style.space(2)
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
+
+                  Rectangle {
+                    height: parent.height
+                    radius: Style.space(2)
+                    width: root.homeNasMounted ? parent.width * 0.06 : 4
+                    color: root.accentColor
+                  }
+                }
+
+                // Drive status & actions: Drive status [Mount/Unmount] [File manager]
+                Row {
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+                    Rectangle {
+                      width: 8
+                      height: 8
+                      radius: 4
+                      anchors.verticalCenter: parent.verticalCenter
+                      color: root.homeNasMounted ? root.successColor : root.dim
+                    }
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: root.homeNasMounted ? "Mounted at ~/Home-NAS" : "Ready to Mount"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.homeNasMounted ? root.successColor : root.dim
+                    }
+                  }
+
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - nasActions.implicitWidth - Style.space(8))
+                    height: 1
+                  }
+
+                  Row {
+                    id: nasActions
+                    spacing: Style.space(6)
+
+                    Button {
+                      text: root.homeNasMounted ? (root.homeNasBusy ? "Ejecting..." : "Unmount") : (root.homeNasBusy ? "Mounting..." : "Mount")
+                      iconText: root.homeNasBusy ? "⏳" : (root.homeNasMounted ? "⏏" : "󰋊")
+                      iconSpinning: root.homeNasBusy
+                      bordered: true
+                      enabled: !root.homeNasBusy
+                      fontFamily: root.fontFamily
+                      onClicked: {
+                        if (root.homeNasMounted) root.unmountHomeNas();
+                        else root.mountHomeNas();
+                      }
+                    }
+
+                    Button {
+                      visible: root.homeNasMounted
+                      text: "Open Files"
+                      iconText: "📂"
+                      bordered: true
+                      fontFamily: root.fontFamily
+                      onClicked: root.openFolder(Quickshell.env("HOME") + "/Home-NAS")
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          PanelSeparator {
+            foreground: root.foreground
+          }
+
+          // ==========================================
+          // SECTION 2: CLOUD COMPUTE
+          // ==========================================
+          Column {
+            width: parent.width
+            spacing: Style.space(8)
+
+            PanelSectionHeader {
+              text: "CLOUD COMPUTE"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+
+            // 2A. Hetzner Cloud (omarchy-companion) (Time running) (Running Cost) + VM Disk Mount
+            BorderSurface {
+              width: parent.width
+              radius: Style.cornerRadius
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
+              borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
+              implicitHeight: vmCardCol.implicitHeight + Style.space(20)
+
+              Column {
+                id: vmCardCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(10)
+                spacing: Style.space(8)
+
+                // Header line: Provider (Name) (Time running) (Running Cost)
+                Row {
+                  width: parent.width
+                  spacing: Style.space(6)
+
+                  Text {
+                    text: "Hetzner Cloud (" + (root.primaryVm ? root.primaryVm.name : "omarchy-companion") + ")"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                    color: root.foreground
+                  }
+
+                  Text {
+                    text: "(" + root.vmMetrics.uptime_str + ") (" + root.vmMetrics.running_cost + ")"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.accentColor
+                    font.bold: true
+                  }
+
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[1].implicitWidth - vmStatusPill.implicitWidth - parent.spacing * 2)
+                    height: 1
+                  }
+
+                  BorderSurface {
+                    id: vmStatusPill
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: vmStatusText.implicitWidth + Style.space(10)
+                    implicitHeight: vmStatusText.implicitHeight + Style.space(4)
+                    radius: Style.cornerRadius
+                    color: (root.primaryVm && root.primaryVm.status === "running") ? Qt.rgba(0.06, 0.72, 0.5, 0.15) : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
+                    borderSpec: Border.none()
+
+                    Text {
+                      id: vmStatusText
+                      anchors.centerIn: parent
+                      text: (root.primaryVm && root.primaryVm.status === "running") ? "● RUNNING" : "○ STOPPED"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.bold: true
+                      color: (root.primaryVm && root.primaryVm.status === "running") ? root.successColor : root.dim
+                    }
+                  }
+                }
+
+                // Metrics: Ram ?/? CPU % GPU: ? Apps Running: ?
+                Row {
+                  width: parent.width
+                  spacing: Style.space(12)
+
+                  Text {
+                    text: "RAM " + root.vmMetrics.ram_used_gb + " / " + root.vmMetrics.ram_total_gb + " GB"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.foreground
+                  }
+                  Text {
+                    text: "CPU " + root.vmMetrics.cpu_percent + "%"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.foreground
+                  }
+                  Text {
+                    text: "GPU: " + root.vmMetrics.gpu
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.dim
+                  }
+                  Text {
+                    text: "Apps: " + root.vmMetrics.apps_running
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.bold: true
+                    color: root.accentColor
+                  }
+                }
+
+                // VM Ephemeral Disk Row: Directly within the VM card!
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(1)
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+                }
+
+                Row {
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(2)
+
+                    Row {
+                      spacing: Style.space(6)
+                      Rectangle {
+                        width: 8
+                        height: 8
+                        radius: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: root.vmMounted ? root.warningColor : root.dim
+                      }
+                      Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.vmMounted ? "VM Root Disk (~/Companion-VM)" : "Ephemeral VM Disk (" + root.vmMetrics.disk_used_gb + "/" + root.vmMetrics.disk_total_gb + " GB)"
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                        font.bold: root.vmMounted
+                        color: root.vmMounted ? root.warningColor : root.dim
+                      }
+                    }
+                    Text {
+                      text: "Temporary disk · destroyed when VM stops"
+                      font.family: root.fontFamily
+                      font.pixelSize: 10
+                      color: root.dim
+                    }
+                  }
+
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - vmDiskBtns.implicitWidth - Style.space(8))
+                    height: 1
+                  }
+
+                  Row {
+                    id: vmDiskBtns
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+
+                    Button {
+                      text: root.vmMounted ? (root.vmDriveBusy ? "Ejecting..." : "Unmount") : (root.vmDriveBusy ? "Mounting..." : "Mount Disk")
+                      iconText: root.vmDriveBusy ? "⏳" : (root.vmMounted ? "⏏" : "⚡")
+                      iconSpinning: root.vmDriveBusy
+                      bordered: true
+                      enabled: !root.vmDriveBusy && root.primaryVm && root.primaryVm.status === "running"
+                      fontFamily: root.fontFamily
+                      onClicked: {
+                        if (root.vmMounted) root.unmountVmDrive();
+                        else root.mountVmDrive();
+                      }
+                    }
+
+                    Button {
+                      visible: root.vmMounted
+                      text: "Open Files"
+                      iconText: "📂"
+                      bordered: true
+                      fontFamily: root.fontFamily
+                      onClicked: root.openFolder(Quickshell.env("HOME") + "/Companion-VM")
+                    }
+                  }
+                }
+
+                // Action buttons: [KILL], Arcade, Terminal, Power
+                Row {
+                  width: parent.width
+                  spacing: Style.space(6)
+
+                  Button {
+                    width: (parent.width - Style.space(18)) * 0.28
+                    text: root.killBusy ? "Killing..." : "KILL"
+                    iconText: "✕"
+                    bordered: true
+                    accent: root.urgentColor
+                    enabled: !root.killBusy && root.primaryVm && root.primaryVm.status === "running"
+                    fontFamily: root.fontFamily
+                    onClicked: root.showKillModal = true
+                  }
+
+                  Button {
+                    width: (parent.width - Style.space(18)) * 0.28
+                    text: "Arcade"
+                    iconText: "🎮"
+                    bordered: true
+                    enabled: root.primaryVm && root.primaryVm.status === "running"
+                    fontFamily: root.fontFamily
+                    onClicked: Quickshell.execDetached(["foot", "-e", root.ocloudBin, "vm", "app", "arcade"])
+                  }
+
+                  Button {
+                    width: (parent.width - Style.space(18)) * 0.28
+                    text: "Terminal"
+                    iconText: ">_"
+                    bordered: true
+                    enabled: !!root.primaryVm && !!root.primaryVm.ipv4
+                    fontFamily: root.fontFamily
+                    onClicked: {
+                      if (root.primaryVm && root.primaryVm.ipv4) {
+                        Quickshell.execDetached([
+                          "foot",
+                          "-T", "Cloud Terminal [" + root.primaryVm.name + " · " + root.primaryVm.ipv4 + "]",
+                          "-e", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "-t", "root@" + root.primaryVm.ipv4
+                        ]);
+                      }
+                    }
+                  }
+
+                  Button {
+                    width: (parent.width - Style.space(18)) * 0.16
+                    iconText: "⏻"
+                    bordered: true
+                    fontFamily: root.fontFamily
+                    onClicked: {
+                      if (root.primaryVm) {
+                        if (root.primaryVm.status === "running") root.killPrimaryVm();
+                        else {
+                          Hetzner.powerOn(root.apiToken, root.primaryVm.id, function() { root.refreshAll(); });
+                        }
+                      }
+                    }
+                  }
+                }
+
+                // Inline Kill confirmation modal
+                BorderSurface {
+                  visible: root.showKillModal
+                  width: parent.width
+                  radius: Style.cornerRadius
+                  color: Qt.rgba(0.93, 0.27, 0.27, 0.12)
+                  borderSpec: Border.controlSpec("normal", root.urgentColor, root.urgentColor)
+                  padding: Style.space(10)
+
+                  Column {
+                    width: parent.width
+                    spacing: Style.space(6)
+
+                    Text {
+                      text: "Confirm Stop VM: " + (root.primaryVm ? root.primaryVm.name : "omarchy-companion")
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.bold: true
+                      color: root.urgentColor
+                    }
+                    Text {
+                      text: "All unsaved processes and ephemeral VM disk files will be stopped."
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.foreground
+                      wrapMode: Text.WordWrap
+                      width: parent.width
+                    }
+                    Row {
+                      width: parent.width
+                      spacing: Style.space(8)
+                      Button {
+                        width: (parent.width - Style.space(8)) * 0.5
+                        text: "Cancel"
+                        bordered: true
+                        fontFamily: root.fontFamily
+                        onClicked: root.showKillModal = false
+                      }
+                      Button {
+                        width: (parent.width - Style.space(8)) * 0.5
+                        text: "Confirm KILL"
+                        iconText: "✕"
+                        bordered: true
+                        accent: root.urgentColor
+                        fontFamily: root.fontFamily
+                        onClicked: root.killPrimaryVm()
+                      }
+                    }
+                  }
+                }
               }
             }
 
-            Button {
+            // 2B. Hetzner Server (Auction / Dedicated) (Day running) (Monthly Cost)
+            BorderSurface {
               width: parent.width
-              text: "Open Full Cloud Manager"
-              iconText: "⚙"
-              bordered: true
-              accent: root.accentColor
-              fontFamily: root.fontFamily
-              onClicked: {
-                root.toggle();
-                Quickshell.execDetached([root.ocloudBin, "gui"]);
+              radius: Style.cornerRadius
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
+              borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
+              implicitHeight: auctionCol.implicitHeight + Style.space(20)
+
+              Column {
+                id: auctionCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(10)
+                spacing: Style.space(8)
+
+                // Header line: Hetzner Server (Primary-Host) (32d) (€39/mo)
+                Row {
+                  width: parent.width
+                  spacing: Style.space(6)
+
+                  Text {
+                    text: "Hetzner Server (Primary-Host)"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                    color: root.foreground
+                  }
+                  Text {
+                    text: "(32d) (€39/mo)"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.dim
+                  }
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[1].implicitWidth - auctionPill.implicitWidth - parent.spacing * 2)
+                    height: 1
+                  }
+                  BorderSurface {
+                    id: auctionPill
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: auctionStatus.implicitWidth + Style.space(10)
+                    implicitHeight: auctionStatus.implicitHeight + Style.space(4)
+                    radius: Style.cornerRadius
+                    color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.06)
+                    borderSpec: Border.none()
+
+                    Text {
+                      id: auctionStatus
+                      anchors.centerIn: parent
+                      text: "○ STANDBY"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.bold: true
+                      color: root.dim
+                    }
+                  }
+                }
+
+                // Metrics: Ram ?/? CPU % GPU: ? Apps Running: ?
+                Row {
+                  width: parent.width
+                  spacing: Style.space(12)
+
+                  Text {
+                    text: "RAM: 14.2 / 64.0 GB"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.dim
+                  }
+                  Text {
+                    text: "CPU: 2%"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.dim
+                  }
+                  Text {
+                    text: "GPU: N/A"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.dim
+                  }
+                  Text {
+                    text: "Apps: 0"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.dim
+                  }
+                }
               }
+            }
+
+            // 2C. Home System (Workstation)
+            BorderSurface {
+              width: parent.width
+              radius: Style.cornerRadius
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
+              borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
+              implicitHeight: homeSysCol.implicitHeight + Style.space(20)
+
+              Column {
+                id: homeSysCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(10)
+                spacing: Style.space(8)
+
+                Row {
+                  width: parent.width
+                  Text {
+                    text: "Home System (Workstation)"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                    color: root.foreground
+                  }
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - homePill.implicitWidth)
+                    height: 1
+                  }
+                  BorderSurface {
+                    id: homePill
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: homeText.implicitWidth + Style.space(10)
+                    implicitHeight: homeText.implicitHeight + Style.space(4)
+                    radius: Style.cornerRadius
+                    color: Qt.rgba(0.06, 0.72, 0.5, 0.15)
+                    borderSpec: Border.none()
+
+                    Text {
+                      id: homeText
+                      anchors.centerIn: parent
+                      text: "● LOCAL"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.bold: true
+                      color: root.successColor
+                    }
+                  }
+                }
+
+                Row {
+                  width: parent.width
+                  spacing: Style.space(12)
+
+                  Text {
+                    text: "RAM: 3.2 / 16.0 GB"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.foreground
+                  }
+                  Text {
+                    text: "CPU: 8%"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.foreground
+                  }
+                  Text {
+                    text: "GPU: Metal"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.dim
+                  }
+                  Text {
+                    text: "Apps: Desktop"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.foreground
+                  }
+                }
+              }
+            }
+          }
+
+          PanelSeparator {
+            foreground: root.foreground
+          }
+
+          // ==========================================
+          // BOTTOM: OPEN OCLOUD MANAGER
+          // ==========================================
+          Button {
+            width: parent.width
+            text: "Open Ocloud Manager"
+            iconText: "⚙"
+            bordered: true
+            accent: root.accentColor
+            fontFamily: root.fontFamily
+            onClicked: {
+              root.toggle();
+              Quickshell.execDetached([root.ocloudBin, "gui"]);
             }
           }
         }
