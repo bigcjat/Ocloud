@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "HetznerApi.js" as Hetzner
 
 Panel {
   id: root
@@ -19,46 +20,77 @@ Panel {
   readonly property color successColor: "#10b981"
   readonly property color warningColor: "#f59e0b"
 
-  property var statusData: ({
-    "storage": {
-      "configured": false,
-      "mounted": false,
-      "used_percent": 0.0,
-      "used_bytes": 0,
-      "total_bytes": 0,
-      "mount_point": "~/Cloud"
-    },
-    "compute": {
-      "active_count": 0,
-      "total_count": 0,
-      "primary_server": null,
-      "servers": []
+  // In-memory reactive state
+  property string apiToken: ""
+  property var serversList: []
+  property var primaryServer: serversList.length > 0 ? serversList[0] : null
+  property int activeVmCount: {
+    var cnt = 0;
+    for (var i = 0; i < serversList.length; i++) {
+      if (serversList[i].status === "running") cnt++;
     }
+    return cnt;
+  }
+
+  property var storageData: ({
+    "configured": true,
+    "mounted": false,
+    "used_percent": 0.0,
+    "mount_point": "~/Cloud"
   })
 
   property bool showProcureView: false
   property string newVmType: "cx23"
   property string newVmLocation: "nbg1"
+  property string statusMessage: ""
 
-  property string ocloudBin: pluginSettings && pluginSettings.ocloudBinPath ? pluginSettings.ocloudBinPath : "ocloud"
-  property int refreshInterval: pluginSettings && pluginSettings.refreshIntervalSec ? pluginSettings.refreshIntervalSec : 60
+  property int refreshInterval: 30
 
-  function refreshStatus() {
-    statusProc.running = true
+  function refreshAll() {
+    if (!root.apiToken || root.apiToken === "") {
+      configProc.running = true;
+      return;
+    }
+
+    // Direct in-memory JavaScript REST call
+    Hetzner.fetchServers(root.apiToken, function(servers) {
+      root.serversList = servers;
+    }, function(err) {
+      console.log("Ocloud Hetzner API error: " + err);
+    });
+
+    // Check mount state
+    mountCheckProc.running = true;
   }
 
+  // Load configuration via cat or file
   Process {
-    id: statusProc
-    command: [ocloudBin, "status", "--json"]
+    id: configProc
+    command: ["cat", Quickshell.env("HOME") + "/.config/omarchy/hetzner.json"]
     running: false
     stdout: StdioCollector {
       onCollected: {
         try {
-          var parsed = JSON.parse(text)
-          if (parsed) root.statusData = parsed
+          var cfg = JSON.parse(text);
+          if (cfg && cfg.api_token) {
+            root.apiToken = cfg.api_token;
+            root.refreshAll();
+          }
         } catch (e) {
-          console.log("Hetzner JSON parse error: " + e)
+          console.log("Config read error: " + e);
         }
+      }
+    }
+  }
+
+  Process {
+    id: mountCheckProc
+    command: ["mount"]
+    running: false
+    stdout: StdioCollector {
+      onCollected: {
+        var isMnt = text.indexOf("/Cloud") !== -1;
+        root.storageData.mounted = isMnt;
       }
     }
   }
@@ -68,13 +100,13 @@ Panel {
     running: true
     repeat: true
     triggeredOnStart: true
-    onTriggered: root.refreshStatus()
+    onTriggered: root.refreshAll()
   }
 
   // Panel Content Card
   contentItem: Rectangle {
-    implicitWidth: 400
-    implicitHeight: root.showProcureView ? 480 : 380
+    implicitWidth: 410
+    implicitHeight: root.showProcureView ? 490 : 380
     color: root.surface
     radius: 12
     border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.15)
@@ -89,7 +121,7 @@ Panel {
       RowLayout {
         Layout.fillWidth: true
         Text {
-          text: "☁ Hetzner Cloud Companion"
+          text: "☁ Ocloud Companion"
           font.pixelSize: 15
           font.bold: true
           color: root.foreground
@@ -98,7 +130,7 @@ Panel {
         Button {
           text: "↻"
           flat: true
-          onClicked: root.refreshStatus()
+          onClicked: root.refreshAll()
         }
       }
 
@@ -123,8 +155,8 @@ Panel {
           }
           Item { Layout.fillWidth: true }
           Text {
-            text: root.statusData.storage.configured ? (root.statusData.storage.used_percent + "% (1.0 TB)") : "Not Configured"
-            color: root.statusData.storage.configured ? root.accentColor : root.dim
+            text: root.storageData.configured ? "1.0 TB (0.0% used)" : "Not Configured"
+            color: root.storageData.configured ? root.accentColor : root.dim
             font.pixelSize: 12
           }
         }
@@ -139,7 +171,7 @@ Panel {
           Rectangle {
             height: parent.height
             radius: 3
-            width: Math.min(parent.width, Math.max(0, parent.width * (root.statusData.storage.used_percent / 100.0)))
+            width: Math.min(parent.width, Math.max(4, parent.width * (root.storageData.used_percent / 100.0)))
             color: root.accentColor
           }
         }
@@ -147,18 +179,21 @@ Panel {
         RowLayout {
           Layout.fillWidth: true
           Text {
-            text: root.statusData.storage.mounted ? "● Mounted at " + root.statusData.storage.mount_point : "○ Drive unmounted"
+            text: root.storageData.mounted ? "● Mounted at ~/Cloud" : "○ Drive unmounted"
             font.pixelSize: 11
-            color: root.statusData.storage.mounted ? root.successColor : root.dim
+            color: root.storageData.mounted ? root.successColor : root.dim
           }
           Item { Layout.fillWidth: true }
           Button {
-            text: root.statusData.storage.mounted ? "Unmount" : "Mount Drive"
+            text: root.storageData.mounted ? "Unmount" : "Mount Drive"
             font.pixelSize: 11
             onClicked: {
-              var cmd = root.statusData.storage.mounted ? "unmount" : "mount"
-              actionProc.command = [root.ocloudBin, "storage", cmd]
-              actionProc.running = true
+              if (root.storageData.mounted) {
+                execProc.command = ["umount", Quickshell.env("HOME") + "/Cloud"];
+              } else {
+                execProc.command = ["ocloud", "storage", "mount"];
+              }
+              execProc.running = true;
             }
           }
         }
@@ -185,15 +220,15 @@ Panel {
           }
           Item { Layout.fillWidth: true }
           Text {
-            text: root.statusData.compute.active_count > 0 ? "● RUNNING" : "○ OFFLINE"
+            text: root.activeVmCount > 0 ? "● " + root.activeVmCount + " RUNNING" : "○ OFFLINE"
             font.pixelSize: 11
             font.bold: true
-            color: root.statusData.compute.active_count > 0 ? root.successColor : root.dim
+            color: root.activeVmCount > 0 ? root.successColor : root.dim
           }
         }
 
         Text {
-          text: root.statusData.compute.primary_server ? (root.statusData.compute.primary_server.name + " (" + root.statusData.compute.primary_server.type + " · " + root.statusData.compute.primary_server.ipv4 + ")") : "No active companion servers"
+          text: root.primaryServer ? (root.primaryServer.name + " (" + (root.primaryServer.server_type ? root.primaryServer.server_type.name : "cx23") + " · " + (root.primaryServer.public_net && root.primaryServer.public_net.ipv4 ? root.primaryServer.public_net.ipv4.ip : "no IP") + ")") : "No active companion servers"
           font.pixelSize: 12
           color: root.dim
         }
@@ -205,34 +240,41 @@ Panel {
           Button {
             text: ">_ Terminal"
             Layout.fillWidth: true
-            enabled: !!root.statusData.compute.primary_server
+            enabled: !!root.primaryServer
             onClicked: {
-              if (root.statusData.compute.primary_server) {
-                actionProc.command = ["alacritty", "-e", root.ocloudBin, "vm", "ssh", String(root.statusData.compute.primary_server.id)]
-                actionProc.running = true
+              if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
+                execProc.command = ["alacritty", "-e", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "root@" + root.primaryServer.public_net.ipv4.ip];
+                execProc.running = true;
               }
             }
           }
           Button {
             text: "🎮 Launch App"
             Layout.fillWidth: true
-            enabled: !!root.statusData.compute.primary_server && root.statusData.compute.active_count > 0
+            enabled: !!root.primaryServer && root.primaryServer.status === "running"
             onClicked: {
-              if (root.statusData.compute.primary_server) {
-                actionProc.command = [root.ocloudBin, "vm", "app", String(root.statusData.compute.primary_server.id), "xeyes"]
-                actionProc.running = true
+              if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
+                var ip = root.primaryServer.public_net.ipv4.ip;
+                execProc.command = ["waypipe", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "root@" + ip, "/usr/local/bin/devilutionx"];
+                execProc.running = true;
               }
             }
           }
           Button {
-            text: root.statusData.compute.active_count > 0 ? "Power Off" : "Power On"
+            text: (root.primaryServer && root.primaryServer.status === "running") ? "Power Off" : "Power On"
             Layout.fillWidth: true
-            enabled: !!root.statusData.compute.primary_server
+            enabled: !!root.primaryServer
             onClicked: {
-              if (root.statusData.compute.primary_server) {
-                var action = root.statusData.compute.active_count > 0 ? "stop" : "start"
-                actionProc.command = [root.ocloudBin, "vm", action, String(root.statusData.compute.primary_server.id)]
-                actionProc.running = true
+              if (root.primaryServer) {
+                if (root.primaryServer.status === "running") {
+                  Hetzner.powerOff(root.apiToken, root.primaryServer.id, function() {
+                    root.refreshAll();
+                  });
+                } else {
+                  Hetzner.powerOn(root.apiToken, root.primaryServer.id, function() {
+                    root.refreshAll();
+                  });
+                }
               }
             }
           }
@@ -269,9 +311,9 @@ Panel {
           ComboBox {
             model: ["cx23 (Intel 2c/4GB · €4/mo)", "cax11 (ARM 2c/4GB · €3.80/mo)", "cpx21 (AMD 3c/4GB · €7/mo)"]
             onCurrentIndexChanged: {
-              if (currentIndex === 0) root.newVmType = "cx23"
-              else if (currentIndex === 1) root.newVmType = "cax11"
-              else if (currentIndex === 2) root.newVmType = "cpx21"
+              if (currentIndex === 0) root.newVmType = "cx23";
+              else if (currentIndex === 1) root.newVmType = "cax11";
+              else if (currentIndex === 2) root.newVmType = "cpx21";
             }
           }
         }
@@ -280,10 +322,13 @@ Panel {
           text: "🚀 Deploy Server in Nuremberg (nbg1)"
           Layout.fillWidth: true
           onClicked: {
-            var srvName = "omarchy-" + Math.floor(Math.random() * 1000)
-            actionProc.command = [root.ocloudBin, "vm", "create", srvName, "--type", root.newVmType, "--location", root.newVmLocation]
-            actionProc.running = true
-            root.showProcureView = false
+            var srvName = "omarchy-" + Math.floor(Math.random() * 1000);
+            Hetzner.createServer(root.apiToken, srvName, root.newVmType, root.newVmLocation, "ubuntu-24.04", ["omarchy-laptop"], null, function(newServer) {
+              root.showProcureView = false;
+              root.refreshAll();
+            }, function(err) {
+              console.log("Procure error: " + err);
+            });
           }
         }
       }
@@ -291,8 +336,8 @@ Panel {
   }
 
   Process {
-    id: actionProc
+    id: execProc
     running: false
-    onExited: root.refreshStatus()
+    onExited: root.refreshAll()
   }
 }
