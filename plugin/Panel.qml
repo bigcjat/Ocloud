@@ -147,7 +147,6 @@ Panel {
           Item { Layout.fillWidth: true }
           Button {
             text: "↻"
-            flat: true
             onClicked: root.refreshAll()
           }
         }
@@ -308,7 +307,6 @@ Panel {
           Button {
             text: root.showProcureView ? "Cancel" : "+ Procure New Cloud VM"
             Layout.fillWidth: true
-            flat: true
             onClicked: root.showProcureView = !root.showProcureView
           }
         }
