@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "community.hetzner",
+  "name": "Hetzner Companion",
+  "version": "1.0.0",
+  "author": "Chris Thompson",
+  "license": "MIT",
+  "description": "Hetzner Cloud Storage Box and Cloud VM Companion for Omarchy",
+  "kinds": ["bar-widget"],
+  "activation": "always",
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Hetzner",
+    "description": "Storage Box capacity and Cloud VM status indicator with quick actions.",
+    "category": "Cloud",
+    "aliases": ["hetzner", "storage-box", "cloud-vm"],
+    "allowMultiple": false,
+    "defaults": {
+      "refreshIntervalSec": 60,
+      "hetzBinPath": "/Users/christhompson/macos_wrap/hetz"
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 15,
+        "max": 600,
+        "step": 15,
+        "defaultValue": 60
+      },
+      {
+        "key": "hetzBinPath",
+        "type": "string",
+        "label": "Path to hetz CLI binary",
+        "defaultValue": "/Users/christhompson/macos_wrap/hetz"
+      }
+    ]
+  }
+}
