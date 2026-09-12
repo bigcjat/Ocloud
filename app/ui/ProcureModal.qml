@@ -107,6 +107,7 @@ Rectangle {
           }
         }
       }
+      }
 
       // Server Name
       ColumnLayout {
