@@ -56,6 +56,42 @@ Rectangle {
         }
       }
 
+      // Cloud Provider Selection
+      ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 4
+        Text { text: "Cloud Provider (API)"; font.pixelSize: 11; font.bold: true; color: textSecondary }
+        ComboBox {
+          id: providerCombo
+          Layout.fillWidth: true
+          model: [
+            "☁ Hetzner Cloud (Standard & ARM)",
+            "🟧 Amazon Web Services (AWS Lightsail)",
+            "🔴 Oracle Cloud (OCI Always-Free)",
+            "🌊 DigitalOcean Droplets",
+            "⚡ Vultr Compute"
+          ]
+          onCurrentIndexChanged: {
+            if (currentIndex === 0) { // Hetzner
+              typeCombo.model = ["cx23 (Intel 2 vCPU / 4 GB RAM · €3.79/mo)", "cax11 (Ampere ARM 2 vCPU / 4 GB RAM · €3.29/mo)", "cpx21 (AMD 3 vCPU / 4 GB RAM · €6.90/mo)"];
+              locCombo.model = ["nbg1 (Nuremberg, Germany 🇩🇪)", "fsn1 (Falkenstein, Germany 🇩🇪)", "hel1 (Helsinki, Finland 🇫🇮)", "ash (Ashburn, VA, USA 🇺🇸)", "hil (Hillsboro, OR, USA 🇺🇸)"];
+            } else if (currentIndex === 1) { // AWS
+              typeCombo.model = ["nano (1 vCPU / 512 MB · $3.50/mo)", "micro (1 vCPU / 1 GB · $5.00/mo)", "small (2 vCPU / 2 GB · $10.00/mo)"];
+              locCombo.model = ["us-east-1 (N. Virginia 🇺🇸)", "us-west-2 (Oregon 🇺🇸)", "eu-central-1 (Frankfurt 🇩🇪)", "ap-northeast-1 (Tokyo 🇯🇵)"];
+            } else if (currentIndex === 2) { // Oracle
+              typeCombo.model = ["VM.Standard.A1.Flex (4 OCPU / 24 GB RAM · €0 Always Free)", "VM.Standard.E2.1.Micro (1 OCPU / 1 GB RAM · €0 Free)"];
+              locCombo.model = ["eu-frankfurt-1 (Germany 🇩🇪)", "us-ashburn-1 (USA 🇺🇸)", "ap-tokyo-1 (Japan 🇯🇵)"];
+            } else if (currentIndex === 3) { // DigitalOcean
+              typeCombo.model = ["s-1vcpu-1gb (Basic · $6.00/mo)", "s-1vcpu-2gb (Basic · $12.00/mo)", "s-2vcpu-4gb (Basic · $24.00/mo)"];
+              locCombo.model = ["nyc1 (New York 🇺🇸)", "sfo3 (San Francisco 🇺🇸)", "fra1 (Frankfurt 🇩🇪)", "sgp1 (Singapore 🇸🇬)"];
+            } else { // Vultr
+              typeCombo.model = ["vc2-1c-1gb (Regular · $5.00/mo)", "vc2-1c-2gb (Regular · $10.00/mo)", "vc2-2c-4gb (High Perf · $24.00/mo)"];
+              locCombo.model = ["ewr (New Jersey 🇺🇸)", "ord (Chicago 🇺🇸)", "fra (Frankfurt 🇩🇪)", "nrt (Tokyo 🇯🇵)"];
+            }
+          }
+        }
+      }
+
       // Server Name
       ColumnLayout {
         Layout.fillWidth: true
@@ -73,7 +109,7 @@ Rectangle {
       ColumnLayout {
         Layout.fillWidth: true
         spacing: 4
-        Text { text: "Instance Type"; font.pixelSize: 11; font.bold: true; color: textSecondary }
+        Text { text: "Instance Spec / Tier"; font.pixelSize: 11; font.bold: true; color: textSecondary }
         ComboBox {
           id: typeCombo
           Layout.fillWidth: true
@@ -85,7 +121,7 @@ Rectangle {
       ColumnLayout {
         Layout.fillWidth: true
         spacing: 4
-        Text { text: "Datacenter Location"; font.pixelSize: 11; font.bold: true; color: textSecondary }
+        Text { text: "Datacenter Region"; font.pixelSize: 11; font.bold: true; color: textSecondary }
         ComboBox {
           id: locCombo
           Layout.fillWidth: true

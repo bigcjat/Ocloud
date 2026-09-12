@@ -320,4 +320,15 @@ ApplicationWindow {
     id: procureModal
     onServerProcured: reloadAll()
   }
+
+  // Global Machine Task Manager Modal
+  MachineTaskManagerModal {
+    id: taskManagerModal
+  }
+
+  // Global Add Storage Modal
+  AddStorageModal {
+    id: addStorageModal
+    onStorageAdded: reloadAll()
+  }
 }

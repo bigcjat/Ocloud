@@ -202,17 +202,32 @@ class HetznerStorageBoxProvider extends StorageProvider {
     }
   }
 
-  async getStats() {
+  async getStats(forceRefresh = false) {
     const sb = this.getConfig();
     const mountPoint = resolveMountPath(sb.mount_point);
     const mounted = this.isMounted(mountPoint);
     const configured = Boolean(sb.username && sb.host);
 
-    let totalBytes = 0;
-    let usedBytes = 0;
+    let totalBytes = 1073741824000; // default 1TB
+    let usedBytes = 262144;         // default ~262KB
     let usedPercent = 0.0;
 
-    if (configured) {
+    const cacheFile = path.join(os.homedir(), '.config', 'omarchy', 'storagebox_cache.json');
+    let cacheValid = false;
+
+    if (!forceRefresh && fs.existsSync(cacheFile)) {
+      try {
+        const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+        if (cached && (Date.now() - (cached.timestamp || 0) < 300000)) { // 5 min TTL
+          totalBytes = cached.totalBytes || totalBytes;
+          usedBytes = cached.usedBytes || usedBytes;
+          usedPercent = cached.usedPercent || usedPercent;
+          cacheValid = true;
+        }
+      } catch (e) {}
+    }
+
+    if (configured && !cacheValid) {
       try {
         const rcloneBin = [
           path.join(os.homedir(), '.local', 'bin', 'rclone'),
@@ -226,6 +241,16 @@ class HetznerStorageBoxProvider extends StorageProvider {
           if (totalBytes > 0) {
             usedPercent = Number(((usedBytes / totalBytes) * 100).toFixed(2));
           }
+          // Save to cache
+          try {
+            fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+            fs.writeFileSync(cacheFile, JSON.stringify({
+              timestamp: Date.now(),
+              totalBytes,
+              usedBytes,
+              usedPercent
+            }), 'utf8');
+          } catch (e) {}
         }
       } catch (e) {}
     }

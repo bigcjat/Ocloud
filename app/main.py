@@ -15,6 +15,8 @@ from PySide6.QtQml import QQmlApplicationEngine
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OCLOUD_BIN = os.path.join(ROOT_DIR, 'ocloud')
 
+import threading
+
 class OcloudBackend(QObject):
     statusUpdated = Signal(str)
     pingUpdated = Signal(str)
@@ -24,6 +26,18 @@ class OcloudBackend(QObject):
         super().__init__()
         self._cached_status = "{}"
         self._cached_ping = "[]"
+        self._is_fetching = False
+
+        # Load instant cache if available
+        cache_path = os.path.expanduser('~/.config/omarchy/status_cache.json')
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, 'r') as f:
+                    content = f.read().strip()
+                    if content:
+                        self._cached_status = content
+            except Exception:
+                pass
 
     def _run_cli(self, args, timeout=30):
         node_candidates = [
@@ -44,12 +58,33 @@ class OcloudBackend(QObject):
 
     @Slot(result=str)
     def fetchStatus(self):
-        out, ok, err = self._run_cli(['status', '--json'])
-        if ok and out:
-            self._cached_status = out
-            self.statusUpdated.emit(out)
-            return out
+        # Trigger background refresh asynchronously, return cached instantly
+        self.refreshStatusAsync()
         return self._cached_status
+
+    @Slot()
+    def refreshStatusAsync(self):
+        if self._is_fetching:
+            return
+        self._is_fetching = True
+
+        def _worker():
+            try:
+                out, ok, err = self._run_cli(['status', '--json'])
+                if ok and out:
+                    self._cached_status = out
+                    self.statusUpdated.emit(out)
+                    try:
+                        cache_dir = os.path.expanduser('~/.config/omarchy')
+                        os.makedirs(cache_dir, exist_ok=True)
+                        with open(os.path.join(cache_dir, 'status_cache.json'), 'w') as f:
+                            f.write(out)
+                    except Exception:
+                        pass
+            finally:
+                self._is_fetching = False
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     @Slot(result=str)
     def fetchPing(self):
@@ -68,6 +103,16 @@ class OcloudBackend(QObject):
             self.actionCompleted.emit("launchApp", True, f"Launched {app_cmd}")
         except Exception as e:
             self.actionCompleted.emit("launchApp", False, str(e))
+
+    @Slot(str, result=str)
+    def inspectMachine(self, server_id):
+        out, ok, err = self._run_cli(['vm', 'inspect', server_id, '--json'])
+        return out if ok else "{}"
+
+    @Slot(str, str)
+    def killProcess(self, server_id, pid):
+        out, ok, err = self._run_cli(['vm', 'kill-proc', server_id, pid])
+        self.actionCompleted.emit("killProcess", ok, out if ok else err)
 
     @Slot(str, str)
     def openTerminal(self, server_name, server_ip):

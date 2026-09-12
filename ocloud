@@ -102,21 +102,18 @@ async function cmdStatus(args) {
       last_backup: { timestamp: new Date().toISOString(), status: 'success' }
     };
   } else {
-    try {
-      hetznerServers = await hetznerCloud.listServers();
-    } catch (e) {}
-    try {
-      customServers = await customCompute.listServers();
-    } catch (e) {}
-    try {
-      storageStats = await hetznerStorage.getStats();
-    } catch (e) {}
-    try {
-      customStorageTargets = await customStorage.listStorage();
-    } catch (e) {}
-    try {
-      backupHistory = backupEngine.getHistory();
-    } catch (e) {}
+    const [hzSrvRes, custSrvRes, sbRes, custStoreRes, backupRes] = await Promise.allSettled([
+      hetznerCloud.listServers(),
+      customCompute.listServers(),
+      hetznerStorage.getStats(args.includes('--refresh')),
+      customStorage.listStorage(),
+      Promise.resolve(backupEngine.getHistory())
+    ]);
+    if (hzSrvRes.status === 'fulfilled') hetznerServers = hzSrvRes.value || [];
+    if (custSrvRes.status === 'fulfilled') customServers = custSrvRes.value || [];
+    if (sbRes.status === 'fulfilled') storageStats = sbRes.value;
+    if (custStoreRes.status === 'fulfilled') customStorageTargets = custStoreRes.value || [];
+    if (backupRes.status === 'fulfilled') backupHistory = backupRes.value || [];
   }
 
   const allServers = [...hetznerServers, ...customServers];
@@ -366,6 +363,21 @@ async function cmdVm(subcmd, args) {
       console.log('━'.repeat(55) + '\n');
     } catch (e) {
       console.error('Inspection failed: ' + e.message);
+    }
+  } else if (subcmd === 'kill-proc') {
+    const targetPid = args[1];
+    if (!targetPid) {
+      console.error('Usage: ocloud vm kill-proc <server> <pid>');
+      process.exit(1);
+    }
+    const keyPath = server.keyPath || path.join(os.homedir(), '.ssh', 'id_ed25519');
+    const user = server.user || 'root';
+    const port = server.port || 22;
+    try {
+      execSync(`ssh -p ${port} -i ${keyPath} -o StrictHostKeyChecking=no ${user}@${ip} "kill -9 ${targetPid}" 2>&1`);
+      console.log(`Killed process ${targetPid} on ${server.name}`);
+    } catch (e) {
+      console.error(`Failed to kill process ${targetPid}: ${e.message}`);
     }
   } else if (subcmd === 'app') {
     const appCmd = args[1] || 'arcade';

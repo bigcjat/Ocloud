@@ -18,18 +18,41 @@ Item {
       spacing: 24
 
       // Header
-      ColumnLayout {
-        spacing: 2
-        Text {
-          text: "Storage & Drives"
-          font.pixelSize: 22
-          font.bold: true
-          color: textPrimary
+      RowLayout {
+        Layout.fillWidth: true
+        ColumnLayout {
+          spacing: 2
+          Text {
+            text: "Storage & Drives"
+            font.pixelSize: 22
+            font.bold: true
+            color: textPrimary
+          }
+          Text {
+            text: "Permanent RAID Storage Boxes, temporary VM root filesystems, S3 buckets, and local storage"
+            font.pixelSize: 13
+            color: textSecondary
+          }
         }
-        Text {
-          text: "Permanent RAID Storage Boxes, temporary VM root filesystems, and local storage"
-          font.pixelSize: 13
-          color: textSecondary
+
+        Item { Layout.fillWidth: true }
+
+        Button {
+          id: addStorageBtn
+          text: "+ Add Storage Device"
+          background: Rectangle {
+            radius: 8
+            color: addStorageBtn.hovered ? "#0284c7" : "#0369a1"
+          }
+          contentItem: Text {
+            text: addStorageBtn.text
+            color: "#ffffff"
+            font.pixelSize: 12
+            font.bold: true
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+          }
+          onClicked: addStorageModal.openModal()
         }
       }
 

@@ -230,6 +230,24 @@ Item {
               spacing: 8
 
               Button {
+                id: tmBtn
+                text: "📊 Task Manager"
+                background: Rectangle {
+                  radius: 6
+                  color: tmBtn.hovered ? "#0284c7" : "#0369a1"
+                }
+                contentItem: Text {
+                  text: tmBtn.text
+                  color: "#ffffff"
+                  font.pixelSize: 11
+                  font.bold: true
+                  horizontalAlignment: Text.AlignHCenter
+                  verticalAlignment: Text.AlignVCenter
+                }
+                onClicked: taskManagerModal.openForServer(modelData)
+              }
+
+              Button {
                 id: streamBtn
                 text: "🎮 Launch App Stream"
                 enabled: modelData.status === "running"

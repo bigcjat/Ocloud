@@ -66,6 +66,7 @@ Panel {
   property bool killBusy: false
   property bool showKillModal: false
   property bool showVmConsent: false
+  property string currentTab: "storage" // "storage" | "compute"
 
   function refreshAll() {
     statusProc.running = true;
@@ -323,15 +324,17 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(440))
-    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(800))
+    contentWidth: panel.fittedContentWidth(Style.space(450))
+    contentHeight: panel.fittedContentHeight(panelColumn.implicitHeight, Style.space(640))
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
       onCloseRequested: root.close()
       onTextKey: function(t) {
-        if (t === "r" || t === "R") root.refreshAll()
+        if (t === "r" || t === "R") root.refreshAll();
+        else if (t === "1" || t === "s" || t === "S") root.currentTab = "storage";
+        else if (t === "2" || t === "c" || t === "C") root.currentTab = "compute";
       }
 
       Flickable {
@@ -353,7 +356,9 @@ Panel {
           PanelHero {
             width: parent.width
             title: "Cloud Storage & Compute"
-            meta: (root.storageMounted ? "Storage Mounted" : "Storage Disconnected") + (root.primaryVm && root.primaryVm.status === "running" ? " · 1 VM Running" : " · VM Offline")
+            meta: root.currentTab === "storage"
+                  ? (root.storageMounted ? "Storage Mounted · ~/Cloud" : "Storage Ready · Disconnected")
+                  : (root.primaryVm && root.primaryVm.status === "running" ? "1 Cloud VM Running" : "Cloud Fleet Ready")
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconComponent: Component {
@@ -375,19 +380,46 @@ Panel {
             }
           }
 
+          // Tab Switcher: Storage vs Compute
+          Row {
+            width: parent.width
+            spacing: Style.space(8)
+
+            Button {
+              width: (parent.width - Style.space(8)) / 2
+              text: "Cloud Storage"
+              iconText: "📦"
+              accent: root.currentTab === "storage" ? root.accentColor : undefined
+              bordered: true
+              fontFamily: root.fontFamily
+              onClicked: root.currentTab = "storage"
+            }
+
+            Button {
+              width: (parent.width - Style.space(8)) / 2
+              text: "Cloud Compute"
+              iconText: "⚡"
+              accent: root.currentTab === "compute" ? root.accentColor : undefined
+              bordered: true
+              fontFamily: root.fontFamily
+              onClicked: root.currentTab = "compute"
+            }
+          }
+
           PanelSeparator {
             foreground: root.foreground
           }
 
           // ==========================================
-          // SECTION 1: STORAGE
+          // SECTION 1: STORAGE (Tab 1)
           // ==========================================
           Column {
             width: parent.width
-            spacing: Style.space(8)
+            spacing: Style.space(10)
+            visible: root.currentTab === "storage"
 
             PanelSectionHeader {
-              text: "STORAGE"
+              text: "STORAGE TARGETS"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
@@ -618,21 +650,114 @@ Panel {
                 }
               }
             }
-          }
 
-          PanelSeparator {
-            foreground: root.foreground
+            // 1C. S3 Object Storage (Cloudflare R2) [used / total]
+            BorderSurface {
+              width: parent.width
+              radius: Style.cornerRadius
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
+              borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
+              implicitHeight: r2Col.implicitHeight + Style.space(20)
+
+              Column {
+                id: r2Col
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(10)
+                spacing: Style.space(8)
+
+                Row {
+                  width: parent.width
+                  Text {
+                    text: "S3 Object Store (Cloudflare R2)"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                    color: root.foreground
+                  }
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth)
+                    height: 1
+                  }
+                  Text {
+                    text: "14.5 / 500 GB (3%)"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    font.bold: true
+                    color: root.foreground
+                  }
+                }
+
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(5)
+                  radius: Style.space(2)
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
+
+                  Rectangle {
+                    height: parent.height
+                    radius: Style.space(2)
+                    width: Math.max(4, parent.width * 0.03)
+                    color: root.accentColor
+                  }
+                }
+
+                Row {
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+                    Rectangle {
+                      width: 8
+                      height: 8
+                      radius: 4
+                      anchors.verticalCenter: parent.verticalCenter
+                      color: root.dim
+                    }
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "Standby · Ready to Mount"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.dim
+                    }
+                  }
+
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - r2Actions.implicitWidth - Style.space(8))
+                    height: 1
+                  }
+
+                  Row {
+                    id: r2Actions
+                    spacing: Style.space(6)
+
+                    Button {
+                      text: "Mount S3"
+                      iconText: "󰋊"
+                      bordered: true
+                      fontFamily: root.fontFamily
+                      onClicked: root.openFolder(Quickshell.env("HOME") + "/Cloud")
+                    }
+                  }
+                }
+              }
+            }
           }
 
           // ==========================================
-          // SECTION 2: CLOUD COMPUTE
+          // SECTION 2: CLOUD COMPUTE (Tab 2)
           // ==========================================
           Column {
             width: parent.width
-            spacing: Style.space(8)
+            spacing: Style.space(10)
+            visible: root.currentTab === "compute"
 
             PanelSectionHeader {
-              text: "CLOUD COMPUTE"
+              text: "COMPUTE NODES & SERVERS"
               foreground: root.foreground
               fontFamily: root.fontFamily
             }
@@ -1009,10 +1134,191 @@ Panel {
                     color: root.dim
                   }
                 }
+
+                // Quick Drive Mount row
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(1)
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+                }
+
+                Row {
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+                    Rectangle {
+                      width: 8
+                      height: 8
+                      radius: 4
+                      anchors.verticalCenter: parent.verticalCenter
+                      color: root.dim
+                    }
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "Host Filesystem (/mnt/data)"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.dim
+                    }
+                  }
+
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - hSrvMountBtn.implicitWidth - Style.space(8))
+                    height: 1
+                  }
+
+                  Button {
+                    id: hSrvMountBtn
+                    text: "Mount Drive"
+                    iconText: "⚡"
+                    bordered: true
+                    fontFamily: root.fontFamily
+                    onClicked: root.openFolder(Quickshell.env("HOME"))
+                  }
+                }
               }
             }
 
-            // 2C. Home System (Workstation)
+            // 2C. Oracle Cloud (ARM-Node) (Always Free)
+            BorderSurface {
+              width: parent.width
+              radius: Style.cornerRadius
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
+              borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
+              implicitHeight: ociCol.implicitHeight + Style.space(20)
+
+              Column {
+                id: ociCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(10)
+                spacing: Style.space(8)
+
+                Row {
+                  width: parent.width
+                  spacing: Style.space(6)
+
+                  Text {
+                    text: "Oracle Cloud (ARM-Node)"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                    color: root.foreground
+                  }
+                  Text {
+                    text: "(18d) (€0/mo · Free)"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.successColor
+                    font.bold: true
+                  }
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[1].implicitWidth - ociPill.implicitWidth - parent.spacing * 2)
+                    height: 1
+                  }
+                  BorderSurface {
+                    id: ociPill
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: ociStatus.implicitWidth + Style.space(10)
+                    implicitHeight: ociStatus.implicitHeight + Style.space(4)
+                    radius: Style.cornerRadius
+                    color: Qt.rgba(0.06, 0.72, 0.5, 0.15)
+                    borderSpec: Border.none()
+
+                    Text {
+                      id: ociStatus
+                      anchors.centerIn: parent
+                      text: "● RUNNING"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.bold: true
+                      color: root.successColor
+                    }
+                  }
+                }
+
+                Row {
+                  width: parent.width
+                  spacing: Style.space(12)
+
+                  Text {
+                    text: "RAM: 6.1 / 24.0 GB"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.foreground
+                  }
+                  Text {
+                    text: "CPU: 4%"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.foreground
+                  }
+                  Text {
+                    text: "GPU: None"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.dim
+                  }
+                  Text {
+                    text: "Apps: 2"
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    color: root.accentColor
+                    font.bold: true
+                  }
+                }
+
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(1)
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+                }
+
+                Row {
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+                    Rectangle {
+                      width: 8
+                      height: 8
+                      radius: 4
+                      anchors.verticalCenter: parent.verticalCenter
+                      color: root.dim
+                    }
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "Boot Volume (/root)"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.dim
+                    }
+                  }
+
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - ociMountBtn.implicitWidth - Style.space(8))
+                    height: 1
+                  }
+
+                  Button {
+                    id: ociMountBtn
+                    text: "Mount Drive"
+                    iconText: "⚡"
+                    bordered: true
+                    fontFamily: root.fontFamily
+                    onClicked: root.openFolder(Quickshell.env("HOME"))
+                  }
+                }
+              }
+            }
+
+            // 2D. Home System (Workstation)
             BorderSurface {
               width: parent.width
               radius: Style.cornerRadius
@@ -1079,16 +1385,60 @@ Panel {
                     color: root.foreground
                   }
                   Text {
-                    text: "GPU: Metal"
+                    text: "GPU: Metal / RTX"
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
-                    color: root.dim
+                    color: root.foreground
                   }
                   Text {
                     text: "Apps: Desktop"
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
-                    color: root.foreground
+                    color: root.dim
+                  }
+                }
+
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(1)
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+                }
+
+                Row {
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Style.space(6)
+                    Rectangle {
+                      width: 8
+                      height: 8
+                      radius: 4
+                      anchors.verticalCenter: parent.verticalCenter
+                      color: root.successColor
+                    }
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "Local NVMe (~/)"
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      color: root.successColor
+                    }
+                  }
+
+                  Item {
+                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - localOpenBtn.implicitWidth - Style.space(8))
+                    height: 1
+                  }
+
+                  Button {
+                    id: localOpenBtn
+                    text: "Open Files"
+                    iconText: "📂"
+                    bordered: true
+                    fontFamily: root.fontFamily
+                    onClicked: root.openFolder(Quickshell.env("HOME"))
                   }
                 }
               }
