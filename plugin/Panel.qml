@@ -336,10 +336,14 @@ Panel {
               radius: Style.cornerRadius
               color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
               borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
-              padding: Style.space(12)
+              implicitHeight: storageInnerCol.implicitHeight + Style.space(24)
 
               Column {
-                width: parent.width
+                id: storageInnerCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(12)
                 spacing: Style.space(10)
 
                 // Header row: Icon, Name, and Capacity badge
@@ -529,10 +533,14 @@ Panel {
               radius: Style.cornerRadius
               color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
               borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
-              padding: Style.space(12)
+              implicitHeight: vpsInnerCol.implicitHeight + Style.space(24)
 
               Column {
-                width: parent.width
+                id: vpsInnerCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(12)
                 spacing: Style.space(10)
 
                 // Header row: Icon, VM name, Status pill
@@ -811,10 +819,14 @@ Panel {
               radius: Style.cornerRadius
               color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
               borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
-              padding: Style.space(10)
+              implicitHeight: pingInnerRow.implicitHeight + Style.space(20)
 
               Row {
-                width: parent.width
+                id: pingInnerRow
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Style.space(10)
                 spacing: Style.space(8)
 
                 Text {
