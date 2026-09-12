@@ -167,6 +167,11 @@ class HetznerCloudProvider extends CloudProvider {
     data.top_processes = procs;
     return data;
   }
+function resolveMountPath(p) {
+  if (!p) return path.join(os.homedir(), 'Cloud');
+  if (p.startsWith('~/')) return path.join(os.homedir(), p.slice(2));
+  if (p === '~') return os.homedir();
+  return path.resolve(p);
 }
 
 class HetznerStorageBoxProvider extends StorageProvider {
@@ -194,13 +199,6 @@ class HetznerStorageBoxProvider extends StorageProvider {
       return false;
     }
   }
-
-function resolveMountPath(p) {
-  if (!p) return path.join(os.homedir(), 'Cloud');
-  if (p.startsWith('~/')) return path.join(os.homedir(), p.slice(2));
-  if (p === '~') return os.homedir();
-  return path.resolve(p);
-}
 
   async getStats() {
     const sb = this.getConfig();
