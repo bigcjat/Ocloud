@@ -14,6 +14,7 @@ Panel {
   manageIpc: false
 
   implicitWidth: button.implicitWidth
+  implicitHeight: button.implicitHeight
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color dim: Qt.darker(foreground, 1.55)
