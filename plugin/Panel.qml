@@ -22,6 +22,7 @@ Panel {
   readonly property color accentColor: Color.accent || "#38bdf8"
   readonly property color successColor: "#10b981"
   readonly property color warningColor: "#f59e0b"
+  readonly property color dangerColor: "#ef4444"
 
   // In-memory reactive state
   property string apiToken: ""
@@ -43,13 +44,14 @@ Panel {
   })
 
   property bool showProcureView: false
+  property bool showConsentModal: false
   property string newVmType: "cx23"
   property string newVmLocation: "nbg1"
   property int refreshInterval: 30
 
   function refreshAll() {
     if (!root.apiToken || root.apiToken === "") {
-      configProc.running = true;
+      vaultProc.running = true;
       return;
     }
 
@@ -62,8 +64,27 @@ Panel {
     mountCheckProc.running = true;
   }
 
+  // Load API token from Ocloud encrypted vault
   Process {
-    id: configProc
+    id: vaultProc
+    command: ["ocloud", "vault", "get", "api_token"]
+    running: false
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var tok = text.trim();
+        if (tok && tok !== "") {
+          root.apiToken = tok;
+          root.refreshAll();
+        } else {
+          legacyConfigProc.running = true;
+        }
+      }
+    }
+  }
+
+  Process {
+    id: legacyConfigProc
     command: ["cat", Quickshell.env("HOME") + "/.config/omarchy/hetzner.json"]
     running: false
     stdout: StdioCollector {
@@ -125,7 +146,7 @@ Panel {
     bar: root.bar
     open: root.opened
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(contentCol.implicitHeight, Style.space(560))
+    contentHeight: panel.fittedContentHeight(contentCol.implicitHeight, Style.space(600))
 
     ColumnLayout {
       id: contentCol
@@ -134,260 +155,271 @@ Panel {
       anchors.top: parent.top
       spacing: Style.space(12)
 
-        // Header
+      // Header
+      RowLayout {
+        Layout.fillWidth: true
+        Text {
+          text: "☁ Ocloud Companion"
+          font.pixelSize: 15
+          font.bold: true
+          color: root.foreground
+        }
+        Item { Layout.fillWidth: true }
+        Button {
+          text: "↻"
+          onClicked: root.refreshAll()
+        }
+      }
+
+      Rectangle {
+        Layout.fillWidth: true
+        height: 1
+        color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
+      }
+
+      // Storage Box Section (Permanent RAID)
+      ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 6
+
         RowLayout {
           Layout.fillWidth: true
           Text {
-            text: "☁ Ocloud Companion"
-            font.pixelSize: 15
+            text: "Storage Box (Permanent)"
             font.bold: true
+            font.pixelSize: 13
             color: root.foreground
           }
           Item { Layout.fillWidth: true }
-          Button {
-            text: "↻"
-            onClicked: root.refreshAll()
-          }
-        }
-
-        Rectangle {
-          Layout.fillWidth: true
-          height: 1
-          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
-        }
-
-        // Storage Box Section
-        ColumnLayout {
-          Layout.fillWidth: true
-          spacing: 6
-
-          RowLayout {
-            Layout.fillWidth: true
-            Text {
-              text: "Storage Box"
-              font.bold: true
-              font.pixelSize: 13
-              color: root.foreground
-            }
-            Item { Layout.fillWidth: true }
-            Text {
-              text: root.storageData.configured ? "1.0 TB (0.0% used)" : "Not Configured"
-              color: root.storageData.configured ? root.accentColor : root.dim
-              font.pixelSize: 12
-            }
-          }
-
-          // Progress bar
-          Rectangle {
-            Layout.fillWidth: true
-            height: 6
-            radius: 3
-            color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
-
-            Rectangle {
-              height: parent.height
-              radius: 3
-              width: Math.min(parent.width, Math.max(4, parent.width * (root.storageData.used_percent / 100.0)))
-              color: root.accentColor
-            }
-          }
-
-          RowLayout {
-            Layout.fillWidth: true
-            Text {
-              text: root.storageData.mounted ? "● Mounted at ~/Cloud (Permanent 1.0 TB)" : "○ Drive unmounted"
-              font.pixelSize: 11
-              color: root.storageData.mounted ? root.successColor : root.dim
-            }
-            Item { Layout.fillWidth: true }
-            Button {
-              text: root.storageData.mounted ? "Unmount" : "Mount Drive"
-              onClicked: {
-                if (root.storageData.mounted) {
-                  execProc.command = ["ocloud", "storage", "unmount"];
-                } else {
-                  execProc.command = ["ocloud", "storage", "mount"];
-                }
-                execProc.running = true;
-              }
-            }
-          }
-        }
-
-        Rectangle {
-          Layout.fillWidth: true
-          height: 1
-          color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
-        }
-
-        // Compute (VM) Section
-        ColumnLayout {
-          Layout.fillWidth: true
-          spacing: 8
-
-          RowLayout {
-            Layout.fillWidth: true
-            Text {
-              text: "Cloud Compute (VM)"
-              font.bold: true
-              font.pixelSize: 13
-              color: root.foreground
-            }
-            Item { Layout.fillWidth: true }
-            Text {
-              text: root.activeVmCount > 0 ? "● " + root.activeVmCount + " RUNNING" : "○ OFFLINE"
-              font.pixelSize: 11
-              font.bold: true
-              color: root.activeVmCount > 0 ? root.successColor : root.dim
-            }
-          }
-
           Text {
-            text: root.primaryServer ? (root.primaryServer.name + " (" + (root.primaryServer.server_type ? root.primaryServer.server_type.name : "cx23") + " · " + (root.primaryServer.public_net && root.primaryServer.public_net.ipv4 ? root.primaryServer.public_net.ipv4.ip : "no IP") + ")") : "No active companion servers"
+            text: root.storageData.configured ? "1.0 TB (0.0% used)" : "Not Configured"
+            color: root.storageData.configured ? root.accentColor : root.dim
             font.pixelSize: 12
-            color: root.dim
-          }
-
-          // VM Ephemeral Drive Row
-          RowLayout {
-            Layout.fillWidth: true
-            ColumnLayout {
-              spacing: 1
-              Text {
-                text: root.vmDriveMounted ? "⚡ Mounted at ~/Companion-VM" : "○ VM Drive unmounted"
-                font.pixelSize: 11
-                font.bold: root.vmDriveMounted
-                color: root.vmDriveMounted ? root.warningColor : root.dim
-              }
-              Text {
-                text: root.vmDriveMounted ? "⚠️ Ephemeral: destroyed on VM shutdown" : "Direct access to companion root"
-                font.pixelSize: 10
-                color: root.vmDriveMounted ? root.warningColor : root.dim
-              }
-            }
-            Item { Layout.fillWidth: true }
-            Button {
-              text: root.vmDriveMounted ? "Unmount VM" : "Mount Drive"
-              enabled: (root.primaryServer && root.primaryServer.status === "running") || root.vmDriveMounted
-              onClicked: {
-                if (root.vmDriveMounted) {
-                  execProc.command = ["ocloud", "vm", "unmount"];
-                } else {
-                  execProc.command = ["ocloud", "vm", "mount"];
-                }
-                execProc.running = true;
-              }
-            }
-          }
-
-          // Action Buttons
-          RowLayout {
-            Layout.fillWidth: true
-            spacing: 6
-            Button {
-              text: ">_ Terminal"
-              Layout.fillWidth: true
-              enabled: !!root.primaryServer
-              onClicked: {
-                if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
-                  var serverName = root.primaryServer.name || "companion";
-                  var ip = root.primaryServer.public_net.ipv4.ip;
-                  Quickshell.execDetached([
-                    "foot",
-                    "-T", "☁ Ocloud Companion [" + serverName + " · " + ip + "]",
-                    "-o", "colors-dark.background=080e18",
-                    "-o", "colors-dark.foreground=e2e8f0",
-                    "-o", "colors-dark.regular4=38bdf8",
-                    "-o", "colors-dark.cursor=080e18 38bdf8",
-                    "-o", "colors-dark.selection-background=1e293b",
-                    "-e", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "-t", "root@" + ip
-                  ]);
-                }
-              }
-            }
-            Button {
-              text: "🎮 Launch App"
-              Layout.fillWidth: true
-              enabled: !!root.primaryServer && root.primaryServer.status === "running"
-              onClicked: {
-                if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
-                  Quickshell.execDetached(["foot", "-e", "ocloud", "vm", "app", "arcade"]);
-                }
-              }
-            }
-            Button {
-              text: (root.primaryServer && root.primaryServer.status === "running") ? "Power Off" : "Power On"
-              Layout.fillWidth: true
-              enabled: !!root.primaryServer
-              onClicked: {
-                if (root.primaryServer) {
-                  if (root.primaryServer.status === "running") {
-                    Hetzner.powerOff(root.apiToken, root.primaryServer.id, function() {
-                      root.refreshAll();
-                    });
-                  } else {
-                    Hetzner.powerOn(root.apiToken, root.primaryServer.id, function() {
-                      root.refreshAll();
-                    });
-                  }
-                }
-              }
-            }
           }
         }
 
-        // Procurement section toggle
+        // Progress bar
         Rectangle {
           Layout.fillWidth: true
-          height: 1
+          height: 6
+          radius: 3
           color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
+
+          Rectangle {
+            height: parent.height
+            radius: 3
+            width: Math.min(parent.width, Math.max(4, parent.width * (root.storageData.used_percent / 100.0)))
+            color: root.accentColor
+          }
         }
 
         RowLayout {
           Layout.fillWidth: true
-          Button {
-            text: root.showProcureView ? "Cancel" : "+ Procure New Cloud VM"
-            Layout.fillWidth: true
-            onClicked: root.showProcureView = !root.showProcureView
+          Text {
+            text: root.storageData.mounted ? "● Mounted at ~/Cloud" : "○ Drive unmounted"
+            font.pixelSize: 11
+            color: root.storageData.mounted ? root.successColor : root.dim
           }
-        }
-
-        // Inline Procurement Form
-        ColumnLayout {
-          Layout.fillWidth: true
-          visible: root.showProcureView
-          spacing: 6
-
-          RowLayout {
-            Layout.fillWidth: true
-            Text { text: "Server Type:"; color: root.foreground; font.pixelSize: 11 }
-            Item { Layout.fillWidth: true }
-            ComboBox {
-              model: ["cx23 (Intel 2c/4GB · €4/mo)", "cax11 (ARM 2c/4GB · €3.80/mo)", "cpx21 (AMD 3c/4GB · €7/mo)"]
-              onCurrentIndexChanged: {
-                if (currentIndex === 0) root.newVmType = "cx23";
-                else if (currentIndex === 1) root.newVmType = "cax11";
-                else if (currentIndex === 2) root.newVmType = "cpx21";
-              }
-            }
-          }
-
+          Item { Layout.fillWidth: true }
           Button {
-            text: "🚀 Deploy Server in Nuremberg (nbg1)"
-            Layout.fillWidth: true
+            text: root.storageData.mounted ? "Unmount" : "Mount Drive"
             onClicked: {
-              var srvName = "omarchy-" + Math.floor(Math.random() * 1000);
-              Hetzner.createServer(root.apiToken, srvName, root.newVmType, root.newVmLocation, "ubuntu-24.04", ["omarchy-laptop"], null, function(newServer) {
-                root.showProcureView = false;
-                root.refreshAll();
-              }, function(err) {
-                console.log("Procure error: " + err);
-              });
+              if (root.storageData.mounted) {
+                execProc.command = ["ocloud", "storage", "unmount"];
+              } else {
+                execProc.command = ["ocloud", "storage", "mount"];
+              }
+              execProc.running = true;
             }
           }
         }
       }
+
+      Rectangle {
+        Layout.fillWidth: true
+        height: 1
+        color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
+      }
+
+      // Compute (VM) Section
+      ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 8
+
+        RowLayout {
+          Layout.fillWidth: true
+          Text {
+            text: "Cloud Compute (VM)"
+            font.bold: true
+            font.pixelSize: 13
+            color: root.foreground
+          }
+          Item { Layout.fillWidth: true }
+          Text {
+            text: root.activeVmCount > 0 ? "● " + root.activeVmCount + " RUNNING" : "○ OFFLINE"
+            font.pixelSize: 11
+            font.bold: true
+            color: root.activeVmCount > 0 ? root.successColor : root.dim
+          }
+        }
+
+        Text {
+          text: root.primaryServer ? (root.primaryServer.name + " (" + (root.primaryServer.server_type ? root.primaryServer.server_type.name : "cx23") + " · " + (root.primaryServer.public_net && root.primaryServer.public_net.ipv4 ? root.primaryServer.public_net.ipv4.ip : "no IP") + ")") : "No active companion servers"
+          font.pixelSize: 12
+          color: root.dim
+        }
+
+        // VM Ephemeral Drive Row
+        RowLayout {
+          Layout.fillWidth: true
+          ColumnLayout {
+            spacing: 1
+            Text {
+              text: root.vmDriveMounted ? "⚡ Mounted at ~/Companion-VM" : "○ VM Drive unmounted"
+              font.pixelSize: 11
+              font.bold: root.vmDriveMounted
+              color: root.vmDriveMounted ? root.warningColor : root.dim
+            }
+            Text {
+              text: root.vmDriveMounted ? "⚠️ Ephemeral: destroyed on VM shutdown" : "Direct access to companion root"
+              font.pixelSize: 10
+              color: root.vmDriveMounted ? root.warningColor : root.dim
+            }
+          }
+          Item { Layout.fillWidth: true }
+          Button {
+            text: root.vmDriveMounted ? "Unmount VM" : "Mount Drive"
+            enabled: (root.primaryServer && root.primaryServer.status === "running") || root.vmDriveMounted
+            onClicked: {
+              if (root.vmDriveMounted) {
+                execProc.command = ["ocloud", "vm", "unmount"];
+                execProc.running = true;
+              } else {
+                root.showConsentModal = true;
+              }
+            }
+          }
+        }
+
+        // Ephemeral Safety Consent Banner in Popup
+        Rectangle {
+          Layout.fillWidth: true
+          visible: root.showConsentModal
+          height: consentCol.implicitHeight + 16
+          radius: 8
+          color: "#291804"
+          border.color: root.warningColor
+
+          ColumnLayout {
+            id: consentCol
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 6
+
+            Text {
+              text: "⚠️ DATA-LOSS SAFETY WARNING"
+              font.pixelSize: 11
+              font.bold: true
+              color: root.warningColor
+            }
+            Text {
+              text: "This drive is hosted on the ephemeral local disk of VM. When the VM powers off, ALL FILES WILL BE LOST."
+              font.pixelSize: 10
+              color: "#fde68a"
+              wrapMode: Text.WordWrap
+              Layout.fillWidth: true
+            }
+            RowLayout {
+              Layout.fillWidth: true
+              Button {
+                text: "Cancel"
+                onClicked: root.showConsentModal = false
+              }
+              Item { Layout.fillWidth: true }
+              Button {
+                text: "I Understand, Mount"
+                onClicked: {
+                  root.showConsentModal = false;
+                  execProc.command = ["ocloud", "vm", "mount", "--yes"];
+                  execProc.running = true;
+                }
+              }
+            }
+          }
+        }
+
+        // Action Buttons
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: 6
+          Button {
+            text: ">_ Terminal"
+            Layout.fillWidth: true
+            enabled: !!root.primaryServer
+            onClicked: {
+              if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
+                var serverName = root.primaryServer.name || "companion";
+                var ip = root.primaryServer.public_net.ipv4.ip;
+                Quickshell.execDetached([
+                  "foot",
+                  "-T", "☁ Ocloud Companion [" + serverName + " · " + ip + "]",
+                  "-o", "colors-dark.background=080e18",
+                  "-o", "colors-dark.foreground=e2e8f0",
+                  "-o", "colors-dark.regular4=38bdf8",
+                  "-e", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=no", "-t", "root@" + ip
+                ]);
+              }
+            }
+          }
+          Button {
+            text: "🎮 Launch App"
+            Layout.fillWidth: true
+            enabled: !!root.primaryServer && root.primaryServer.status === "running"
+            onClicked: {
+              if (root.primaryServer && root.primaryServer.public_net && root.primaryServer.public_net.ipv4) {
+                Quickshell.execDetached(["foot", "-e", "ocloud", "vm", "app", "arcade"]);
+              }
+            }
+          }
+          Button {
+            text: (root.primaryServer && root.primaryServer.status === "running") ? "Power Off" : "Power On"
+            Layout.fillWidth: true
+            enabled: !!root.primaryServer
+            onClicked: {
+              if (root.primaryServer) {
+                if (root.primaryServer.status === "running") {
+                  Hetzner.powerOff(root.apiToken, root.primaryServer.id, function() {
+                    root.refreshAll();
+                  });
+                } else {
+                  Hetzner.powerOn(root.apiToken, root.primaryServer.id, function() {
+                    root.refreshAll();
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // App Manager Link
+      Rectangle {
+        Layout.fillWidth: true
+        height: 1
+        color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.1)
+      }
+
+      Button {
+        id: desktopAppBtn
+        text: "🖥 Open Ocloud Desktop Manager"
+        Layout.fillWidth: true
+        onClicked: {
+          root.toggle();
+          Quickshell.execDetached(["ocloud", "gui"]);
+        }
+      }
     }
+  }
 
   Process {
     id: execProc

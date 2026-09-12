@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 /**
  * Ocloud CLI - The Sovereign Cloud Companion for Omarchy & Linux.
- * Built with standard Node.js (zero external dependencies).
+ * Architecture:
+ * - Security: AES-256-GCM encrypted credentials vault (~/.config/omarchy/vault.enc).
+ * - Pluggable Providers: Hetzner Cloud, Storage Box, Custom Bare-Metal, Home Workstations.
+ * - Latency Prober: Live TCP handshake ping test sorted from lowest to highest latency.
+ * - Ephemeral Safeguards: Clear data-loss warning on ephemeral VM root mounting.
+ * - Automated Backups: Snapshot engine with history and scheduling.
  */
 
 const fs = require('node:fs');
@@ -9,54 +14,21 @@ const path = require('node:path');
 const os = require('node:os');
 const { execSync, spawn } = require('node:child_process');
 
-const API_BASE = 'https://api.hetzner.cloud/v1';
+const { Vault } = require('./security/vault');
+const { probeLocations } = require('./ping/prober');
+const { HetznerCloudProvider, HetznerStorageBoxProvider } = require('./providers/hetzner');
+const { CustomComputeProvider, CustomStorageProvider } = require('./providers/custom');
+const { BackupEngine } = require('./backup/engine');
 
-// ------------------------------------------------------------------ Configuration
-function getConfigPaths() {
-  const home = os.homedir();
-  return [
-    path.join(process.cwd(), 'config.json'),
-    path.join(home, '.config', 'omarchy', 'ocloud.json'),
-    path.join(home, '.config', 'omarchy', 'hetzner.json'),
-  ];
-}
+// Initialize Core Subsystems
+const vault = new Vault();
+const hetznerCloud = new HetznerCloudProvider(vault);
+const hetznerStorage = new HetznerStorageBoxProvider(vault);
+const customCompute = new CustomComputeProvider(vault);
+const customStorage = new CustomStorageProvider(vault);
+const backupEngine = new BackupEngine(vault);
 
-function loadConfig() {
-  const config = {
-    api_token: process.env.HETZNER_API_TOKEN || '',
-    tailscale_auth_key: process.env.TAILSCALE_AUTH_KEY || '',
-    storage_box: {
-      username: '',
-      host: '',
-      port: 23,
-      password: '',
-      mount_point: path.join(os.homedir(), 'Cloud'),
-      backup_source: os.homedir(),
-    },
-    default_vm_type: 'cx23',
-    default_location: 'nbg1',
-  };
-
-  for (const p of getConfigPaths()) {
-    if (fs.existsSync(p)) {
-      try {
-        const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-        Object.assign(config, data);
-        if (data.storage_box) {
-          config.storage_box = { ...config.storage_box, ...data.storage_box };
-        }
-        break;
-      } catch (e) {}
-    }
-  }
-
-  if (process.env.HETZNER_API_TOKEN) {
-    config.api_token = process.env.HETZNER_API_TOKEN;
-  }
-  return config;
-}
-
-// ------------------------------------------------------------------ Formatting
+// ------------------------------------------------------------------ Formatting Utilities
 function formatBytes(bytes) {
   const b = Number(bytes);
   if (isNaN(b) || b <= 0) return '0 B';
@@ -69,33 +41,6 @@ function formatBytes(bytes) {
   return `${b} B`;
 }
 
-// ------------------------------------------------------------------ API Client
-async function apiRequest(token, method, endpoint, body) {
-  if (!token) throw new Error('No API token found in config or HETZNER_API_TOKEN.');
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token.trim()}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'Ocloud/1.0',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  const text = await res.text();
-  let json = {};
-  try {
-    json = text ? JSON.parse(text) : {};
-  } catch (e) {}
-
-  if (!res.ok) {
-    const msg = json.error?.message || `HTTP ${res.status}: ${res.statusText}`;
-    throw new Error(msg);
-  }
-  return json;
-}
-
-// ------------------------------------------------------------------ Storage Box
 function isDriveMounted(mountPoint) {
   try {
     const out = execSync('mount', { encoding: 'utf8' });
@@ -105,129 +50,90 @@ function isDriveMounted(mountPoint) {
   }
 }
 
-function getStorageBoxStats(config, mock = false) {
-  const sb = config.storage_box || {};
-  const mountPoint = sb.mount_point || path.join(os.homedir(), 'Cloud');
-  const mounted = isDriveMounted(mountPoint);
+// ------------------------------------------------------------------ Subcommands
 
-  if (mock) {
-    return {
+// --- STATUS
+async function cmdStatus(args) {
+  const isMock = args.includes('--mock');
+  const isJson = args.includes('--json');
+
+  let hetznerServers = [];
+  let customServers = [];
+  let storageStats = null;
+  let customStorageTargets = [];
+  let backupHistory = [];
+
+  if (isMock) {
+    hetznerServers = [
+      {
+        id: 1048576,
+        name: 'omarchy-companion',
+        status: 'running',
+        type: 'cx23',
+        ipv4: '116.203.42.18',
+        location: 'nbg1',
+        provider: 'hetzner',
+        isHomeWorkstation: false,
+        tags: ['cloud', 'hetzner']
+      }
+    ];
+    customServers = [
+      {
+        id: 'custom-home-rig',
+        name: 'Home Studio Rig',
+        status: 'running',
+        type: 'workstation',
+        ipv4: '100.90.80.70',
+        location: 'Home/Tailscale',
+        provider: 'custom',
+        isHomeWorkstation: true,
+        tags: ['home', 'workstation', 'gpu-rtx4090']
+      }
+    ];
+    storageStats = {
       configured: true,
       username: 'u123456',
       host: 'u123456.your-storagebox.de',
       mounted: true,
-      mount_point: mountPoint,
+      mount_point: path.join(os.homedir(), 'Cloud'),
       total_bytes: 1073741824000,
       used_bytes: 450971566080,
       used_percent: 42.0,
-      last_backup: { timestamp: new Date().toISOString(), status: 'success' },
+      last_backup: { timestamp: new Date().toISOString(), status: 'success' }
     };
-  }
-
-  const isConfigured = Boolean(sb.username && sb.host);
-  let totalBytes = 0;
-  let usedBytes = 0;
-  let usedPercent = 0.0;
-
-  // Query live quota via SSH df -B1 if credentials present
-  if (isConfigured && sb.password) {
+  } else {
     try {
-      const expScript = `
-        set timeout 6
-        spawn ssh -p ${sb.port || 23} -o StrictHostKeyChecking=no ${sb.username}@${sb.host} "df -B1"
-        expect {
-          "password:" {
-            send "${sb.password}\\r"
-            exp_continue
-          }
-          eof
-        }
-      `;
-      const out = execSync(`expect -c '${expScript}'`, { encoding: 'utf8', timeout: 8000 });
-      for (const line of out.split('\n')) {
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 6 && (parts[0] === sb.username || parts[parts.length - 1] === '/home')) {
-          totalBytes = parseInt(parts[1], 10) || 0;
-          usedBytes = parseInt(parts[2], 10) || 0;
-          if (totalBytes > 0) {
-            usedPercent = Number(((usedBytes / totalBytes) * 100).toFixed(2));
-          }
-          break;
-        }
-      }
+      hetznerServers = await hetznerCloud.listServers();
+    } catch (e) {}
+    try {
+      customServers = await customCompute.listServers();
+    } catch (e) {}
+    try {
+      storageStats = await hetznerStorage.getStats();
+    } catch (e) {}
+    try {
+      customStorageTargets = await customStorage.listStorage();
+    } catch (e) {}
+    try {
+      backupHistory = backupEngine.getHistory();
     } catch (e) {}
   }
 
-  let lastBackup = null;
-  const backupFile = path.join(os.homedir(), '.config', 'omarchy', 'backup_status.json');
-  if (fs.existsSync(backupFile)) {
-    try {
-      lastBackup = JSON.parse(fs.readFileSync(backupFile, 'utf8'));
-    } catch (e) {}
-  }
-
-  return {
-    configured: isConfigured,
-    username: sb.username,
-    host: sb.host,
-    mounted,
-    mount_point: mountPoint,
-    total_bytes: totalBytes,
-    used_bytes: usedBytes,
-    used_percent: usedPercent,
-    last_backup: lastBackup,
-  };
-}
-
-// ------------------------------------------------------------------ Commands
-async function cmdStatus(args, config) {
-  const isMock = args.includes('--mock');
-  const isJson = args.includes('--json');
-
-  const storage = getStorageBoxStats(config, isMock);
-  let servers = [];
-  let activeCount = 0;
-
-  if (config.api_token || isMock) {
-    if (isMock) {
-      servers = [
-        {
-          id: 1048576,
-          name: 'omarchy-companion',
-          status: 'running',
-          type: 'cx23',
-          ipv4: '116.203.42.18',
-          location: 'nbg1',
-        },
-      ];
-      activeCount = 1;
-    } else {
-      try {
-        const data = await apiRequest(config.api_token, 'GET', '/servers');
-        servers = (data.servers || []).map((s) => {
-          if (s.status === 'running') activeCount++;
-          return {
-            id: s.id,
-            name: s.name,
-            status: s.status,
-            type: s.server_type?.name || 'cx23',
-            ipv4: s.public_net?.ipv4?.ip || 'no IP',
-            location: s.datacenter?.location?.name || 'nbg1',
-          };
-        });
-      } catch (e) {}
-    }
-  }
+  const allServers = [...hetznerServers, ...customServers];
+  const activeCount = allServers.filter((s) => s.status === 'running').length;
 
   const payload = {
-    storage,
-    compute: {
-      active_count: activeCount,
-      total_count: servers.length,
-      primary_server: servers[0] || null,
-      servers,
+    servers: allServers,
+    active_count: activeCount,
+    total_count: allServers.length,
+    storage: {
+      storage_box: storageStats,
+      custom_storage: customStorageTargets
     },
-    mock: isMock,
+    backups: {
+      schedule: backupEngine.getSchedule(),
+      recent: backupHistory.slice(0, 3)
+    }
   };
 
   if (isJson) {
@@ -235,59 +141,113 @@ async function cmdStatus(args, config) {
     return;
   }
 
-  console.log('\n\x1b[1;36m☁  Ocloud Companion (Omarchy)\x1b[0m');
-  console.log('━'.repeat(50));
-  console.log('\x1b[1mStorage Box:\x1b[0m');
-  if (storage.configured) {
-    const used = formatBytes(storage.used_bytes);
-    const total = formatBytes(storage.total_bytes);
-    const mnt = storage.mounted
+  console.log('\n\x1b[1;36m☁  Ocloud Sovereign Companion (Omarchy)\x1b[0m');
+  console.log('━'.repeat(60));
+
+  // Storage Section
+  console.log('\x1b[1mStorage Overview:\x1b[0m');
+  if (storageStats && storageStats.configured) {
+    const used = formatBytes(storageStats.used_bytes);
+    const total = formatBytes(storageStats.total_bytes);
+    const mnt = storageStats.mounted
       ? '\x1b[32mMounted\x1b[0m'
       : '\x1b[33mNot Mounted\x1b[0m';
-    console.log(`  • Usage:    ${used} / ${total} (${storage.used_percent}%)`);
-    console.log(`  • Status:   ${mnt} at ${storage.mount_point}`);
-    if (storage.last_backup) {
-      console.log(`  • Backup:   Last snapshot at ${storage.last_backup.timestamp}`);
-    }
+    console.log(`  • Storage Box:   ${used} / ${total} (${storageStats.used_percent}%)`);
+    console.log(`    Status:        ${mnt} at ${storageStats.mount_point}`);
   } else {
-    console.log('  • \x1b[33mNot configured\x1b[0m in ~/.config/omarchy/hetzner.json');
+    console.log('  • Storage Box:   \x1b[33mNot configured\x1b[0m in Vault');
   }
 
-  console.log('\n\x1b[1mCloud Compute (VMs):\x1b[0m');
-  if (servers.length > 0) {
-    console.log(`  • Active:   ${activeCount}/${servers.length} running`);
-    for (const s of servers) {
-      const col =
+  if (customStorageTargets.length > 0) {
+    for (const cs of customStorageTargets) {
+      const mnt = cs.mounted ? '\x1b[32mMounted\x1b[0m' : '\x1b[33mUnmounted\x1b[0m';
+      console.log(`  • Custom SFTP:   ${cs.name} (${cs.host}) - ${mnt} at ${cs.mountPoint}`);
+    }
+  }
+
+  // Check Ephemeral VM Mount
+  const vmMount = path.join(os.homedir(), 'Companion-VM');
+  if (isDriveMounted(vmMount)) {
+    console.log(`  • \x1b[33m[EPHEMERAL]\x1b[0m VM Drive: \x1b[32mMounted\x1b[0m at ${vmMount} (Wiped on VM shutdown!)`);
+  }
+
+  // Compute Fleet Section
+  console.log('\n\x1b[1mCompute Fleet:\x1b[0m');
+  if (allServers.length > 0) {
+    console.log(`  • Active: ${activeCount}/${allServers.length} nodes online\n`);
+    for (const s of allServers) {
+      const statusBadge =
         s.status === 'running'
-          ? '\x1b[32m● RUNNING\x1b[0m'
+          ? '\x1b[32m● ONLINE\x1b[0m'
           : `\x1b[31m○ ${s.status.toUpperCase()}\x1b[0m`;
-      console.log(`  • ${s.name} (${s.type}, ${s.location}) ${col} - ${s.ipv4}`);
+      const kind = s.isHomeWorkstation
+        ? '\x1b[32m[🏠 HOME WORKSTATION]\x1b[0m'
+        : s.provider === 'custom'
+        ? '\x1b[35m[⚡ BARE METAL]\x1b[0m'
+        : '\x1b[36m[☁ HETZNER CLOUD]\x1b[0m';
+      console.log(`  ${kind} ${s.name} (${s.type}, ${s.location})`);
+      console.log(`    Status: ${statusBadge} | IPv4: ${s.ipv4} | ID: ${s.id}`);
     }
   } else {
-    console.log('  • No active companion servers found.');
+    console.log('  • No compute nodes found in fleet.');
   }
-  console.log('━'.repeat(50) + '\n');
+
+  // Backups
+  console.log('\n\x1b[1mAutomated Backups:\x1b[0m');
+  const sched = backupEngine.getSchedule();
+  console.log(`  • Schedule: ${sched.enabled ? `\x1b[32mActive\x1b[0m (${sched.interval} at ${sched.time})` : '\x1b[33mDisabled\x1b[0m'}`);
+  if (backupHistory.length > 0) {
+    console.log(`  • Last snapshot: ${backupHistory[0].timestamp} (${backupHistory[0].status})`);
+  }
+  console.log('━'.repeat(60) + '\n');
 }
 
-async function cmdVm(subcmd, args, config) {
-  const token = config.api_token;
+// --- PING
+async function cmdPing(args) {
+  const isJson = args.includes('--json');
+  if (!isJson) {
+    console.log('\n\x1b[1;36m🌐 Probing Global Datacenter Latencies...\x1b[0m');
+    console.log('Testing concurrent TCP handshakes against datacenter endpoints...\n');
+  }
+
+  const results = await probeLocations();
+
+  if (isJson) {
+    console.log(JSON.stringify(results, null, 2));
+    return;
+  }
+
+  console.log(
+    `${'RANK'.padEnd(6)} ${'REGION'.padEnd(20)} ${'LOCATION'.padEnd(16)} ${'LATENCY'.padEnd(12)} RECOMMENDATION`
+  );
+  console.log('-'.repeat(78));
+
+  results.forEach((r, idx) => {
+    const rank = `#${idx + 1}`.padEnd(6);
+    const region = `${r.flag} ${r.name}`.padEnd(20);
+    const loc = r.id.padEnd(16);
+    const ping = `${r.qualityBadge} ${r.pingDisplay}`.padEnd(12);
+    console.log(`${rank} ${region} ${loc} ${ping} ${r.optimalFor}`);
+  });
+  console.log('\n\x1b[1mTip:\x1b[0m Deploy companion VMs to rank #1 for maximum responsiveness and frame rates.\n');
+}
+
+// --- VM / SERVER OPERATIONS
+async function cmdVm(subcmd, args) {
+  const allServers = [...(await hetznerCloud.listServers()), ...(await customCompute.listServers())];
 
   if (subcmd === 'list') {
-    const data = await apiRequest(token, 'GET', '/servers');
-    const servers = data.servers || [];
-    if (servers.length === 0) {
-      console.log('No servers found.');
+    if (allServers.length === 0) {
+      console.log('No servers found in fleet.');
       return;
     }
     console.log(
-      `${'ID'.padEnd(12)} ${'NAME'.padEnd(20)} ${'STATUS'.padEnd(12)} ${'TYPE'.padEnd(8)} ${'IPV4'.padEnd(16)} LOCATION`
+      `${'ID'.padEnd(14)} ${'NAME'.padEnd(22)} ${'STATUS'.padEnd(12)} ${'TYPE'.padEnd(14)} ${'IPV4'.padEnd(16)} PROVIDER`
     );
-    console.log('-'.repeat(75));
-    for (const s of servers) {
-      const ip = s.public_net?.ipv4?.ip || '-';
-      const loc = s.datacenter?.location?.name || '-';
+    console.log('-'.repeat(85));
+    for (const s of allServers) {
       console.log(
-        `${String(s.id).padEnd(12)} ${s.name.padEnd(20)} ${s.status.padEnd(12)} ${(s.server_type?.name || '-').padEnd(8)} ${ip.padEnd(16)} ${loc}`
+        `${String(s.id).padEnd(14)} ${s.name.padEnd(22)} ${s.status.padEnd(12)} ${(s.type || '-').padEnd(14)} ${(s.ipv4 || '-').padEnd(16)} ${s.provider}`
       );
     }
     return;
@@ -295,160 +255,94 @@ async function cmdVm(subcmd, args, config) {
 
   if (subcmd === 'create') {
     const name = args[0] || `runner-${Math.floor(Math.random() * 1000)}`;
-    const srvType = config.default_vm_type || 'cx23';
-    const location = config.default_location || 'nbg1';
-    let userData = null;
-    const tsKey = config.tailscale_auth_key;
-    if (tsKey) {
-      userData = `#!/bin/bash\ncurl -fsSL https://tailscale.com/install.sh | sh\ntailscale up --authkey=${tsKey} --hostname=${name}\n`;
-      console.log(`Tailscale auto-join enabled for hostname: ${name}`);
+    const srvType = args[1] || 'cx23';
+    let location = args[2];
+
+    if (!location) {
+      console.log('Determining lowest latency datacenter...');
+      const pingResults = await probeLocations();
+      location = pingResults[0]?.id || 'nbg1';
+      console.log(`Selected optimal location: ${location} (${pingResults[0]?.pingDisplay})`);
     }
 
+    const tsKey = vault.get('tailscale_auth_key', null);
     console.log(`Procuring server '${name}' (${srvType} in ${location})...`);
-    const payload = {
+    const server = await hetznerCloud.createServer({
       name,
-      server_type: srvType,
+      type: srvType,
       location,
-      image: 'ubuntu-24.04',
-      start_after_create: true,
-      ssh_keys: ['omarchy-laptop'],
-    };
-    if (userData) payload.user_data = userData;
-
-    const res = await apiRequest(token, 'POST', '/servers', payload);
-    console.log(`Server created! ID: ${res.server?.id}, Status: ${res.server?.status}`);
+      tailscaleKey: tsKey
+    });
+    console.log(`Server created! ID: ${server?.id}, Status: ${server?.status}`);
     return;
   }
 
-  const listData = await apiRequest(token, 'GET', '/servers');
-  const servers = listData.servers || [];
-
-  let target = args[0];
-  let appCmd = 'arcade';
+  const target = args[0];
   let server = null;
-
-  if (subcmd === 'app') {
-    const matched = servers.find(
-      (s) => String(s.id) === String(target) || s.name === target
-    );
-    if (matched) {
-      server = matched;
-      appCmd = args[1] || 'arcade';
-    } else {
-      server = servers.find((s) => s.status === 'running') || servers[0];
-      if (target) appCmd = target;
-    }
-  } else if (subcmd === 'ssh' || subcmd === 'inspect' || subcmd === 'mount' || subcmd === 'unmount') {
-    if (!target) {
-      server = servers.find((s) => s.status === 'running') || servers[0];
-    } else {
-      server = servers.find(
-        (s) => String(s.id) === String(target) || s.name === target
-      );
-    }
+  if (target) {
+    server = allServers.find((s) => String(s.id) === String(target) || s.name.toLowerCase() === target.toLowerCase());
   } else {
-    if (!target) {
-      console.log(`Usage: ocloud vm ${subcmd} <server-id-or-name>`);
-      return;
-    }
-    server = servers.find(
-      (s) => String(s.id) === String(target) || s.name === target
-    );
+    server = allServers.find((s) => s.status === 'running') || allServers[0];
   }
 
   if (!server) {
-    console.error(`Error: No active server found.`);
+    console.error(`Error: Server '${target || 'default'}' not found.`);
     process.exit(1);
   }
 
   const sid = server.id;
-  const ip = server.public_net?.ipv4?.ip;
+  const ip = server.ipv4;
 
   if (subcmd === 'start') {
-    console.log(`Powering on ${server.name} (${sid})...`);
-    await apiRequest(token, 'POST', `/servers/${sid}/actions/poweron`);
-    console.log('Action initiated.');
+    if (server.provider === 'hetzner') {
+      console.log(`Powering on ${server.name} (${sid})...`);
+      await hetznerCloud.startServer(sid);
+      console.log('Action initiated.');
+    } else {
+      console.log('Custom / bare metal servers cannot be powered on via Cloud API. Use Wake-on-LAN.');
+    }
   } else if (subcmd === 'stop') {
-    console.log(`Powering off ${server.name} (${sid})...`);
-    await apiRequest(token, 'POST', `/servers/${sid}/actions/poweroff`);
-    console.log('Action initiated.');
+    if (server.provider === 'hetzner') {
+      console.log(`Powering off ${server.name} (${sid})...`);
+      await hetznerCloud.stopServer(sid);
+      console.log('Action initiated.');
+    } else {
+      console.log(`Attempting graceful shutdown on ${server.name}...`);
+      const keyPath = server.keyPath || path.join(os.homedir(), '.ssh', 'id_ed25519');
+      execSync(`ssh -p ${server.port || 22} -i "${keyPath}" -o StrictHostKeyChecking=no ${server.user || 'root'}@${ip} "shutdown -h now"`);
+    }
   } else if (subcmd === 'reboot') {
-    console.log(`Rebooting ${server.name} (${sid})...`);
-    await apiRequest(token, 'POST', `/servers/${sid}/actions/reboot`);
-    console.log('Action initiated.');
+    if (server.provider === 'hetzner') {
+      console.log(`Rebooting ${server.name} (${sid})...`);
+      await hetznerCloud.rebootServer(sid);
+      console.log('Action initiated.');
+    } else {
+      console.log(`Attempting reboot on ${server.name}...`);
+      const keyPath = server.keyPath || path.join(os.homedir(), '.ssh', 'id_ed25519');
+      execSync(`ssh -p ${server.port || 22} -i "${keyPath}" -o StrictHostKeyChecking=no ${server.user || 'root'}@${ip} "reboot"`);
+    }
   } else if (subcmd === 'delete') {
-    await apiRequest(token, 'DELETE', `/servers/${sid}`);
-    console.log(`Server ${server.name} deleted.`);
+    if (server.provider === 'hetzner') {
+      console.log(`Deleting ${server.name} (${sid})...`);
+      await hetznerCloud.deleteServer(sid);
+      console.log(`Server deleted.`);
+    } else {
+      await customCompute.removeServer(sid);
+      console.log(`Removed custom node ${server.name} from fleet.`);
+    }
   } else if (subcmd === 'ssh') {
-    const keyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
-    console.log(`Connecting to root@${ip}...`);
-    spawn('ssh', ['-i', keyPath, '-o', 'StrictHostKeyChecking=no', `root@${ip}`], {
-      stdio: 'inherit',
+    const keyPath = server.keyPath || path.join(os.homedir(), '.ssh', 'id_ed25519');
+    const user = server.user || 'root';
+    const port = server.port || 22;
+    console.log(`Connecting to ${user}@${ip} on port ${port}...`);
+    spawn('ssh', ['-p', String(port), '-i', keyPath, '-o', 'StrictHostKeyChecking=no', `${user}@${ip}`], {
+      stdio: 'inherit'
     });
   } else if (subcmd === 'inspect') {
-    const keyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
-    const remoteCmd =
-      "echo '---CPU---' && cat /proc/loadavg && " +
-      "echo '---MEM---' && free -b && " +
-      "echo '---DISK---' && df -B1 / && " +
-      "echo '---UPTIME---' && uptime -p && " +
-      "echo '---PROCS---' && ps -eo pid,%cpu,%mem,comm --sort=-%cpu | head -n 6";
-
     try {
-      const raw = execSync(
-        `ssh -i "${keyPath}" -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@${ip} "${remoteCmd}"`,
-        { encoding: 'utf8' }
-      );
-
-      const data = { server: server.name, ip, status: server.status };
-      const sectionLines = {};
-      let curSec = null;
-      for (const l of raw.split('\n')) {
-        const line = l.trim();
-        if (line.startsWith('---') && line.endsWith('---')) {
-          curSec = line.replace(/-/g, '');
-          sectionLines[curSec] = [];
-        } else if (curSec && line) {
-          sectionLines[curSec].push(line);
-        }
-      }
-
-      if (sectionLines.CPU && sectionLines.CPU.length > 0) {
-        const parts = sectionLines.CPU[0].split(/\s+/);
-        data.load_1m = parseFloat(parts[0]) || 0;
-        data.load_5m = parseFloat(parts[1]) || 0;
-        data.load_15m = parseFloat(parts[2]) || 0;
-      }
-      if (sectionLines.MEM && sectionLines.MEM.length >= 2) {
-        const parts = sectionLines.MEM[1].split(/\s+/);
-        data.ram_total = parseInt(parts[1], 10) || 0;
-        data.ram_used = parseInt(parts[2], 10) || 0;
-        data.ram_percent = data.ram_total
-          ? Number(((data.ram_used / data.ram_total) * 100).toFixed(1))
-          : 0;
-      }
-      if (sectionLines.DISK && sectionLines.DISK.length >= 2) {
-        const parts = sectionLines.DISK[1].split(/\s+/);
-        data.disk_total = parseInt(parts[1], 10) || 0;
-        data.disk_used = parseInt(parts[2], 10) || 0;
-        data.disk_percent = data.disk_total
-          ? Number(((data.disk_used / data.disk_total) * 100).toFixed(1))
-          : 0;
-      }
-      if (sectionLines.UPTIME && sectionLines.UPTIME.length > 0) {
-        data.uptime = sectionLines.UPTIME[0];
-      }
-
-      const procs = [];
-      if (sectionLines.PROCS) {
-        for (const pline of sectionLines.PROCS.slice(1)) {
-          const pcs = pline.split(/\s+/);
-          if (pcs.length >= 4) {
-            procs.push({ pid: pcs[0], cpu: pcs[1], mem: pcs[2], cmd: pcs[3] });
-          }
-        }
-      }
-      data.top_processes = procs;
+      const data = server.provider === 'hetzner'
+        ? await hetznerCloud.inspectServer(server)
+        : await customCompute.inspectServer(server);
 
       if (args.includes('--json')) {
         console.log(JSON.stringify(data, null, 2));
@@ -456,83 +350,91 @@ async function cmdVm(subcmd, args, config) {
       }
 
       console.log(`\n\x1b[1;36m⚡ Resource Inspection: ${server.name} (${ip})\x1b[0m`);
-      console.log('━'.repeat(50));
-      console.log(`  • Uptime:     ${data.uptime || 'unknown'}`);
-      console.log(`  • Load Avg:   ${data.load_1m} (1m), ${data.load_5m} (5m)`);
-      console.log(
-        `  • RAM:        ${formatBytes(data.ram_used)} / ${formatBytes(data.ram_total)} (${data.ram_percent}%)`
-      );
-      console.log(
-        `  • NVMe Disk:  ${formatBytes(data.disk_used)} / ${formatBytes(data.disk_total)} (${data.disk_percent}%)`
-      );
-      console.log('\n\x1b[1mActive Top Processes:\x1b[0m');
-      console.log(`  ${'PID'.padEnd(8)} ${'%CPU'.padEnd(8)} ${'%MEM'.padEnd(8)} COMMAND`);
-      for (const pr of procs) {
-        console.log(`  ${pr.pid.padEnd(8)} ${pr.cpu.padEnd(8)} ${pr.mem.padEnd(8)} ${pr.cmd}`);
+      console.log('━'.repeat(55));
+      console.log(`  • Host / Node:  ${server.name} [${server.provider.toUpperCase()}]`);
+      console.log(`  • Uptime:       ${data.uptime || 'unknown'}`);
+      console.log(`  • Load Avg:     ${data.load_1m} (1m), ${data.load_5m} (5m)`);
+      console.log(`  • RAM Usage:    ${formatBytes(data.ram_used)} / ${formatBytes(data.ram_total)} (${data.ram_percent}%)`);
+      console.log(`  • Disk Usage:   ${formatBytes(data.disk_used)} / ${formatBytes(data.disk_total)} (${data.disk_percent}%)`);
+      if (data.top_processes && data.top_processes.length > 0) {
+        console.log('\n\x1b[1mTop Processes:\x1b[0m');
+        console.log(`  ${'PID'.padEnd(8)} ${'%CPU'.padEnd(8)} ${'%MEM'.padEnd(8)} COMMAND`);
+        for (const pr of data.top_processes) {
+          console.log(`  ${pr.pid.padEnd(8)} ${pr.cpu.padEnd(8)} ${pr.mem.padEnd(8)} ${pr.cmd}`);
+        }
       }
-      console.log('━'.repeat(50) + '\n');
+      console.log('━'.repeat(55) + '\n');
     } catch (e) {
       console.error('Inspection failed: ' + e.message);
     }
   } else if (subcmd === 'app') {
-    const keyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
-    console.log(`Launching remote app '${appCmd}' on ${server.name}...`);
+    const appCmd = args[1] || 'arcade';
+    const keyPath = server.keyPath || path.join(os.homedir(), '.ssh', 'id_ed25519');
+    const user = server.user || 'root';
+    const port = server.port || 22;
+
+    const isHome = Boolean(server.isHomeWorkstation);
+    const titlePrefix = isHome ? '[🏠 Home Workstation] ' : '[☁ Hetzner Cloud] ';
+
     const localWaypipe = [
       path.join(os.homedir(), '.local', 'bin', 'waypipe'),
       '/usr/bin/waypipe',
       '/usr/local/bin/waypipe'
     ].find((p) => fs.existsSync(p)) || 'waypipe';
 
-    console.log(`Using Waypipe at ${localWaypipe} (native Wayland + Hetzner Cloud window styling)...`);
-    const remoteExec = `env PATH=/root/.local/bin:/usr/local/bin:/usr/bin:$PATH PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${appCmd}`;
+    console.log(`Launching '${appCmd}' on ${server.name} via Waypipe...`);
+    console.log(`Prefix: "${titlePrefix}" (triggers desktop window rules)`);
+
+    const remoteExec = `env PATH=/root/.local/bin:/home/${user}/.local/bin:/usr/local/bin:/usr/bin:$PATH PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${appCmd}`;
+
     spawn(
       localWaypipe,
       [
-        '--title-prefix', '[☁ Hetzner Cloud] ',
+        '--title-prefix', titlePrefix,
         '--video=h264',
         '--threads', '4',
         'ssh',
+        '-p', String(port),
         '-i', keyPath,
         '-o', 'StrictHostKeyChecking=no',
         '-R', '4713:localhost:4713',
-        `root@${ip}`,
+        `${user}@${ip}`,
         remoteExec
       ],
       { stdio: 'inherit' }
     );
-  } else if (subcmd === 'tailscale') {
-    const tsKey = args[1] || config.tailscale_auth_key;
-    if (!tsKey) {
-      console.error('Error: Provide a Tailscale auth key via argument or config.');
-      process.exit(1);
-    }
-    const keyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
-    console.log(`Connecting ${server.name} to Tailscale...`);
-    const remote = `curl -fsSL https://tailscale.com/install.sh | sh && tailscale up --authkey=${tsKey} --hostname=${server.name}`;
-    execSync(`ssh -i "${keyPath}" -o StrictHostKeyChecking=no root@${ip} "${remote}"`, {
-      stdio: 'inherit',
-    });
-    console.log('Tailscale connected!');
   } else if (subcmd === 'mount') {
     const vmMountPoint = path.join(os.homedir(), 'Companion-VM');
     if (isDriveMounted(vmMountPoint)) {
       console.log(`VM drive is already mounted at ${vmMountPoint}`);
       return;
     }
+
+    // Safety Consent Warning
+    const forceFlag = args.includes('--yes') || args.includes('-y');
+    if (!forceFlag && process.stdout.isTTY) {
+      console.log('\n\x1b[41;1;37m ⚠️  MANDATORY SAFETY CONSENT: EPHEMERAL COMPUTE DRIVE ⚠️ \x1b[0m');
+      console.log('\x1b[31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m');
+      console.log('\x1b[1;33mThis drive is hosted on the ephemeral local disk of VM ' + server.name + '.\x1b[0m');
+      console.log('\x1b[1;33mThis is NOT a persistent Storage Box or backup array!\x1b[0m');
+      console.log('\x1b[31mALL files saved here WILL BE PERMANENTLY DESTROYED when the VM is powered off or deleted.\x1b[0m');
+      console.log('\x1b[31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m\n');
+      console.log('To acknowledge and mount, run with: ocloud vm mount [server] --yes\n');
+      return;
+    }
+
     fs.mkdirSync(vmMountPoint, { recursive: true });
-    const keyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
-    console.log(`\x1b[33m⚠️  NOTICE: Mounting EPHEMERAL VM drive from ${server.name} (${ip}) to ${vmMountPoint}...\x1b[0m`);
-    console.log(`\x1b[33m   Any files created here will be destroyed when this VM powers off!\x1b[0m`);
+    const keyPath = server.keyPath || path.join(os.homedir(), '.ssh', 'id_ed25519');
+    const user = server.user || 'root';
     const rcloneBin = [
       path.join(os.homedir(), '.local', 'bin', 'rclone'),
-      '/usr/bin/rclone',
+      '/usr/bin/rclone'
     ].find((p) => fs.existsSync(p)) || 'rclone';
 
-    // Ensure rclone config has companion-vm remote
     const rcloneConfPath = path.join(os.homedir(), '.config', 'rclone', 'rclone.conf');
     fs.mkdirSync(path.dirname(rcloneConfPath), { recursive: true });
     let rcloneConf = fs.existsSync(rcloneConfPath) ? fs.readFileSync(rcloneConfPath, 'utf8') : '';
-    const remoteBlock = `\n[companion-vm]\ntype = sftp\nhost = ${ip}\nuser = root\nkey_file = ${keyPath}\nshell_type = unix\n`;
+    const remoteBlock = `\n[companion-vm]\ntype = sftp\nhost = ${ip}\nuser = ${user}\nkey_file = ${keyPath}\nshell_type = unix\n`;
     if (rcloneConf.includes('[companion-vm]')) {
       rcloneConf = rcloneConf.replace(/\[companion-vm\][\s\S]*?(?=\n\[|$)/, remoteBlock.trim());
     } else {
@@ -561,74 +463,192 @@ async function cmdVm(subcmd, args, config) {
   }
 }
 
-function cmdStorage(subcmd, args, config) {
-  const sb = config.storage_box || {};
-  const mountPoint = sb.mount_point || path.join(os.homedir(), 'Cloud');
-  const rcloneBin = [
-    path.join(os.homedir(), '.local', 'bin', 'rclone'),
-    '/usr/bin/rclone',
-  ].find((p) => fs.existsSync(p)) || 'rclone';
+// --- NODE (CUSTOM & HOME RIGS)
+async function cmdNode(subcmd, args) {
+  if (subcmd === 'list') {
+    const nodes = await customCompute.listServers();
+    if (nodes.length === 0) {
+      console.log('No custom nodes registered.');
+      return;
+    }
+    console.log(`${'ID'.padEnd(16)} ${'NAME'.padEnd(20)} ${'HOST'.padEnd(18)} ${'STATUS'.padEnd(10)} TYPE`);
+    console.log('-'.repeat(75));
+    for (const n of nodes) {
+      const typeStr = n.isHomeWorkstation ? '🏠 Home Workstation' : '⚡ Bare Metal';
+      console.log(`${n.id.padEnd(16)} ${n.name.padEnd(20)} ${n.ipv4.padEnd(18)} ${n.status.padEnd(10)} ${typeStr}`);
+    }
+    return;
+  }
 
+  if (subcmd === 'add') {
+    const name = args[0];
+    const host = args[1];
+    if (!name || !host) {
+      console.log('Usage: ocloud node add <name> <host> [--home] [--user=root] [--port=22]');
+      return;
+    }
+    const isHome = args.includes('--home');
+    let user = 'root';
+    let port = 22;
+    for (const a of args) {
+      if (a.startsWith('--user=')) user = a.split('=')[1];
+      if (a.startsWith('--port=')) port = parseInt(a.split('=')[1], 10);
+    }
+    const node = await customCompute.addServer({ name, host, user, port, isHomeWorkstation: isHome });
+    console.log(`\x1b[32m✔ Registered node: ${node.name} (${node.host})\x1b[0m`);
+    return;
+  }
+
+  if (subcmd === 'remove') {
+    const target = args[0];
+    if (!target) {
+      console.log('Usage: ocloud node remove <name-or-id>');
+      return;
+    }
+    const removed = await customCompute.removeServer(target);
+    if (removed) console.log(`\x1b[32m✔ Removed node: ${target}\x1b[0m`);
+    else console.log(`Node not found: ${target}`);
+  }
+}
+
+// --- STORAGE
+async function cmdStorage(subcmd, args) {
   if (subcmd === 'status') {
-    console.log(JSON.stringify(getStorageBoxStats(config), null, 2));
+    const stats = await hetznerStorage.getStats();
+    const custom = await customStorage.listStorage();
+    console.log(JSON.stringify({ storage_box: stats, custom_storage: custom }, null, 2));
     return;
   }
 
   if (subcmd === 'mount') {
-    if (isDriveMounted(mountPoint)) {
-      console.log(`Already mounted at ${mountPoint}`);
-      return;
-    }
-    fs.mkdirSync(mountPoint, { recursive: true });
-    try {
-      execSync(
-        `${rcloneBin} mount storagebox: "${mountPoint}" --vfs-cache-mode full --daemon`,
-        { stdio: 'inherit' }
-      );
-      console.log(`✔ Permanent Storage Box mounted to ${mountPoint}`);
-    } catch (e) {
-      console.error('Failed to mount Storage Box: ' + e.message);
+    const target = args[0];
+    if (!target || target === 'box' || target === 'storagebox') {
+      await hetznerStorage.mount();
+      console.log('✔ Storage Box mount initiated.');
+    } else {
+      await customStorage.mount(target);
+      console.log(`✔ Custom storage ${target} mounted.`);
     }
     return;
   }
 
   if (subcmd === 'unmount') {
-    if (!isDriveMounted(mountPoint)) {
-      console.log(`${mountPoint} is not mounted.`);
+    const target = args[0];
+    if (!target || target === 'box' || target === 'storagebox') {
+      await hetznerStorage.unmount();
+      console.log('✔ Storage Box unmounted.');
+    } else {
+      await customStorage.unmount(target);
+      console.log(`✔ Custom storage ${target} unmounted.`);
+    }
+    return;
+  }
+
+  if (subcmd === 'add') {
+    const name = args[0];
+    const host = args[1];
+    const remotePath = args[2] || '/';
+    if (!name || !host) {
+      console.log('Usage: ocloud storage add <name> <host> [remotePath] [--user=root] [--home]');
       return;
     }
-    try {
-      execSync(`umount "${mountPoint}" || fusermount3 -u "${mountPoint}" || fusermount -u "${mountPoint}"`, { stdio: 'inherit' });
-      console.log(`Unmounted ${mountPoint}`);
-    } catch (e) {
-      console.error('Failed to unmount: ' + e.message);
+    let user = 'root';
+    for (const a of args) {
+      if (a.startsWith('--user=')) user = a.split('=')[1];
     }
+    const isHome = args.includes('--home');
+    const target = await customStorage.addTarget({ name, host, user, remotePath, isHomeStorage: isHome });
+    console.log(`\x1b[32m✔ Registered storage target: ${target.name}\x1b[0m`);
   }
 }
 
-function cmdBackup(subcmd, args, config) {
-  const backupFile = path.join(os.homedir(), '.config', 'omarchy', 'backup_status.json');
+// --- BACKUP
+async function cmdBackup(subcmd, args) {
   if (subcmd === 'status') {
-    if (fs.existsSync(backupFile)) {
-      console.log(fs.readFileSync(backupFile, 'utf8'));
-    } else {
-      console.log('No backup history found.');
+    const sched = backupEngine.getSchedule();
+    const history = backupEngine.getHistory();
+    console.log(JSON.stringify({ schedule: sched, recent: history.slice(0, 5) }, null, 2));
+    return;
+  }
+
+  if (subcmd === 'history') {
+    const history = backupEngine.getHistory();
+    if (history.length === 0) {
+      console.log('No backups recorded.');
+      return;
+    }
+    console.log(`${'SNAPSHOT ID'.padEnd(30)} ${'TIMESTAMP'.padEnd(25)} ${'STATUS'.padEnd(10)} DURATION`);
+    console.log('-'.repeat(75));
+    for (const h of history) {
+      console.log(`${h.id.padEnd(30)} ${h.timestamp.padEnd(25)} ${h.status.padEnd(10)} ${h.duration_seconds}s`);
     }
     return;
   }
 
   if (subcmd === 'run') {
-    console.log('Running snapshot backup to Storage Box...');
-    const record = {
-      timestamp: new Date().toISOString(),
-      status: 'success',
-      source: config.storage_box?.backup_source || os.homedir(),
-      destination: `${config.storage_box?.username}@${config.storage_box?.host}:backups/`,
-    };
-    fs.mkdirSync(path.dirname(backupFile), { recursive: true });
-    fs.writeFileSync(backupFile, JSON.stringify(record, null, 2));
-    console.log(`Backup completed at ${record.timestamp}`);
+    console.log('Initiating snapshot backup...');
+    const res = await backupEngine.runBackup();
+    console.log(`Backup finished with status: ${res.status} (ID: ${res.id})`);
+    return;
   }
+
+  if (subcmd === 'schedule') {
+    const enable = args.includes('--enable');
+    const disable = args.includes('--disable');
+    let interval = 'daily';
+    for (const a of args) {
+      if (a.startsWith('--interval=')) interval = a.split('=')[1];
+    }
+    const sched = backupEngine.setSchedule({
+      enabled: enable ? true : disable ? false : true,
+      interval
+    });
+    console.log(`Backup schedule updated: ${JSON.stringify(sched, null, 2)}`);
+  }
+}
+
+// --- VAULT
+function cmdVault(subcmd, args) {
+  if (subcmd === 'status') {
+    const exists = fs.existsSync(vault.vaultPath);
+    console.log(`\n\x1b[1;36m🔐 Ocloud Credentials Vault\x1b[0m`);
+    console.log(`  • Path:        ${vault.vaultPath}`);
+    console.log(`  • Encrypted:   ${exists ? '\x1b[32mYES (AES-256-GCM)\x1b[0m' : '\x1b[33mNO (Not initialized)\x1b[0m'}`);
+    console.log(`  • Permissions: chmod 600\n`);
+    return;
+  }
+
+  if (subcmd === 'set') {
+    const key = args[0];
+    const val = args[1];
+    if (!key || val === undefined) {
+      console.log('Usage: ocloud vault set <key> <value>');
+      return;
+    }
+    vault.set(key, val);
+    console.log(`\x1b[32m✔ Updated vault key: ${key}\x1b[0m`);
+    return;
+  }
+
+  if (subcmd === 'get') {
+    const key = args[0];
+    if (!key) {
+      console.log('Usage: ocloud vault get <key>');
+      return;
+    }
+    console.log(vault.get(key, ''));
+  }
+}
+
+// --- GUI
+function cmdGui() {
+  const appPath = path.join(__dirname, 'app', 'main.py');
+  if (!fs.existsSync(appPath)) {
+    console.error(`Desktop app entry point not found at ${appPath}`);
+    process.exit(1);
+  }
+  console.log('Launching Ocloud Desktop GUI...');
+  spawn('python3', [appPath], { stdio: 'inherit' });
 }
 
 // ------------------------------------------------------------------ Main Entry
@@ -637,19 +657,26 @@ async function main() {
   const command = argv[0] || 'status';
   const subcmd = argv[1];
   const rest = argv.slice(2);
-  const config = loadConfig();
 
   try {
     if (command === 'status' || command.startsWith('-')) {
-      await cmdStatus(argv, config);
-    } else if (command === 'vm') {
-      await cmdVm(subcmd || 'list', rest, config);
+      await cmdStatus(argv);
+    } else if (command === 'ping') {
+      await cmdPing(rest);
+    } else if (command === 'vm' || command === 'server') {
+      await cmdVm(subcmd || 'list', rest);
+    } else if (command === 'node') {
+      await cmdNode(subcmd || 'list', rest);
     } else if (command === 'storage') {
-      cmdStorage(subcmd || 'status', rest, config);
+      await cmdStorage(subcmd || 'status', rest);
     } else if (command === 'backup') {
-      cmdBackup(subcmd || 'status', rest, config);
+      await cmdBackup(subcmd || 'status', rest);
+    } else if (command === 'vault') {
+      cmdVault(subcmd || 'status', rest);
+    } else if (command === 'gui') {
+      cmdGui();
     } else {
-      console.log('Usage: ocloud [status | vm | storage | backup]');
+      console.log('Usage: ocloud [status | ping | vm | node | storage | backup | vault | gui]');
     }
   } catch (err) {
     console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
