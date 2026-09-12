@@ -8,8 +8,8 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "community.hetzner"
-  ipcTarget: "community.hetzner"
+  moduleName: "community.ocloud"
+  ipcTarget: "community.ocloud"
   manageIpc: false
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -40,7 +40,7 @@ Panel {
   property string newVmType: "cx23"
   property string newVmLocation: "nbg1"
 
-  property string hetzBin: pluginSettings && pluginSettings.hetzBinPath ? pluginSettings.hetzBinPath : "/Users/christhompson/macos_wrap/hetz"
+  property string ocloudBin: pluginSettings && pluginSettings.ocloudBinPath ? pluginSettings.ocloudBinPath : "ocloud"
   property int refreshInterval: pluginSettings && pluginSettings.refreshIntervalSec ? pluginSettings.refreshIntervalSec : 60
 
   function refreshStatus() {
@@ -49,7 +49,7 @@ Panel {
 
   Process {
     id: statusProc
-    command: [hetzBin, "status", "--json"]
+    command: [ocloudBin, "status", "--json"]
     running: false
     stdout: StdioCollector {
       onCollected: {
@@ -157,7 +157,7 @@ Panel {
             font.pixelSize: 11
             onClicked: {
               var cmd = root.statusData.storage.mounted ? "unmount" : "mount"
-              actionProc.command = [root.hetzBin, "storage", cmd]
+              actionProc.command = [root.ocloudBin, "storage", cmd]
               actionProc.running = true
             }
           }
@@ -208,7 +208,7 @@ Panel {
             enabled: !!root.statusData.compute.primary_server
             onClicked: {
               if (root.statusData.compute.primary_server) {
-                actionProc.command = ["alacritty", "-e", root.hetzBin, "vm", "ssh", String(root.statusData.compute.primary_server.id)]
+                actionProc.command = ["alacritty", "-e", root.ocloudBin, "vm", "ssh", String(root.statusData.compute.primary_server.id)]
                 actionProc.running = true
               }
             }
@@ -219,7 +219,7 @@ Panel {
             enabled: !!root.statusData.compute.primary_server && root.statusData.compute.active_count > 0
             onClicked: {
               if (root.statusData.compute.primary_server) {
-                actionProc.command = [root.hetzBin, "vm", "app", String(root.statusData.compute.primary_server.id), "xeyes"]
+                actionProc.command = [root.ocloudBin, "vm", "app", String(root.statusData.compute.primary_server.id), "xeyes"]
                 actionProc.running = true
               }
             }
@@ -231,7 +231,7 @@ Panel {
             onClicked: {
               if (root.statusData.compute.primary_server) {
                 var action = root.statusData.compute.active_count > 0 ? "stop" : "start"
-                actionProc.command = [root.hetzBin, "vm", action, String(root.statusData.compute.primary_server.id)]
+                actionProc.command = [root.ocloudBin, "vm", action, String(root.statusData.compute.primary_server.id)]
                 actionProc.running = true
               }
             }
@@ -281,7 +281,7 @@ Panel {
           Layout.fillWidth: true
           onClicked: {
             var srvName = "omarchy-" + Math.floor(Math.random() * 1000)
-            actionProc.command = [root.hetzBin, "vm", "create", srvName, "--type", root.newVmType, "--location", root.newVmLocation]
+            actionProc.command = [root.ocloudBin, "vm", "create", srvName, "--type", root.newVmType, "--location", root.newVmLocation]
             actionProc.running = true
             root.showProcureView = false
           }

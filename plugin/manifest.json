@@ -1,25 +1,25 @@
 {
   "schemaVersion": 1,
-  "id": "community.hetzner",
-  "name": "Hetzner Companion",
+  "id": "community.ocloud",
+  "name": "Ocloud",
   "version": "1.0.0",
   "author": "Chris Thompson",
   "license": "MIT",
-  "description": "Hetzner Cloud Storage Box and Cloud VM Companion for Omarchy",
+  "description": "Sovereign cloud storage and on-demand cloud compute companion for Omarchy",
   "kinds": ["bar-widget"],
   "activation": "always",
   "entryPoints": {
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "Hetzner",
-    "description": "Storage Box capacity and Cloud VM status indicator with quick actions.",
+    "displayName": "Ocloud",
+    "description": "Cloud storage capacity and cloud VM status indicator with quick actions.",
     "category": "Cloud",
-    "aliases": ["hetzner", "storage-box", "cloud-vm"],
+    "aliases": ["ocloud", "cloud-storage", "cloud-compute"],
     "allowMultiple": false,
     "defaults": {
       "refreshIntervalSec": 60,
-      "hetzBinPath": "/Users/christhompson/macos_wrap/hetz"
+      "ocloudBinPath": "ocloud"
     },
     "schema": [
       {
@@ -32,10 +32,10 @@
         "defaultValue": 60
       },
       {
-        "key": "hetzBinPath",
+        "key": "ocloudBinPath",
         "type": "string",
-        "label": "Path to hetz CLI binary",
-        "defaultValue": "/Users/christhompson/macos_wrap/hetz"
+        "label": "Path to ocloud CLI binary",
+        "defaultValue": "ocloud"
       }
     ]
   }

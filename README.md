@@ -1,105 +1,169 @@
-# ☁ Hetzner Cloud & Storage Companion for Omarchy (and macOS)
+# ☁ Ocloud
 
-A native, zero-dependency desktop integration for [Hetzner](https://www.hetzner.com/) designed for **Omarchy** and **macOS**. It provides:
+**The Sovereign Cloud Companion for Omarchy (and Linux).**
 
-1. **Storage Box Cloud Drive & Backups**: Attach your Hetzner Storage Box as a native virtual folder (`~/Cloud`) and run automated, client-side encrypted snapshots.
-2. **Cloud Compute Companion (VMs)**: Manage always-on remote compute, offload heavy builds, run 24/7 background jobs, or spin up on-demand x86/ARM cloud servers with one command.
-3. **Omarchy Top-Bar Widget**: A native Quickshell (Qt Quick / QML) widget that sits in your top bar, monitors your storage and VM status in real time, and provides one-click terminal access and power controls.
+[https://github.com/bigcjat/Ocloud](https://github.com/bigcjat/Ocloud)
+
+Ocloud bridges personal cloud storage and on-demand cloud compute directly into your desktop environment. It gives you the seamlessness of iCloud—cloud drive mounting, automated encrypted backups, and background compute—without proprietary lock-in, monthly surveillance, or Big Tech bloat.
+
+---
+
+## Architecture & Provider Roadmap
+
+Ocloud is built with a **modular provider architecture**. While **Hetzner** is the initial first-class reference implementation, Ocloud is designed to plug into any cloud infrastructure or self-hosted homelab.
+
+```
+                    ┌─────────────────────────┐
+                    │      Ocloud Core        │
+                    │   (CLI + Omarchy Shell) │
+                    └────────────┬────────────┘
+                                 │
+           ┌─────────────────────┴─────────────────────┐
+           ▼                                           ▼
+┌──────────────────────┐                   ┌──────────────────────┐
+│   Storage Providers  │                   │   Compute Providers  │
+├──────────────────────┤                   ├──────────────────────┤
+│ • Hetzner Storage Box│                   │ • Hetzner Cloud VMs  │
+│ • Backblaze B2 [next]│                   │ • Scaleway     [next]│
+│ • S3 / MinIO   [next]│                   │ • DigitalOcean [next]│
+│ • rsync.net    [next]│                   │ • Proxmox Homelab    │
+└──────────────────────┘                   └──────────────────────┘
+```
+
+---
+
+## Core Capabilities
+
+### 1. Cloud Storage Engine
+* **Virtual Cloud Drive (`~/Cloud`)**: Mounts your remote storage locally with full VFS caching. Drag-and-drop 100GB files without consuming local disk space.
+* **Encrypted Snapshots**: Client-side encrypted, deduplicated background backups (Restic/Borg). Even your cloud provider cannot read your data.
+
+### 2. Disposable & Always-On Cloud Compute
+* **Offload Builds & Heavy Jobs**: Compile large projects or run batch tasks on beefy multi-core cloud instances while your laptop stays cold and preserves battery.
+* **Native Desktop Window Streaming**: Run graphical apps or games on the remote cloud VM and stream them directly into your local Hyprland workspace via **Waypipe** or X11 forwarding—tiling and resizing like a local app.
+* **Tailscale Mesh Integration**: Automatically enrolls newly spawned cloud VMs into your private Tailnet on first boot using ephemeral auth keys. No open SSH ports on the public internet.
+
+### 3. Native Omarchy Top-Bar Widget
+* Powered by Quickshell (Qt Quick / QML) to seamlessly match Omarchy’s aesthetics and themes.
+* Real-time storage capacity gauge and VM power status in the top bar.
+* One-click terminal access, app launcher, and VM power controls.
 
 ---
 
 ## Quick Start
 
-### 1. Configuration
+### 1. Installation
 
-The configuration file is stored at `~/.config/omarchy/hetzner.json` (or `./config.json`):
+Clone the repository:
+```bash
+git clone https://github.com/bigcjat/Ocloud.git
+cd Ocloud
+```
+
+Make `ocloud` available on your PATH:
+```bash
+mkdir -p ~/.local/bin
+ln -sf "$(pwd)/ocloud" ~/.local/bin/ocloud
+```
+
+### 2. Configuration
+
+Create your configuration at `~/.config/omarchy/ocloud.json` (or `~/.config/omarchy/hetzner.json`):
 
 ```json
 {
-  "api_token": "YOUR_HETZNER_CLOUD_API_TOKEN",
+  "provider": "hetzner",
+  "api_token": "YOUR_CLOUD_API_TOKEN",
+  "tailscale_auth_key": "",
   "storage_box": {
-    "username": "u123456",
-    "host": "u123456.your-storagebox.de",
+    "username": "uXXXXXX",
+    "host": "uXXXXXX.your-storagebox.de",
     "port": 23,
     "mount_point": "~/Cloud",
     "backup_source": "~"
   },
-  "default_vm_type": "cx22",
+  "default_vm_type": "cx23",
   "default_location": "nbg1"
 }
 ```
 
-*Permissions note: The file is protected with `chmod 600`.*
+*Note: Your credentials are kept 100% local on your machine and are never tracked by Git.*
 
 ---
 
-## CLI Usage (`hetz`)
-
-The `hetz` CLI is built in Python 3 with **zero third-party dependencies** (uses standard library only) and works natively on Linux and macOS.
+## CLI Reference (`ocloud`)
 
 ### Status Overview
 ```bash
-# Formatted human-readable overview
-./hetz status
+# Formatted dashboard
+ocloud status
 
-# Raw JSON output (used by the Omarchy top-bar widget)
-./hetz status --json
+# Raw JSON (used by the Omarchy top bar)
+ocloud status --json
 
-# Run in simulated mock mode without credentials
-./hetz --mock status
+# Run in simulated mock mode
+ocloud --mock status
 ```
 
-### Cloud VM Management
+### Cloud Compute (VMs)
 ```bash
-# List all active cloud servers
-./hetz vm list
+# List all active cloud machines
+ocloud vm list
 
-# Create a new server (cx22: 2 vCPU Intel, 4GB RAM, 40GB NVMe in Nuremberg)
-./hetz vm create my-companion-server --type cx22 --location nbg1
+# Create a new server (e.g. cx23 2-core Intel in Nuremberg)
+ocloud vm create runner-01 --type cx23 --location nbg1
 
-# Start / Stop / Reboot a server
-./hetz vm start <server-id-or-name>
-./hetz vm stop <server-id-or-name>
-./hetz vm reboot <server-id-or-name>
+# Inspect live CPU, RAM, NVMe disk, and active processes
+ocloud vm inspect runner-01
 
-# Direct SSH into the server
-./hetz vm ssh <server-id-or-name>
+# Launch a remote GUI app or game as a native window
+ocloud vm app runner-01 /path/to/game
+
+# Connect server to Tailnet
+ocloud vm tailscale runner-01 --key tskey-auth-XXXX
+
+# Power controls
+ocloud vm start runner-01
+ocloud vm stop runner-01
+ocloud vm reboot runner-01
+ocloud vm ssh runner-01
 ```
 
-### Storage Box & Drive Mount
+### Cloud Storage
 ```bash
-# Check Storage Box quota and mount status
-./hetz storage status
+# Check quota and mount state
+ocloud storage status
 
-# Mount Storage Box to ~/Cloud (uses rclone or sshfs)
-./hetz storage mount
+# Mount virtual drive to ~/Cloud
+ocloud storage mount
 
-# Unmount ~/Cloud
-./hetz storage unmount
+# Unmount drive
+ocloud storage unmount
 ```
 
 ### Automated Backups
 ```bash
-# Trigger an encrypted incremental backup
-./hetz backup run
+# Trigger immediate incremental snapshot
+ocloud backup run
 
-# View last backup timestamp and status
-./hetz backup status
+# View last snapshot info
+ocloud backup status
 ```
 
 ---
 
 ## Installing the Omarchy Top-Bar Plugin
 
-To link the plugin into your Omarchy desktop shell:
+To load the widget into your Omarchy desktop shell:
 
 ```bash
-# 1. Symlink the plugin folder into your Omarchy plugins directory:
 mkdir -p ~/.config/omarchy/plugins
-ln -s "$(pwd)/plugin" ~/.config/omarchy/plugins/community.hetzner
-
-# 2. Tell the Omarchy shell to rescan plugins:
+ln -s "$(pwd)/plugin" ~/.config/omarchy/plugins/community.ocloud
 omarchy-shell shell rescanPlugins
 ```
 
-The Hetzner widget will appear in the top bar, displaying your current Storage Box capacity and live VM status. Left-clicking opens the companion panel; right-clicking triggers instant quick actions.
+---
+
+## License
+
+MIT
