@@ -218,7 +218,7 @@ class HetznerStorageBoxProvider extends StorageProvider {
           path.join(os.homedir(), '.local', 'bin', 'rclone'),
           '/usr/bin/rclone'
         ].find((p) => fs.existsSync(p)) || 'rclone';
-        const out = execSync(`${rcloneBin} about storagebox: --json 2>/dev/null`, { encoding: 'utf8', timeout: 5000 });
+        const out = execSync(`${rcloneBin} about storagebox: --json 2>/dev/null`, { encoding: 'utf8', timeout: 12000 });
         const parsed = JSON.parse(out);
         if (parsed && typeof parsed.total === 'number') {
           totalBytes = parsed.total;
