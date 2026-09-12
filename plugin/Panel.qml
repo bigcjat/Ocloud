@@ -380,7 +380,7 @@ Panel {
             }
             trailingControl: Component {
               PanelActionButton {
-                iconText: "↻"
+                iconText: "󰑐"
                 tooltipText: "Refresh (R)"
                 foreground: root.foreground
                 fontFamily: root.fontFamily
@@ -397,7 +397,7 @@ Panel {
             Button {
               width: (parent.width - Style.space(8)) / 2
               text: "Cloud Storage"
-              iconText: "📦"
+              iconText: "󰋊"
               accent: root.currentTab === "storage" ? root.accentColor : undefined
               bordered: true
               fontFamily: root.fontFamily
@@ -407,7 +407,7 @@ Panel {
             Button {
               width: (parent.width - Style.space(8)) / 2
               text: "Cloud Compute"
-              iconText: "⚡"
+              iconText: "󰘳"
               accent: root.currentTab === "compute" ? root.accentColor : undefined
               bordered: true
               fontFamily: root.fontFamily
@@ -508,11 +508,13 @@ Panel {
                 }
 
                 // Drive status & actions: Drive status [Mount/Unmount] [File manager]
-                Row {
+                Item {
                   width: parent.width
-                  spacing: Style.space(8)
+                  implicitHeight: Math.max(sbStatusRow.implicitHeight, sbActionRow.implicitHeight)
 
                   Row {
+                    id: sbStatusRow
+                    anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
                     Rectangle {
@@ -531,18 +533,15 @@ Panel {
                     }
                   }
 
-                  Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - sbActionRow.implicitWidth - Style.space(8))
-                    height: 1
-                  }
-
                   Row {
                     id: sbActionRow
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
 
                     Button {
                       text: root.storageMounted ? (root.storageBusy ? "Ejecting..." : "Unmount") : (root.storageBusy ? "Mounting..." : "Mount")
-                      iconText: root.storageBusy ? "⏳" : (root.storageMounted ? "⏏" : "󰋊")
+                      iconText: root.storageBusy ? "󰑐" : (root.storageMounted ? "󰅟" : "󰋊")
                       iconSpinning: root.storageBusy
                       bordered: true
                       enabled: !root.storageBusy
@@ -556,7 +555,7 @@ Panel {
                     Button {
                       visible: root.storageMounted
                       text: "Open Files"
-                      iconText: "📂"
+                      iconText: "󰉋"
                       bordered: true
                       accent: root.accentColor
                       fontFamily: root.fontFamily
@@ -642,11 +641,13 @@ Panel {
                 }
 
                 // Drive status & actions: Drive status [Mount/Unmount] [File manager]
-                Row {
+                Item {
                   width: parent.width
-                  spacing: Style.space(8)
+                  implicitHeight: Math.max(nasStatusRow.implicitHeight, nasActions.implicitHeight)
 
                   Row {
+                    id: nasStatusRow
+                    anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
                     Rectangle {
@@ -665,18 +666,15 @@ Panel {
                     }
                   }
 
-                  Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - nasActions.implicitWidth - Style.space(8))
-                    height: 1
-                  }
-
                   Row {
                     id: nasActions
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
 
                     Button {
                       text: root.homeNasMounted ? (root.homeNasBusy ? "Ejecting..." : "Unmount") : (root.homeNasBusy ? "Mounting..." : "Mount")
-                      iconText: root.homeNasBusy ? "⏳" : (root.homeNasMounted ? "⏏" : "󰋊")
+                      iconText: root.homeNasBusy ? "󰑐" : (root.homeNasMounted ? "󰅟" : "󰋊")
                       iconSpinning: root.homeNasBusy
                       bordered: true
                       enabled: !root.homeNasBusy
@@ -690,7 +688,7 @@ Panel {
                     Button {
                       visible: root.homeNasMounted
                       text: "Open Files"
-                      iconText: "📂"
+                      iconText: "󰉋"
                       bordered: true
                       fontFamily: root.fontFamily
                       onClicked: root.openFolder(Quickshell.env("HOME") + "/Home-NAS")
@@ -773,11 +771,13 @@ Panel {
                   }
                 }
 
-                Row {
+                Item {
                   width: parent.width
-                  spacing: Style.space(8)
+                  implicitHeight: Math.max(r2StatusRow.implicitHeight, r2Actions.implicitHeight)
 
                   Row {
+                    id: r2StatusRow
+                    anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
                     Rectangle {
@@ -796,13 +796,10 @@ Panel {
                     }
                   }
 
-                  Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - r2Actions.implicitWidth - Style.space(8))
-                    height: 1
-                  }
-
                   Row {
                     id: r2Actions
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
 
                     Button {
@@ -950,11 +947,13 @@ Panel {
                   color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
                 }
 
-                Row {
+                Item {
                   width: parent.width
-                  spacing: Style.space(8)
+                  implicitHeight: Math.max(vmDiskInfoCol.implicitHeight, vmDiskBtns.implicitHeight)
 
                   Column {
+                    id: vmDiskInfoCol
+                    anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(2)
 
@@ -984,19 +983,15 @@ Panel {
                     }
                   }
 
-                  Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - vmDiskBtns.implicitWidth - Style.space(8))
-                    height: 1
-                  }
-
                   Row {
                     id: vmDiskBtns
+                    anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
 
                     Button {
                       text: root.vmMounted ? (root.vmDriveBusy ? "Ejecting..." : "Unmount") : (root.vmDriveBusy ? "Mounting..." : "Mount Disk")
-                      iconText: root.vmDriveBusy ? "⏳" : (root.vmMounted ? "⏏" : "⚡")
+                      iconText: root.vmDriveBusy ? "󰑐" : (root.vmMounted ? "󰅟" : "󰋊")
                       iconSpinning: root.vmDriveBusy
                       bordered: true
                       enabled: !root.vmDriveBusy && root.primaryVm && root.primaryVm.status === "running"
@@ -1010,7 +1005,7 @@ Panel {
                     Button {
                       visible: root.vmMounted
                       text: "Open Files"
-                      iconText: "📂"
+                      iconText: "󰉋"
                       bordered: true
                       fontFamily: root.fontFamily
                       onClicked: root.openFolder(Quickshell.env("HOME") + "/Companion-VM")
@@ -1018,15 +1013,15 @@ Panel {
                   }
                 }
 
-                // Action buttons: [KILL], Arcade, Terminal, Power
+                // Action buttons: [KILL], Terminal, Power (Arcade removed per user request)
                 Row {
                   width: parent.width
-                  spacing: Style.space(6)
+                  spacing: Style.space(8)
 
                   Button {
-                    width: (parent.width - Style.space(18)) * 0.28
+                    width: (parent.width - Style.space(16)) * 0.42
                     text: root.killBusy ? "Killing..." : "KILL"
-                    iconText: "✕"
+                    iconText: "󰅙"
                     bordered: true
                     accent: root.urgentColor
                     enabled: !root.killBusy && root.primaryVm && root.primaryVm.status === "running"
@@ -1035,19 +1030,9 @@ Panel {
                   }
 
                   Button {
-                    width: (parent.width - Style.space(18)) * 0.28
-                    text: "Arcade"
-                    iconText: "🎮"
-                    bordered: true
-                    enabled: root.primaryVm && root.primaryVm.status === "running"
-                    fontFamily: root.fontFamily
-                    onClicked: Quickshell.execDetached(["foot", "-e", root.ocloudBin, "vm", "app", "arcade"])
-                  }
-
-                  Button {
-                    width: (parent.width - Style.space(18)) * 0.28
+                    width: (parent.width - Style.space(16)) * 0.42
                     text: "Terminal"
-                    iconText: ">_"
+                    iconText: "󰆍"
                     bordered: true
                     enabled: !!root.primaryVm && !!root.primaryVm.ipv4
                     fontFamily: root.fontFamily
@@ -1063,8 +1048,8 @@ Panel {
                   }
 
                   Button {
-                    width: (parent.width - Style.space(18)) * 0.16
-                    iconText: "⏻"
+                    width: (parent.width - Style.space(16)) * 0.16
+                    iconText: "󰐥"
                     bordered: true
                     fontFamily: root.fontFamily
                     onClicked: {
@@ -1119,7 +1104,7 @@ Panel {
                       Button {
                         width: (parent.width - Style.space(8)) * 0.5
                         text: "Confirm KILL"
-                        iconText: "✕"
+                        iconText: "󰅙"
                         bordered: true
                         accent: root.urgentColor
                         fontFamily: root.fontFamily
@@ -1246,11 +1231,13 @@ Panel {
                   color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
                 }
 
-                Row {
+                Item {
                   width: parent.width
-                  spacing: Style.space(8)
+                  implicitHeight: Math.max(hSrvStatusRow.implicitHeight, hSrvMountBtn.implicitHeight)
 
                   Row {
+                    id: hSrvStatusRow
+                    anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
                     Rectangle {
@@ -1269,15 +1256,12 @@ Panel {
                     }
                   }
 
-                  Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - hSrvMountBtn.implicitWidth - Style.space(8))
-                    height: 1
-                  }
-
                   Button {
                     id: hSrvMountBtn
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
                     text: "Mount Drive"
-                    iconText: "⚡"
+                    iconText: "󰋊"
                     bordered: true
                     fontFamily: root.fontFamily
                     onClicked: root.openFolder(Quickshell.env("HOME"))
@@ -1401,11 +1385,13 @@ Panel {
                   color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
                 }
 
-                Row {
+                Item {
                   width: parent.width
-                  spacing: Style.space(8)
+                  implicitHeight: Math.max(ociStatusRow.implicitHeight, ociMountBtn.implicitHeight)
 
                   Row {
+                    id: ociStatusRow
+                    anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
                     Rectangle {
@@ -1424,15 +1410,12 @@ Panel {
                     }
                   }
 
-                  Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - ociMountBtn.implicitWidth - Style.space(8))
-                    height: 1
-                  }
-
                   Button {
                     id: ociMountBtn
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
                     text: "Mount Drive"
-                    iconText: "⚡"
+                    iconText: "󰋊"
                     bordered: true
                     fontFamily: root.fontFamily
                     onClicked: root.openFolder(Quickshell.env("HOME"))
@@ -1554,11 +1537,13 @@ Panel {
                   color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
                 }
 
-                Row {
+                Item {
                   width: parent.width
-                  spacing: Style.space(8)
+                  implicitHeight: Math.max(localStatusRow.implicitHeight, localOpenBtn.implicitHeight)
 
                   Row {
+                    id: localStatusRow
+                    anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Style.space(6)
                     Rectangle {
@@ -1577,15 +1562,12 @@ Panel {
                     }
                   }
 
-                  Item {
-                    width: Math.max(0, parent.width - parent.children[0].implicitWidth - localOpenBtn.implicitWidth - Style.space(8))
-                    height: 1
-                  }
-
                   Button {
                     id: localOpenBtn
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
                     text: "Open Files"
-                    iconText: "📂"
+                    iconText: "󰉋"
                     bordered: true
                     fontFamily: root.fontFamily
                     onClicked: root.openFolder(Quickshell.env("HOME"))
@@ -1600,12 +1582,12 @@ Panel {
           }
 
           // ==========================================
-          // BOTTOM: OPEN OCLOUD MANAGER
+          // BOTTOM: OPEN PERSONAL CLOUD HYPERVISOR
           // ==========================================
           Button {
             width: parent.width
-            text: "Open Ocloud Manager"
-            iconText: "⚙"
+            text: "Open Personal Cloud Hypervisor"
+            iconText: "󰒓"
             bordered: true
             accent: root.accentColor
             fontFamily: root.fontFamily

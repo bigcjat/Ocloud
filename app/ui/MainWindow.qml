@@ -98,11 +98,13 @@ ApplicationWindow {
             GradientStop { position: 0.0; color: "#0284c7" }
             GradientStop { position: 1.0; color: "#0369a1" }
           }
-          Text {
+          Image {
             anchors.centerIn: parent
-            text: "☁"
-            font.pixelSize: 16
-            color: "#ffffff"
+            width: 18
+            height: 18
+            source: Qt.resolvedUrl("icons/server.svg")
+            fillMode: Image.PreserveAspectFit
+            smooth: true
           }
         }
         Text {
@@ -132,7 +134,7 @@ ApplicationWindow {
           Text {
             id: coresText
             anchors.centerIn: parent
-            text: "⚡ 12 Cores (14% Load)"
+            text: "CPU 12 Cores (14% Load)"
             font.pixelSize: 11
             color: "#38bdf8"
             font.bold: true
@@ -147,7 +149,7 @@ ApplicationWindow {
           Text {
             id: ramText
             anchors.centerIn: parent
-            text: "🧠 RAM 24.3 / 88 GB"
+            text: "RAM 24.3 / 88 GB"
             font.pixelSize: 11
             color: "#10b981"
             font.bold: true
@@ -162,7 +164,7 @@ ApplicationWindow {
           Text {
             id: poolText
             anchors.centerIn: parent
-            text: "📦 Pool 1.1 / 3.0 TB"
+            text: "POOL 1.1 / 3.0 TB"
             font.pixelSize: 11
             color: "#f59e0b"
             font.bold: true
@@ -213,12 +215,12 @@ ApplicationWindow {
         // Nav Buttons
         Repeater {
           model: [
-            { id: "fleet", name: "Compute Nodes", icon: "🌐", count: serverList.length },
-            { id: "workloads", name: "Workloads & Docker", icon: "🐳", count: 3 },
-            { id: "storage", name: "Storage Pools", icon: "💾", count: storageBox.mounted ? 1 : 0 },
-            { id: "apps", name: "App Streaming", icon: "🎮", count: 3 },
-            { id: "backups", name: "Automated Backups", icon: "🔄", count: 0 },
-            { id: "settings", name: "Vault & Plugins", icon: "⚙️", count: 0 }
+            { id: "fleet", name: "Compute Nodes", iconSvg: "icons/server.svg", count: serverList.length },
+            { id: "workloads", name: "Workloads & Docker", iconSvg: "icons/box.svg", count: 3 },
+            { id: "storage", name: "Storage Pools", iconSvg: "icons/hard-drive.svg", count: storageBox.mounted ? 1 : 0 },
+            { id: "apps", name: "App Streaming", iconSvg: "icons/terminal.svg", count: 3 },
+            { id: "backups", name: "Automated Backups", iconSvg: "icons/archive.svg", count: 0 },
+            { id: "settings", name: "Vault & Plugins", iconSvg: "icons/shield.svg", count: 0 }
           ]
 
           delegate: Rectangle {
@@ -235,9 +237,12 @@ ApplicationWindow {
               anchors.rightMargin: 12
               spacing: 12
 
-              Text {
-                text: modelData.icon
-                font.pixelSize: 16
+              Image {
+                width: 18
+                height: 18
+                source: Qt.resolvedUrl(modelData.iconSvg)
+                fillMode: Image.PreserveAspectFit
+                smooth: true
               }
 
               Text {

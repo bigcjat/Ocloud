@@ -58,7 +58,7 @@ Item {
 
         Button {
           id: procureBtn
-          text: "🚀 Procure Cloud VM"
+          text: "+ Procure Cloud VM"
           background: Rectangle {
             radius: 8
             gradient: Gradient {

@@ -43,7 +43,13 @@ Rectangle {
       // Header
       RowLayout {
         spacing: 10
-        Text { text: "📦"; font.pixelSize: 22 }
+        Image {
+          width: 24
+          height: 24
+          source: Qt.resolvedUrl("icons/hard-drive.svg")
+          fillMode: Image.PreserveAspectFit
+          smooth: true
+        }
         ColumnLayout {
           spacing: 2
           Text {
