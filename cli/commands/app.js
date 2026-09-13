@@ -2,6 +2,7 @@ const { spawn, execSync } = require('child_process');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const crypto = require('crypto');
 const { loadSettings } = require('../utils/file_manager');
 
 function getWaypipeBin() {
@@ -335,10 +336,26 @@ async function cmdApp(subcmd, rest, context = {}) {
     const titlePrefix = isHome
       ? '[🏠 Home Workstation] '
       : `[☁ ${providerLabel} · ${server.name}] `;
-    const remoteExec = `env PATH=/root/.local/bin:/home/${user}/.local/bin:/usr/local/bin:/usr/bin:$PATH OCLOUD_PROVIDER="${providerLabel}" OCLOUD_SERVER="${server.name}" PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${cmd}`;
+
+    // Setup pristine low-latency audio tunnel over PipeWire/PulseAudio UNIX socket
+    const localPulseSocket = process.env.PULSE_SERVER?.startsWith('unix:')
+      ? process.env.PULSE_SERVER.replace('unix:', '')
+      : path.join(process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid ? process.getuid() : 1000}`, 'pulse', 'native');
+    const hasPulseAudio = fs.existsSync(localPulseSocket);
+    const pulseId = crypto.randomBytes(4).toString('hex');
+    const remotePulseSocket = `/tmp/pulse-ocloud-${pulseId}.sock`;
+
+    const audioEnv = hasPulseAudio
+      ? `PULSE_SERVER=unix:${remotePulseSocket} SDL_AUDIODRIVER=pulseaudio ALSOFT_DRIVERS=pulse`
+      : 'PULSE_SERVER=tcp:localhost:4713';
+
+    const remoteExec = `env PATH=/root/.local/bin:/home/${user}/.local/bin:/usr/local/bin:/usr/bin:$PATH OCLOUD_PROVIDER="${providerLabel}" OCLOUD_SERVER="${server.name}" ${audioEnv} QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${cmd}`;
 
     console.log(`\x1b[36m🚀 Streaming "${cmd}" from ${server.name} via Waypipe (${hasDrm ? 'Hardware DRM' : 'Software SHM'})...\x1b[0m`);
     console.log(`Window Prefix: "${titlePrefix}"`);
+    if (hasPulseAudio) {
+      console.log(`🔊 Audio: PipeWire native UNIX socket forwarded (${localPulseSocket} -> ${remotePulseSocket})`);
+    }
 
     const env = {
       ...process.env,
@@ -346,16 +363,25 @@ async function cmdApp(subcmd, rest, context = {}) {
       XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR || path.join('/run', 'user', String(process.getuid ? process.getuid() : 1000))
     };
 
+    const sshArgs = [
+      '-p', String(port),
+      '-i', keyPath,
+      '-o', 'BatchMode=yes',
+      '-o', 'StrictHostKeyChecking=no'
+    ];
+
+    if (hasPulseAudio) {
+      sshArgs.push('-R', `${remotePulseSocket}:${localPulseSocket}`);
+    } else {
+      sshArgs.push('-R', '4713:localhost:4713');
+    }
+
     const waypipeArgs = [
       '--title-prefix', titlePrefix,
       ...(hasDrm ? ['--video=h264'] : ['--no-gpu', '--compress=lz4']),
       '--threads', '4',
       'ssh',
-      '-p', String(port),
-      '-i', keyPath,
-      '-o', 'BatchMode=yes',
-      '-o', 'StrictHostKeyChecking=no',
-      '-R', '4713:localhost:4713',
+      ...sshArgs,
       `${user}@${host}`,
       remoteExec
     ];
