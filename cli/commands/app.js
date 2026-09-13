@@ -93,7 +93,28 @@ async function resolveServer(targetServer, registry) {
     };
   }
 
-  const host = server.tailscale_ip || server.ipv4 || server.ip;
+  // Resolve Tailscale IP if available
+  let tailscaleIp = server.tailscale_ip;
+  if (!tailscaleIp && server.name) {
+    try {
+      const tsRaw = execSync('tailscale status --json', { timeout: 1500, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const tsData = JSON.parse(tsRaw);
+      if (tsData && tsData.Peer) {
+        const targetName = server.name.toLowerCase();
+        for (const p of Object.values(tsData.Peer)) {
+          const peerName = (p.HostName || '').toLowerCase();
+          const dnsName = (p.DNSName || '').split('.')[0].toLowerCase();
+          if (peerName === targetName || dnsName === targetName) {
+            tailscaleIp = (p.TailscaleIPs || []).find(ip => ip.includes('.'));
+            if (tailscaleIp) break;
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  const isTailscale = Boolean(tailscaleIp);
+  const host = tailscaleIp || server.ipv4 || server.ip;
   const user = server.user || (server.isHomeWorkstation ? (process.env.USER || 'bigcjat') : 'root');
   const port = server.port || 22;
 
@@ -104,7 +125,7 @@ async function resolveServer(targetServer, registry) {
   ].filter(Boolean);
   const keyPath = keyCandidates.find(p => fs.existsSync(p)) || path.join(os.homedir(), '.ssh', 'id_ed25519');
 
-  return { server, host, user, port, keyPath };
+  return { server, host, user, port, keyPath, isTailscale };
 }
 
 function getInstallScriptForApp(rawCmd) {
@@ -234,7 +255,7 @@ async function cmdApp(subcmd, rest, context = {}) {
       process.exit(1);
     }
 
-    const { server, host, user, port, keyPath } = await resolveServer(targetServer, registry);
+    const { server, host, user, port, keyPath, isTailscale } = await resolveServer(targetServer, registry);
 
     if (!host || host === '-' || host === 'no IP') {
       console.error(`Error: Server '${server.name}' does not have a reachable IPv4 or Tailscale IP.`);
@@ -250,7 +271,7 @@ async function cmdApp(subcmd, rest, context = {}) {
     }
 
     // Pre-flight probe SSH connectivity
-    console.log(`Connecting to ${server.name} (${user}@${host}:${port})...`);
+    console.log(`Connecting to ${server.name} via ${isTailscale ? 'Tailscale' : 'IPv4'} (${user}@${host}:${port})...`);
     try {
       execSync(`ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=no ${user}@${host} "echo ready"`, {
         timeout: 10000,
