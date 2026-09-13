@@ -111,31 +111,35 @@ function getInstallScriptForApp(rawCmd) {
   const binary = rawCmd.trim().split(' ')[0].split('/').pop();
 
   if (binary === 'arcade') {
-    return `
-      if [ -f "/root/.local/bin/arcade" ]; then
-        echo "arcade already installed";
-      else
-        curl -sSL https://raw.githubusercontent.com/bigcjat/omarchyarcade/main/install.sh | bash
-      fi
-    `.replace(/\n\s+/g, ' ').trim();
+    return [
+      'if [ -f "/root/.local/bin/arcade" ]; then',
+      '  echo "arcade already installed";',
+      'else',
+      '  curl -sSL https://raw.githubusercontent.com/bigcjat/omarchyarcade/main/install.sh | bash;',
+      'fi'
+    ].join('\n');
   }
 
-  let debianPkg = binary;
-  if (binary === 'firefox') debianPkg = 'firefox-esr firefox';
+  let debianInstall = `apt-get install -y -qq ${binary} waypipe;`;
+  if (binary === 'firefox') {
+    debianInstall = `(apt-get install -y -qq firefox-esr || apt-get install -y -qq firefox) && apt-get install -y -qq waypipe;`;
+  }
 
-  return `
-    if command -v apt-get >/dev/null 2>&1; then
-      export DEBIAN_FRONTEND=noninteractive && apt-get update -qq && apt-get install -y -qq ${debianPkg} waypipe
-    elif command -v pacman >/dev/null 2>&1; then
-      pacman -Sy --noconfirm ${binary} waypipe
-    elif command -v dnf >/dev/null 2>&1; then
-      dnf install -y -q ${binary} waypipe
-    elif command -v apk >/dev/null 2>&1; then
-      apk add --no-cache ${binary} waypipe
-    elif command -v zypper >/dev/null 2>&1; then
-      zypper --non-interactive install ${binary} waypipe
-    fi
-  `.replace(/\n\s+/g, ' ').trim();
+  return [
+    'if command -v apt-get >/dev/null 2>&1; then',
+    '  export DEBIAN_FRONTEND=noninteractive;',
+    '  apt-get update -qq;',
+    `  ${debianInstall}`,
+    'elif command -v pacman >/dev/null 2>&1; then',
+    `  pacman -Sy --noconfirm ${binary} waypipe;`,
+    'elif command -v dnf >/dev/null 2>&1; then',
+    `  dnf install -y -q ${binary} waypipe;`,
+    'elif command -v apk >/dev/null 2>&1; then',
+    `  apk add --no-cache ${binary} waypipe;`,
+    'elif command -v zypper >/dev/null 2>&1; then',
+    `  zypper --non-interactive install ${binary} waypipe;`,
+    'fi'
+  ].join('\n');
 }
 
 async function cmdApp(subcmd, rest, context = {}) {
@@ -151,19 +155,18 @@ async function cmdApp(subcmd, rest, context = {}) {
     const { server, host, user, port, keyPath } = await resolveServer(targetServer, registry);
     const binary = cmd.trim().split(' ')[0].split('/').pop();
 
-    const probeCmd = `PATH=/root/.local/bin:/home/${user}/.local/bin:/usr/local/bin:/usr/bin:$PATH command -v ${binary} || echo "NOT_FOUND"`;
+    const probeCmd = `if PATH=/root/.local/bin:/home/${user}/.local/bin:/usr/local/bin:/usr/bin:$PATH command -v ${binary} >/dev/null 2>&1; then echo "OCLOUD_APP_FOUND"; else echo "OCLOUD_APP_NOT_FOUND"; fi`;
     try {
       const out = execSync(
         `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=4 -o StrictHostKeyChecking=no ${user}@${host} "${probeCmd}"`,
         { timeout: 6000, encoding: 'utf8' }
       ).trim();
-      const installed = out.length > 0 && !out.includes('NOT_FOUND');
+      const installed = out.includes('OCLOUD_APP_FOUND');
       console.log(JSON.stringify({
         installed,
         serverName: server.name,
         serverId: server.id,
-        cmd: binary,
-        binPath: installed ? out : null
+        cmd: binary
       }));
       return;
     } catch (e) {
@@ -190,8 +193,8 @@ async function cmdApp(subcmd, rest, context = {}) {
     console.log(`Installing ${cmd} on ${server.name}...`);
     try {
       execSync(
-        `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${user}@${host} "${installScript}"`,
-        { timeout: 180000, stdio: 'inherit' }
+        `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${user}@${host} "bash -s"`,
+        { input: installScript, timeout: 180000, stdio: ['pipe', 'inherit', 'inherit'] }
       );
       console.log(`✔ Successfully installed ${cmd} on ${server.name}.`);
       return;
@@ -258,6 +261,36 @@ async function cmdApp(subcmd, rest, context = {}) {
       console.error(`Failed to connect to ${server.name} via SSH: ${errMsg.trim()}`);
       process.exit(1);
     }
+
+    // Ensure waypipe exists on remote node, auto-install silently if missing
+    try {
+      const hasWaypipe = execSync(
+        `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=4 -o StrictHostKeyChecking=no ${user}@${host} "command -v waypipe >/dev/null 2>&1 && echo FOUND || echo NOT_FOUND"`,
+        { timeout: 5000, encoding: 'utf8' }
+      ).trim();
+      if (!hasWaypipe.includes('FOUND')) {
+        console.log(`Auto-installing missing waypipe dependency on ${server.name}...`);
+        const wpInstallScript = [
+          'if command -v apt-get >/dev/null 2>&1; then',
+          '  export DEBIAN_FRONTEND=noninteractive;',
+          '  apt-get update -qq;',
+          '  apt-get install -y -qq waypipe;',
+          'elif command -v pacman >/dev/null 2>&1; then',
+          '  pacman -Sy --noconfirm waypipe;',
+          'elif command -v dnf >/dev/null 2>&1; then',
+          '  dnf install -y -q waypipe;',
+          'elif command -v apk >/dev/null 2>&1; then',
+          '  apk update -q && apk add --no-cache waypipe;',
+          'elif command -v zypper >/dev/null 2>&1; then',
+          '  zypper --non-interactive refresh -q && zypper --non-interactive install waypipe;',
+          'fi'
+        ].join('\n');
+        execSync(
+          `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${user}@${host} "bash -s"`,
+          { input: wpInstallScript, timeout: 60000, stdio: ['pipe', 'inherit', 'inherit'] }
+        );
+      }
+    } catch (e) {}
 
     // Record shortcut in recent_apps
     recordRecentApp(cmd);
