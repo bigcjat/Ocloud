@@ -199,6 +199,8 @@ Item {
           capacityText: storageBox.configured ? (Math.round((storageBox.used_bytes || 0) / (1024*1024*1024)) + " GB / " + Math.round((storageBox.total_bytes || 1073741824000) / (1024*1024*1024)) + " GB") : "1000 GB RAID"
           usedPercent: storageBox.used_percent ? (storageBox.used_percent / 100.0) : 0.01
           isMounted: storageBox.mounted || (sbRemote && sbRemote.isMounted)
+          autoMount: !!(sbRemote && sbRemote.autoMount)
+          showAutoMount: true
           statusVariant: (storageBox.mounted || (sbRemote && sbRemote.isMounted)) ? "success" : "neutral"
           statusText: (storageBox.mounted || (sbRemote && sbRemote.isMounted)) ? "Mounted" : "Offline"
           showDisconnect: false
@@ -206,6 +208,7 @@ Item {
           onOpenClicked: ocloud.openCloudFolder(storageBox.mount_point || "~/Cloud")
           onUnmountClicked: ocloud.unmountStorageBox()
           onMountClicked: ocloud.mountStorageBox()
+          onAutoMountToggled: ocloud.toggleAutoMount("storagebox")
         }
 
         // Google Drive
