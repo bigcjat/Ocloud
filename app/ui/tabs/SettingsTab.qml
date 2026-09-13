@@ -375,38 +375,6 @@ Item {
             }
           }
 
-          // Hetzner Token Field
-          ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 4
-            Text {
-              text: "Hetzner Cloud API Token"
-              font.pixelSize: 11
-              font.bold: true
-              color: textSecondary
-            }
-            RowLayout {
-              Layout.fillWidth: true
-              spacing: 10
-              AppTextField {
-                id: tokenField
-                Layout.fillWidth: true
-                implicitHeight: 34
-                echoMode: TextInput.Password
-                placeholderText: "Enter your Hetzner Cloud API token"
-              }
-              AppButton {
-                text: "Save to Vault"
-                variant: "primary"
-                onClicked: {
-                  if (tokenField.text.trim()) {
-                    ocloud.setVaultSecret("api_token", tokenField.text.trim());
-                    tokenField.text = "";
-                  }
-                }
-              }
-            }
-          }
 
           // Tailscale Key Field
           ColumnLayout {
