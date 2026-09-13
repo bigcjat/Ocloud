@@ -92,7 +92,7 @@ Item {
         variant: "info"
         iconSource: "icons/shield.svg"
         title: "Native Window Integration Active"
-        message: "Remote apps run cleanly with Waypipe title prefixing, Hyprland red borders (#d50c2d), and a non-intrusive bottom-right badge."
+        message: "Remote apps stream with provider-tagged window titles and glowing compositor borders (Hetzner Red #d50c2d · Google Blue #4285f4). Custom suites like Omarchy Arcade also feature an in-app status badge."
       }
 
       // App Cards Grid (Dynamic Built-in + User Shortcuts)

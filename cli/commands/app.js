@@ -312,7 +312,7 @@ async function cmdApp(subcmd, rest, context = {}) {
     const titlePrefix = isHome
       ? '[🏠 Home Workstation] '
       : `[☁ ${providerLabel} · ${server.name}] `;
-    const remoteExec = `env PATH=/root/.local/bin:/home/${user}/.local/bin:/usr/local/bin:/usr/bin:$PATH PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${cmd}`;
+    const remoteExec = `env PATH=/root/.local/bin:/home/${user}/.local/bin:/usr/local/bin:/usr/bin:$PATH OCLOUD_PROVIDER="${providerLabel}" OCLOUD_SERVER="${server.name}" PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${cmd}`;
 
     console.log(`\x1b[36m🚀 Streaming "${cmd}" from ${server.name} via Waypipe...\x1b[0m`);
     console.log(`Window Prefix: "${titlePrefix}"`);
