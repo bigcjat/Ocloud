@@ -92,7 +92,7 @@ Item {
         variant: "info"
         iconSource: "icons/shield.svg"
         title: "Native Window Integration Active"
-        message: "Remote apps stream with provider-tagged window titles and glowing compositor borders (Hetzner Red #d50c2d · Google Blue #4285f4). Custom suites like Omarchy Arcade also feature an in-app status badge."
+        message: "Remote apps stream with provider-tagged window titles and distinctive glowing Red borders (#d50c2d) across all Cloud VMs (Emerald Green for Home Workstations)."
       }
 
       // App Cards Grid (Dynamic Built-in + User Shortcuts)
