@@ -213,24 +213,14 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
   }
 
   if (subcmd === 'mount') {
-    const target = args[0];
+    let target = args[0] || 'storagebox';
+    if (target === 'box' || target === 'hetzner_storage_box') target = 'storagebox';
     const noOpen = args.includes('--no-open');
-
-    if (!target || target === 'box' || target === 'storagebox' || target === 'hetzner_storage_box') {
-      if (sbDriver) {
-        const res = await sbDriver.mount(null, !noOpen);
-        console.log(`✔ Storage Box mounted at ${res.mount_point}`);
-        if (!noOpen) console.log('📂 Opened file manager.');
-      } else {
-        console.log('Hetzner Storage Box plugin not available.');
-      }
-      return;
-    }
 
     const accounts = getCloudAccounts(registry, vault);
     const acc = accounts.find(a => a.name.toLowerCase() === target.toLowerCase() || a.providerId === target.toLowerCase());
     const remoteName = acc ? acc.name : target;
-    const mountPoint = acc ? acc.mountPath : resolveMountPath(`~/Cloud-${target}`);
+    const mountPoint = acc ? acc.mountPath : resolveMountPath(target === 'storagebox' ? '~/Cloud' : `~/Cloud-${target}`);
 
     fs.mkdirSync(mountPoint, { recursive: true });
     if (isDriveMounted(mountPoint)) {
@@ -241,15 +231,15 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     // Pre-flight check: verify remote is reachable before attempting FUSE mount
     console.log(`Verifying connection to '${remoteName}'...`);
     try {
-      execSync(`${rcloneBin} lsd "${remoteName}:" --contimeout 3s --timeout 3s --retries 1 --low-level-retries 1`, {
+      execSync(`${rcloneBin} lsd "${remoteName}:" --contimeout 8s --timeout 8s --retries 1 --low-level-retries 1 --log-level=ERROR`, {
         env,
         encoding: 'utf8',
-        timeout: 4500,
+        timeout: 12000,
         stdio: ['pipe', 'pipe', 'pipe']
       });
     } catch (probeErr) {
       const errOut = (probeErr.stderr ? probeErr.stderr.toString() : '') || (probeErr.stdout ? probeErr.stdout.toString() : '') || probeErr.message || '';
-      const lines = errOut.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.includes('DEBUG :'));
+      const lines = errOut.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.includes('DEBUG :') && !l.includes('NOTICE :'));
       let lastLine = lines.length > 0 ? lines[lines.length - 1] : 'Remote connection failed or timed out';
       lastLine = lastLine.replace(/^[\d/:\s]+(ERROR|WARNING|NOTICE)\s*:\s*/i, '');
       console.error(`Failed to mount ${remoteName}: ${lastLine}`);
@@ -261,14 +251,26 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
 
     console.log(`Mounting ${remoteName}: at ${mountPoint}...`);
     try {
-      execSync(`${rcloneBin} mount "${remoteName}:" "${mountPoint}" --vfs-cache-mode full --daemon --log-file="${logFile}" --log-level=NOTICE`, { env, timeout: 10000 });
+      const child = spawn(rcloneBin, [
+        'mount', `${remoteName}:`, mountPoint,
+        '--vfs-cache-mode', 'full',
+        '--daemon',
+        `--log-file=${logFile}`,
+        '--log-level=NOTICE'
+      ], {
+        env,
+        detached: true,
+        stdio: 'ignore'
+      });
+      child.unref();
+
       let mounted = false;
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 30; i++) {
         if (isDriveMounted(mountPoint)) {
           mounted = true;
           break;
         }
-        execSync('sleep 0.5');
+        await new Promise(r => setTimeout(r, 500));
       }
 
       if (!mounted) {
@@ -298,18 +300,12 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
   }
 
   if (subcmd === 'unmount') {
-    const target = args[0];
-    if (!target || target === 'box' || target === 'storagebox' || target === 'hetzner_storage_box') {
-      if (sbDriver) {
-        await sbDriver.unmount();
-        console.log('✔ Storage Box unmounted.');
-      }
-      return;
-    }
+    let target = args[0] || 'storagebox';
+    if (target === 'box' || target === 'hetzner_storage_box') target = 'storagebox';
 
     const accounts = getCloudAccounts(registry, vault);
     const acc = accounts.find(a => a.name.toLowerCase() === target.toLowerCase() || a.providerId === target.toLowerCase());
-    const mountPoint = acc ? acc.mountPath : resolveMountPath(`~/Cloud-${target}`);
+    const mountPoint = acc ? acc.mountPath : resolveMountPath(target === 'storagebox' ? '~/Cloud' : `~/Cloud-${target}`);
 
     if (!isDriveMounted(mountPoint)) {
       console.log(`Drive at ${mountPoint} is not mounted.`);

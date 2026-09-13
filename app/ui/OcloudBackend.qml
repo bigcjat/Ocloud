@@ -253,7 +253,7 @@ Item {
       root.actionCompleted("mountCloudAccount", ok, msg);
       root.refreshStatusAsync();
       root.fetchCloudAccountsAsync();
-    });
+    }, 30000);
   }
 
   function unmountCloudAccount(path) {
@@ -264,7 +264,7 @@ Item {
       root.actionCompleted("unmountCloudAccount", ok, msg);
       root.refreshStatusAsync();
       root.fetchCloudAccountsAsync();
-    });
+    }, 20000);
   }
 
   function openCloudFolder(path) {

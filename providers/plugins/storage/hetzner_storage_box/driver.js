@@ -49,10 +49,15 @@ class HetznerStorageBoxDriver extends BaseStorageDriver {
 
   isMounted(mountPoint) {
     try {
-      const out = execSync('mount', { encoding: 'utf8' });
-      return out.includes(mountPoint);
+      const { isDriveMounted } = require('../../../../cli/utils/format');
+      return isDriveMounted(mountPoint);
     } catch (e) {
-      return false;
+      try {
+        const out = execSync('mount', { encoding: 'utf8' });
+        return out.includes(mountPoint);
+      } catch (err) {
+        return false;
+      }
     }
   }
 
@@ -140,14 +145,28 @@ class HetznerStorageBoxDriver extends BaseStorageDriver {
         '/usr/bin/rclone'
       ].find((p) => fs.existsSync(p)) || 'rclone';
 
-      execSync(`${rcloneBin} mount storagebox: "${mountPoint}" --vfs-cache-mode full --daemon </dev/null >/dev/null 2>&1 || true`);
-      for (let i = 0; i < 16; i++) {
+      const logFile = `/tmp/rclone-mount-storagebox.log`;
+      try {
+        execSync(`${rcloneBin} mount storagebox: "${mountPoint}" --vfs-cache-mode full --daemon --log-file="${logFile}" </dev/null >/dev/null 2>&1`);
+      } catch (e) {}
+
+      for (let i = 0; i < 20; i++) {
         if (this.isMounted(mountPoint)) break;
-        execSync('sleep 0.5');
+        await new Promise(r => setTimeout(r, 500));
       }
     }
 
-    if (openFileManager && this.isMounted(mountPoint)) {
+    const mounted = this.isMounted(mountPoint);
+    if (!mounted) {
+      let errDetails = '';
+      try {
+        const logFile = `/tmp/rclone-mount-storagebox.log`;
+        if (fs.existsSync(logFile)) errDetails = fs.readFileSync(logFile, 'utf8').trim();
+      } catch(e) {}
+      throw new Error(`Failed to mount Storage Box: ${errDetails || 'Mount connection timed out'}`);
+    }
+
+    if (openFileManager) {
       try {
         const { launchFileManager } = require('../../../../cli/utils/file_manager');
         launchFileManager(mountPoint);
@@ -159,7 +178,7 @@ class HetznerStorageBoxDriver extends BaseStorageDriver {
       }
     }
 
-    return { success: true, mount_point: mountPoint, mounted: this.isMounted(mountPoint) };
+    return { success: true, mount_point: mountPoint, mounted: true };
   }
 
   async unmount(customMountPoint = null) {
@@ -168,14 +187,9 @@ class HetznerStorageBoxDriver extends BaseStorageDriver {
     if (!this.isMounted(mountPoint)) {
       return { success: true, message: `${mountPoint} is not mounted.` };
     }
-    try {
-      execSync(`fusermount3 -u "${mountPoint}" 2>/dev/null || fusermount -u "${mountPoint}" 2>/dev/null || umount "${mountPoint}" 2>/dev/null`, { timeout: 8000, stdio: 'ignore' });
-    } catch (e) {
-      try {
-        execSync(`fusermount3 -u -z "${mountPoint}" 2>/dev/null || fusermount -u -z "${mountPoint}" 2>/dev/null || umount -l "${mountPoint}" 2>/dev/null`, { timeout: 8000, stdio: 'ignore' });
-      } catch (err) {}
-    }
-    return { success: true, unmounted: mountPoint, mounted: false };
+    const { safeUnmount } = require('../../../../cli/utils/format');
+    const ok = safeUnmount(mountPoint);
+    return { success: ok, unmounted: mountPoint, mounted: !ok };
   }
 }
 

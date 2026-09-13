@@ -21,12 +21,11 @@ function isDriveMounted(mountPoint) {
     if (!out.includes(p)) return false;
 
     // Verify mount is actually accessible and responsive (not a dead/zombie FUSE mount)
+    // stat queries the mountpoint inode directly without fetching directory trees over WAN
     try {
-      execSync(`timeout 1 ls -A "${p}"`, { timeout: 1500, stdio: 'ignore' });
+      execSync(`stat -t "${p}"`, { timeout: 2000, stdio: 'ignore' });
       return true;
     } catch (err) {
-      // In mount table but unresponsive/hung/ENOTCONN: clean up zombie mount
-      safeUnmount(p, 2000);
       return false;
     }
   } catch (e) {
