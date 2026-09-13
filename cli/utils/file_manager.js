@@ -10,7 +10,9 @@ function loadSettings() {
     fileManager: 'default',
     customFileManagerCmd: '',
     probeMountsBeforeOpen: true,
-    probeTimeoutSeconds: 2
+    probeTimeoutSeconds: 2,
+    autoMountRemotes: [],
+    recent_apps: []
   };
 
   if (fs.existsSync(cfgPath)) {

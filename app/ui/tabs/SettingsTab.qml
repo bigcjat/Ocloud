@@ -17,6 +17,19 @@ Item {
   property int probeTimeout: 2
   property string statusMessage: ""
   property bool statusIsError: false
+  property bool hasTailscaleKey: false
+  property int tailscaleDaysSince: -1
+  property bool tailscaleExpiringSoon: false
+
+  function reloadTailscaleInfo() {
+    ocloud.getVaultKeyInfo("tailscale_auth_key", function(info, ok) {
+      if (ok && info) {
+        hasTailscaleKey = !!info.hasKey;
+        tailscaleDaysSince = (typeof info.daysSince === "number") ? info.daysSince : -1;
+        tailscaleExpiringSoon = !!info.isExpiringSoon;
+      }
+    });
+  }
 
   function loadSettings() {
     try {
@@ -50,6 +63,7 @@ Item {
 
   Component.onCompleted: {
     loadSettings();
+    reloadTailscaleInfo();
   }
 
   Connections {
@@ -67,6 +81,9 @@ Item {
       if (action === "saveSettings" || action === "testLaunchFileManager") {
         statusMessage = msg;
         statusIsError = !success;
+      }
+      if (action === "setVaultSecret") {
+        reloadTailscaleInfo();
       }
     }
   }
@@ -379,13 +396,24 @@ Item {
           // Tailscale Key Field
           ColumnLayout {
             Layout.fillWidth: true
-            spacing: 4
-            Text {
-              text: "Tailscale Reusable Auth Key (Optional for auto-join)"
-              font.pixelSize: 11
-              font.bold: true
-              color: textSecondary
+            spacing: 6
+
+            RowLayout {
+              Layout.fillWidth: true
+              Text {
+                text: "Tailscale Reusable Auth Key (Optional for auto-join)"
+                font.pixelSize: 11
+                font.bold: true
+                color: textSecondary
+              }
+              Item { Layout.fillWidth: true }
+              AppBadge {
+                visible: hasTailscaleKey
+                text: tailscaleDaysSince >= 0 ? (tailscaleDaysSince === 0 ? "Added today (90d max)" : ("Added " + tailscaleDaysSince + "d ago (90d max)")) : "Stored in Vault"
+                variant: tailscaleExpiringSoon ? "warning" : "success"
+              }
             }
+
             RowLayout {
               Layout.fillWidth: true
               spacing: 10
@@ -394,7 +422,7 @@ Item {
                 Layout.fillWidth: true
                 implicitHeight: 34
                 echoMode: TextInput.Password
-                placeholderText: "tskey-auth-..."
+                placeholderText: hasTailscaleKey ? "••••••••••••••••••••••••" : "tskey-auth-..."
               }
               AppButton {
                 text: "Save to Vault"
@@ -403,7 +431,18 @@ Item {
                   if (tsField.text.trim()) {
                     ocloud.setVaultSecret("tailscale_auth_key", tsField.text.trim());
                     tsField.text = "";
+                    root.reloadTailscaleInfo();
                   }
+                }
+              }
+              AppButton {
+                visible: hasTailscaleKey
+                text: "Clear"
+                variant: "danger"
+                onClicked: {
+                  ocloud.setVaultSecret("tailscale_auth_key", "");
+                  tsField.text = "";
+                  root.reloadTailscaleInfo();
                 }
               }
             }

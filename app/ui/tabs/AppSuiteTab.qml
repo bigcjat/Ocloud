@@ -11,6 +11,28 @@ Item {
   readonly property bool isNarrow: width < 520
 
   property string selectedServerId: serverList.length > 0 ? String(serverList[0].id) : ""
+  property var appList: []
+
+  function reloadApps() {
+    ocloud.fetchAppShortcuts(function(list) {
+      if (list && list.length > 0) {
+        root.appList = list;
+      }
+    });
+  }
+
+  Component.onCompleted: {
+    reloadApps();
+  }
+
+  Connections {
+    target: ocloud
+    function onActionCompleted(action, success, msg) {
+      if (action === "launchApp") {
+        root.reloadApps();
+      }
+    }
+  }
 
   ScrollView {
     anchors.fill: parent
@@ -59,181 +81,83 @@ Item {
         message: "Remote apps run cleanly with Waypipe title prefixing, Hyprland red borders (#d50c2d), and a non-intrusive bottom-right badge."
       }
 
-      // App Cards Grid
+      // App Cards Grid (Dynamic Built-in + User Shortcuts)
       GridLayout {
         Layout.fillWidth: true
-        columns: 3
+        columns: root.isNarrow ? 1 : (width < 800 ? 2 : 3)
         rowSpacing: 16
         columnSpacing: 16
 
-        // 1. Omarchy Arcade
-        AppCard {
-          Layout.fillWidth: true
-          implicitHeight: 180
+        Repeater {
+          model: appList
 
-          ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            spacing: 10
+          delegate: AppCard {
+            Layout.fillWidth: true
+            implicitHeight: 185
 
-            RowLayout {
-              Layout.fillWidth: true
-              Rectangle {
-                width: 56
-                height: 24
-                radius: 6
-                color: "#1e1b4b"
-                border.color: "#312e81"
-                Text {
-                  anchors.centerIn: parent
-                  text: "ARCADE"
-                  font.pixelSize: 10
-                  font.bold: true
-                  color: accentSky
+            ColumnLayout {
+              anchors.fill: parent
+              anchors.margins: 16
+              spacing: 10
+
+              RowLayout {
+                Layout.fillWidth: true
+                Rectangle {
+                  width: Math.max(56, tagTxt.implicitWidth + 14)
+                  height: 24
+                  radius: 6
+                  color: modelData.tag === "RECENT" ? "#1e293b" : "#1e1b4b"
+                  border.color: modelData.tag === "RECENT" ? "#334155" : "#312e81"
+                  Text {
+                    id: tagTxt
+                    anchors.centerIn: parent
+                    text: modelData.tag || "APP"
+                    font.pixelSize: 10
+                    font.bold: true
+                    color: modelData.tag === "RECENT" ? "#38bdf8" : accentSky
+                  }
+                }
+                Item { Layout.fillWidth: true }
+                AppBadge {
+                  visible: !!modelData.featured || modelData.tag === "RECENT"
+                  text: modelData.featured ? "Featured" : "Shortcut"
+                  variant: modelData.featured ? "info" : "neutral"
                 }
               }
-              Item { Layout.fillWidth: true }
-              AppBadge {
-                text: "Featured"
-                variant: "info"
+
+              Text {
+                text: modelData.name || modelData.cmd
+                font.pixelSize: 15
+                font.bold: true
+                color: textPrimary
+                elide: Text.ElideRight
+                Layout.fillWidth: true
               }
-            }
 
-            Text {
-              text: "Omarchy Arcade"
-              font.pixelSize: 15
-              font.bold: true
-              color: textPrimary
-            }
-
-            Text {
-              text: "Full QML arcade launcher hosting 2048, Minesweeper, and retro arcade titles."
-              font.pixelSize: 11
-              color: textMuted
-              Layout.fillWidth: true
-              wrapMode: Text.WordWrap
-            }
-
-            Item { Layout.fillHeight: true }
-
-            AppButton {
-              text: "Launch Arcade"
-              variant: "primary"
-              onClicked: ocloud.launchApp(root.selectedServerId, "arcade")
-            }
-          }
-        }
-
-        // 2. 2048 Game
-        AppCard {
-          Layout.fillWidth: true
-          implicitHeight: 180
-
-          ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            spacing: 10
-
-            RowLayout {
-              Layout.fillWidth: true
-              Rectangle {
-                width: 44
-                height: 24
-                radius: 6
-                color: "#451a03"
-                border.color: "#78350f"
-                Text {
-                  anchors.centerIn: parent
-                  text: "2048"
-                  font.pixelSize: 11
-                  font.bold: true
-                  color: "#f59e0b"
-                }
+              Text {
+                text: modelData.desc || ("Command: " + modelData.cmd)
+                font.pixelSize: 11
+                color: textMuted
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                maximumLineCount: 2
+                elide: Text.ElideRight
               }
-              Item { Layout.fillWidth: true }
-            }
 
-            Text {
-              text: "2048 QML"
-              font.pixelSize: 15
-              font.bold: true
-              color: textPrimary
-            }
+              Item { Layout.fillHeight: true }
 
-            Text {
-              text: "Smooth 60 FPS hardware accelerated sliding tile puzzle running directly on remote host."
-              font.pixelSize: 11
-              color: textMuted
-              Layout.fillWidth: true
-              wrapMode: Text.WordWrap
-            }
-
-            Item { Layout.fillHeight: true }
-
-            AppButton {
-              text: "Launch 2048"
-              variant: "primary"
-              onClicked: ocloud.launchApp(root.selectedServerId, "2048")
-            }
-          }
-        }
-
-        // 3. Minesweeper Game
-        AppCard {
-          Layout.fillWidth: true
-          implicitHeight: 180
-
-          ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            spacing: 10
-
-            RowLayout {
-              Layout.fillWidth: true
-              Rectangle {
-                width: 52
-                height: 24
-                radius: 6
-                color: "#450a0a"
-                border.color: "#7f1d1d"
-                Text {
-                  anchors.centerIn: parent
-                  text: "MINES"
-                  font.pixelSize: 10
-                  font.bold: true
-                  color: dangerRed
-                }
+              AppButton {
+                text: "Launch " + (modelData.name || modelData.cmd)
+                variant: modelData.featured ? "primary" : "secondary"
+                iconSource: "icons/terminal.svg"
+                onClicked: ocloud.launchApp(root.selectedServerId, modelData.cmd)
               }
-              Item { Layout.fillWidth: true }
-            }
-
-            Text {
-              text: "Minesweeper"
-              font.pixelSize: 15
-              font.bold: true
-              color: textPrimary
-            }
-
-            Text {
-              text: "Classic logic grid sweeper running in pure QML with low-latency Waypipe forwarding."
-              font.pixelSize: 11
-              color: textMuted
-              Layout.fillWidth: true
-              wrapMode: Text.WordWrap
-            }
-
-            Item { Layout.fillHeight: true }
-
-            AppButton {
-              text: "Launch Minesweeper"
-              variant: "primary"
-              onClicked: ocloud.launchApp(root.selectedServerId, "minesweeper")
             }
           }
         }
       }
 
-      // Custom Command Runner Card
+      // Custom Command Runner Card (Automatically adds executed app as shortcut)
       AppCard {
         Layout.fillWidth: true
         implicitHeight: customAppCol.implicitHeight + 32
@@ -265,7 +189,7 @@ Item {
           }
 
           Text {
-            text: "Execute any GUI application installed on your remote server (e.g. gimp, blender, firefox, kdenlive, foot)"
+            text: "Execute any GUI application installed on your remote server (e.g. gimp, blender, firefox, kdenlive, foot). Once launched, it will be automatically pinned as a shortcut above."
             font.pixelSize: 11
             color: textMuted
           }
@@ -283,10 +207,12 @@ Item {
 
             AppButton {
               text: "Stream App"
+              iconSource: "icons/terminal.svg"
               variant: "primary"
               onClicked: {
                 if (customCmdField.text.trim()) {
                   ocloud.launchApp(root.selectedServerId, customCmdField.text.trim());
+                  customCmdField.text = "";
                 }
               }
             }

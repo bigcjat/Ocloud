@@ -271,6 +271,13 @@ Item {
     runCli(["storage", "open", path], function() {});
   }
 
+  function toggleAutoMount(name) {
+    runCli(["storage", "toggle-auto-mount", name], function(out, ok) {
+      root.actionCompleted("toggleAutoMount", ok, ok ? ("Updated auto-mount for " + name) : ("Failed to update auto-mount: " + out));
+      root.fetchCloudAccountsAsync();
+    });
+  }
+
   function disconnectCloudAccount(name) {
     root.busyChanged(true, "Removing " + name + "...");
     runCli(["storage", "remove", name], function(out, ok) {
@@ -507,6 +514,16 @@ Item {
     });
   }
 
+  function fetchAppShortcuts(callback) {
+    runCli(["app", "list"], function(out, ok) {
+      var list = [];
+      if (ok && out) {
+        try { list = JSON.parse(out); } catch(e) {}
+      }
+      if (callback) callback(list);
+    });
+  }
+
   function launchApp(serverId, app) {
     runCli(["app", "launch", serverId, app], function(out, ok) {
       root.actionCompleted("launchApp", ok, out);
@@ -735,17 +752,23 @@ Item {
   // ==========================================
   // BACKUPS
   // ==========================================
-  function runBackup() {
+  function runBackup(source, dest) {
     root.busyChanged(true, "Running backup snapshot...");
-    runCli(["backup", "run"], function(out, ok) {
+    var args = ["backup", "run"];
+    if (source) args.push("--source=" + source);
+    if (dest) args.push("--dest=" + dest);
+    runCli(args, function(out, ok) {
       root.busyChanged(false, "");
       root.actionCompleted("runBackup", ok, out);
       root.refreshStatusAsync();
     });
   }
 
-  function setBackupSchedule(enabled, interval) {
-    runCli(["backup", "schedule", enabled ? interval : "disabled"], function(out, ok) {
+  function setBackupSchedule(enabled, interval, source, dest) {
+    var args = ["backup", "schedule", enabled ? "--enable" : "--disable", "--interval=" + (interval || "daily")];
+    if (source) args.push("--source=" + source);
+    if (dest) args.push("--dest=" + dest);
+    runCli(args, function(out, ok) {
       root.actionCompleted("setBackupSchedule", ok, out);
       root.refreshStatusAsync();
     });
@@ -811,6 +834,18 @@ Item {
 
   function getVaultSecret(key) {
     return "";
+  }
+
+  function getVaultKeyInfo(key, callback) {
+    runCli(["vault", "key-info", key || "tailscale_auth_key"], function(out, ok) {
+      if (callback) {
+        try {
+          callback(JSON.parse(out), ok);
+        } catch(e) {
+          callback({ hasKey: false, masked: "", daysSince: null }, false);
+        }
+      }
+    });
   }
 
   function setVaultSecret(key, val) {

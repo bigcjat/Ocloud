@@ -3,7 +3,30 @@ const path = require('path');
 const os = require('os');
 const { execSync, spawn } = require('child_process');
 const { isDriveMounted, resolveMountPath, safeUnmount } = require('../utils/format');
-const { launchFileManager } = require('../utils/file_manager');
+const { launchFileManager, loadSettings } = require('../utils/file_manager');
+
+function ensureAutostartFile(enable = true) {
+  const autostartDir = path.join(os.homedir(), '.config', 'autostart');
+  const desktopFile = path.join(autostartDir, 'ocloud-mounts.desktop');
+  if (!enable) {
+    try { if (fs.existsSync(desktopFile)) fs.unlinkSync(desktopFile); } catch(e) {}
+    return;
+  }
+  try {
+    fs.mkdirSync(autostartDir, { recursive: true });
+    const ocloudBin = path.join(__dirname, '..', '..', 'ocloud');
+    const content = `[Desktop Entry]
+Type=Application
+Name=Ocloud Drive Auto-Mount
+Comment=Remount user-configured cloud drives on session startup
+Exec=${ocloudBin} storage remount-auto
+Terminal=false
+Hidden=false
+X-GNOME-Autostart-enabled=true
+`;
+    fs.writeFileSync(desktopFile, content, 'utf8');
+  } catch(e) {}
+}
 
 function getRcloneBin() {
   const candidates = [
@@ -27,6 +50,9 @@ function getCloudAccounts(registry, vault = null) {
 
   const plugins = registry ? registry.listStoragePlugins() : [];
   const remotes = [];
+
+  const settings = loadSettings();
+  const autoMountList = settings.autoMountRemotes || [];
 
   for (const [name, cfg] of Object.entries(dump)) {
     if (name === 'companion-vm') continue;
@@ -84,7 +110,8 @@ function getCloudAccounts(registry, vault = null) {
       iconDataUri,
       accountDetail: detail,
       mountPath,
-      isMounted: isDriveMounted(mountPath)
+      isMounted: isDriveMounted(mountPath),
+      autoMount: autoMountList.includes(name)
     });
   }
 
@@ -294,6 +321,58 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     } else {
       console.error(`Failed to unmount ${mountPoint}`);
     }
+    return;
+  }
+
+  if (subcmd === 'remount-auto' || subcmd === 'auto-mount') {
+    const settings = loadSettings();
+    const list = settings.autoMountRemotes || [];
+    if (list.length === 0) {
+      console.log('No drives configured for startup auto-mount.');
+      return;
+    }
+    console.log(`Auto-mounting ${list.length} drive(s): ${list.join(', ')}...`);
+    const accounts = getCloudAccounts(registry, vault);
+    for (const remName of list) {
+      const acc = accounts.find(a => a.name === remName || a.type === remName);
+      if (!acc) continue;
+      if (acc.isMounted) {
+        console.log(`• '${remName}' is already mounted at ${acc.mountPath}`);
+        continue;
+      }
+      try {
+        console.log(`• Auto-mounting '${remName}' at ${acc.mountPath}...`);
+        await cmdStorage('mount', [remName, acc.mountPath, '--no-open'], { registry, vault });
+      } catch (err) {
+        console.error(`• Failed to auto-mount '${remName}': ${err.message}`);
+      }
+    }
+    return;
+  }
+
+  if (subcmd === 'toggle-auto-mount') {
+    const rem = args[0];
+    if (!rem) {
+      console.error('Usage: ocloud storage toggle-auto-mount <remoteName>');
+      process.exit(1);
+    }
+    const settings = loadSettings();
+    let list = settings.autoMountRemotes || [];
+    let enabled = false;
+    if (list.includes(rem)) {
+      list = list.filter(r => r !== rem);
+      enabled = false;
+    } else {
+      list.push(rem);
+      enabled = true;
+    }
+    settings.autoMountRemotes = list;
+    const cfgPath = path.join(os.homedir(), '.config', 'ocloud', 'settings.json');
+    fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
+    fs.writeFileSync(cfgPath, JSON.stringify(settings, null, 2), 'utf8');
+
+    ensureAutostartFile(list.length > 0);
+    console.log(JSON.stringify({ remote: rem, autoMount: enabled, allAutoMounts: list }));
     return;
   }
 

@@ -90,6 +90,26 @@ FloatingWindow {
     return "Ocloud";
   }
 
+  function calculateTotalFleetCost() {
+    if (!serverList || serverList.length === 0) return "";
+    var totalHourly = 0;
+    var totalMonthly = 0;
+    var symbol = "€";
+    for (var i = 0; i < serverList.length; i++) {
+      var s = serverList[i];
+      if (s.status === "running" || !s.status) {
+        var isGcp = (s.provider === "gcp");
+        var h = (typeof s.priceHourly === "number") ? s.priceHourly : (s.pricing_hourly || (isGcp ? 0.0084 : 0.0058));
+        var m = (typeof s.priceMonthly === "number") ? s.priceMonthly : (s.pricing_monthly || (isGcp ? 6.11 : 3.65));
+        totalHourly += Number(h) || 0;
+        totalMonthly += Number(m) || 0;
+        if (s.currencySymbol) symbol = s.currencySymbol;
+      }
+    }
+    if (totalHourly <= 0) return "";
+    return symbol + totalHourly.toFixed(4) + " / hr (" + symbol + totalMonthly.toFixed(2) + " / mo)";
+  }
+
   Shortcut { sequence: "Alt+1"; onActivated: activeTab = "fleet" }
   Shortcut { sequence: "Alt+2"; onActivated: activeTab = "workloads" }
   Shortcut { sequence: "Alt+3"; onActivated: activeTab = "storage" }
@@ -342,6 +362,12 @@ FloatingWindow {
           AppBadge {
             text: serverList.length + (serverList.length === 1 ? (window.isHalf ? " Node" : " Node Online") : (window.isHalf ? " Nodes" : " Nodes Online"))
             variant: serverList.length > 0 ? "success" : "neutral"
+          }
+
+          AppBadge {
+            visible: serverList.length > 0 && !!calculateTotalFleetCost()
+            text: calculateTotalFleetCost()
+            variant: "info"
           }
 
           AppBadge {

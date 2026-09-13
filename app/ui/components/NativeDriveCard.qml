@@ -20,6 +20,8 @@ Rectangle {
   property string statusText: "Mounted"
   property bool isConnected: true
   property bool isMounted: true
+  property bool autoMount: false
+  property bool showAutoMount: false
   property bool showDisconnect: false
   property bool showSettings: true
 
@@ -29,6 +31,7 @@ Rectangle {
   signal connectClicked()
   signal mountClicked()
   signal disconnectClicked()
+  signal autoMountToggled(bool enabled)
 
   readonly property bool isNarrow: width < 480
 
@@ -96,6 +99,12 @@ Rectangle {
           AppBadge {
             variant: root.statusVariant
             text: root.statusText
+          }
+
+          AppBadge {
+            visible: root.showAutoMount && root.autoMount
+            variant: "info"
+            text: "Auto-Mount"
           }
         }
 
@@ -193,6 +202,14 @@ Rectangle {
         iconSource: "icons/external-link.svg"
         variant: "secondary"
         onClicked: root.openClicked()
+      }
+
+      // Auto-mount Toggle
+      AppButton {
+        visible: root.showAutoMount && root.isConnected
+        text: root.autoMount ? (root.isNarrow ? "Auto: ON" : "Auto-Mount: ON") : (root.isNarrow ? "Auto: OFF" : "Auto-Mount: OFF")
+        variant: root.autoMount ? "primary" : "secondary"
+        onClicked: root.autoMountToggled(!root.autoMount)
       }
 
       // Mount Drive

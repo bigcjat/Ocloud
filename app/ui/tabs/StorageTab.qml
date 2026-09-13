@@ -211,7 +211,7 @@ Item {
         // Google Drive
         NativeDriveCard {
           id: gdriveDriveCard
-          property var remote: getRemoteByName("gdrive") || getRemoteByName("drive")
+          property var remote: getRemoteByName("gdrive")
           visible: !!remote
           driveName: "Google Drive"
           driveType: "Virtual Cloud Drive (FUSE)"
@@ -219,6 +219,8 @@ Item {
           mountPath: remote ? remote.mountPath : "~/GoogleDrive"
           capacityText: remote && remote.isMounted ? "Online & Synced" : "Ready to Mount"
           isMounted: !!remote && remote.isMounted
+          autoMount: !!(remote && remote.autoMount)
+          showAutoMount: !!remote
           statusVariant: remote && remote.isMounted ? "success" : "neutral"
           statusText: remote && remote.isMounted ? "Mounted" : "Not Mounted"
           showDisconnect: false
@@ -226,6 +228,7 @@ Item {
           onOpenClicked: if (remote) ocloud.openCloudFolder(remote.mountPath)
           onUnmountClicked: if (remote) ocloud.unmountCloudAccount(remote.mountPath)
           onMountClicked: if (remote) ocloud.mountCloudAccount(remote.name, remote.mountPath)
+          onAutoMountToggled: if (remote) ocloud.toggleAutoMount(remote.name)
         }
 
         // Microsoft OneDrive
@@ -239,6 +242,8 @@ Item {
           mountPath: remote ? remote.mountPath : "~/OneDrive"
           capacityText: remote && remote.isMounted ? "Online & Synced" : "Ready to Mount"
           isMounted: !!remote && remote.isMounted
+          autoMount: !!(remote && remote.autoMount)
+          showAutoMount: !!remote
           statusVariant: remote && remote.isMounted ? "success" : "neutral"
           statusText: remote && remote.isMounted ? "Mounted" : "Not Mounted"
           showDisconnect: false
@@ -246,6 +251,7 @@ Item {
           onOpenClicked: if (remote) ocloud.openCloudFolder(remote.mountPath)
           onUnmountClicked: if (remote) ocloud.unmountCloudAccount(remote.mountPath)
           onMountClicked: if (remote) ocloud.mountCloudAccount(remote.name, remote.mountPath)
+          onAutoMountToggled: if (remote) ocloud.toggleAutoMount(remote.name)
         }
 
         // Dropbox
@@ -259,6 +265,8 @@ Item {
           mountPath: remote ? remote.mountPath : "~/Dropbox"
           capacityText: remote && remote.isMounted ? "Online & Synced" : "Ready to Mount"
           isMounted: !!remote && remote.isMounted
+          autoMount: !!(remote && remote.autoMount)
+          showAutoMount: !!remote
           statusVariant: remote && remote.isMounted ? "success" : "neutral"
           statusText: remote && remote.isMounted ? "Mounted" : "Not Mounted"
           showDisconnect: false
@@ -266,6 +274,7 @@ Item {
           onOpenClicked: if (remote) ocloud.openCloudFolder(remote.mountPath)
           onUnmountClicked: if (remote) ocloud.unmountCloudAccount(remote.mountPath)
           onMountClicked: if (remote) ocloud.mountCloudAccount(remote.name, remote.mountPath)
+          onAutoMountToggled: if (remote) ocloud.toggleAutoMount(remote.name)
         }
 
         // Cloudflare R2
@@ -279,6 +288,8 @@ Item {
           mountPath: "~/R2"
           capacityText: "Active S3 Bucket"
           isMounted: (r2Storage && r2Storage.mounted) || (remote && remote.isMounted)
+          autoMount: !!(remote && remote.autoMount)
+          showAutoMount: !!remote
           statusVariant: ((r2Storage && r2Storage.mounted) || (remote && remote.isMounted)) ? "success" : "neutral"
           statusText: ((r2Storage && r2Storage.mounted) || (remote && remote.isMounted)) ? "Mounted" : "Not Mounted"
           showDisconnect: false
@@ -286,6 +297,7 @@ Item {
           onOpenClicked: ocloud.openCloudFolder("~/R2")
           onUnmountClicked: ocloud.unmountCloudAccount("~/R2")
           onMountClicked: ocloud.mountCloudAccount(remote ? remote.name : "r2-ocloud", "~/R2")
+          onAutoMountToggled: if (remote) ocloud.toggleAutoMount(remote.name)
         }
 
         // Custom S3 / SFTP Remotes
@@ -303,6 +315,8 @@ Item {
             mountPath: modelData.mountPath
             capacityText: modelData.isMounted ? "Mounted Volume" : "Offline"
             isMounted: modelData.isMounted
+            autoMount: !!modelData.autoMount
+            showAutoMount: true
             statusVariant: modelData.isMounted ? "success" : "neutral"
             statusText: modelData.isMounted ? "Mounted" : "Not Mounted"
             showDisconnect: false
@@ -310,6 +324,7 @@ Item {
             onOpenClicked: ocloud.openCloudFolder(modelData.mountPath)
             onUnmountClicked: ocloud.unmountCloudAccount(modelData.mountPath)
             onMountClicked: ocloud.mountCloudAccount(modelData.name, modelData.mountPath)
+            onAutoMountToggled: ocloud.toggleAutoMount(modelData.name)
           }
         }
       }

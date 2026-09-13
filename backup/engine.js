@@ -52,9 +52,17 @@ class BackupEngine {
     }
   }
 
-  setSchedule({ enabled, interval = 'daily', time = '03:00' }) {
+  setSchedule({ enabled, interval = 'daily', time = '03:00', source = null, destination = null }) {
     this._ensureDir();
-    const config = { enabled, interval, time, updated_at: new Date().toISOString() };
+    const prev = this.getSchedule();
+    const config = {
+      enabled,
+      interval,
+      time,
+      source: source !== null ? source : (prev.source || os.homedir()),
+      destination: destination !== null ? destination : (prev.destination || 'storagebox'),
+      updated_at: new Date().toISOString()
+    };
     fs.writeFileSync(this.scheduleFile, JSON.stringify(config, null, 2));
     this._syncCronOrTimer(config);
     return config;
@@ -69,7 +77,9 @@ class BackupEngine {
         let cronTime = '0 3 * * *'; // default daily 3am
         if (config.interval === 'hourly') cronTime = '0 * * * *';
         else if (config.interval === 'weekly') cronTime = '0 3 * * 0';
-        lines.push(`${cronTime} /usr/bin/env ocloud backup run --auto >> ~/.config/omarchy/backups/cron.log 2>&1`);
+        const srcFlag = config.source ? ` --source="${config.source}"` : '';
+        const dstFlag = config.destination ? ` --dest="${config.destination}"` : '';
+        lines.push(`${cronTime} /usr/bin/env ocloud backup run --auto${srcFlag}${dstFlag} >> ~/.config/omarchy/backups/cron.log 2>&1`);
       }
       const newCrontab = lines.filter(Boolean).join('\n') + '\n';
       execSync(`echo "${newCrontab}" | crontab -`);
@@ -80,9 +90,20 @@ class BackupEngine {
 
   async runBackup(options = {}) {
     const sb = this.vault.get('storage_box', {});
-    const sourceDir = options.source || sb.backup_source || os.homedir();
+    const sched = this.getSchedule();
+    let sourceDir = options.source || sched.source || sb.backup_source || os.homedir();
+    if (sourceDir.startsWith('~/')) {
+      sourceDir = path.join(os.homedir(), sourceDir.slice(2));
+    }
+
     const snapshotName = `snapshot-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-    const destination = options.destination || `storagebox:backups/${snapshotName}`;
+    let target = (options.destination || sched.destination || 'storagebox').trim();
+    let destination = target;
+    if (!target.includes(':') && !target.startsWith('/')) {
+      destination = `${target}:backups/${snapshotName}`;
+    } else if (target.includes(':') && !target.includes('snapshot-')) {
+      destination = `${target.replace(/\/+$/, '')}/${snapshotName}`;
+    }
 
     console.log(`Starting backup: ${sourceDir} -> ${destination}`);
     const rcloneBin = [

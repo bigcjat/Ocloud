@@ -12,6 +12,47 @@ Item {
 
   property var recentBackups: (backupInfo && backupInfo.recent) || []
   property var scheduleConfig: (backupInfo && backupInfo.schedule) || ({})
+  property var cloudAccountsList: []
+
+  function reloadCloudList() {
+    try {
+      cloudAccountsList = JSON.parse(ocloud.fetchCloudAccounts() || "[]");
+    } catch(e) {
+      cloudAccountsList = [];
+    }
+  }
+
+  Component.onCompleted: {
+    reloadCloudList();
+  }
+
+  Connections {
+    target: ocloud
+    function onCloudAccountsUpdated(jsonStr) {
+      try {
+        cloudAccountsList = JSON.parse(jsonStr);
+      } catch(e) {
+        cloudAccountsList = [];
+      }
+    }
+  }
+
+  readonly property var destinationList: {
+    var list = [];
+    if (storageBox && storageBox.configured) {
+      list.push({ id: "storagebox", name: "Hetzner Storage Box (" + (storageBox.mount_point || "~/Cloud") + ")" });
+    }
+    for (var i = 0; i < cloudAccountsList.length; i++) {
+      var a = cloudAccountsList[i];
+      if (a.type !== "smb" && a.name !== "storagebox") {
+        list.push({ id: a.name, name: (a.providerName || a.name) + " (" + a.mountPath + ")" });
+      }
+    }
+    if (list.length === 0) {
+      list.push({ id: "storagebox", name: "Hetzner Storage Box (~/Cloud)" });
+    }
+    return list;
+  }
 
   ScrollView {
     anchors.fill: parent
@@ -32,7 +73,10 @@ Item {
           text: "Take Snapshot Now"
           iconSource: "icons/archive.svg"
           variant: "primary"
-          onClicked: ocloud.runBackup()
+          onClicked: {
+            var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
+            ocloud.runBackup(srcField.text.trim(), targetDest);
+          }
         }
       }
 
@@ -85,7 +129,86 @@ Item {
               id: enableSwitch
               checked: scheduleConfig.enabled || false
               onToggled: {
-                ocloud.setBackupSchedule(checked, intervalCombo.currentValue);
+                var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
+                ocloud.setBackupSchedule(checked, intervalCombo.currentValue, srcField.text.trim(), targetDest);
+              }
+            }
+          }
+
+          // Source Folder Selection
+          ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Text {
+              text: "Source Directory to Backup:"
+              font.pixelSize: 12
+              font.bold: true
+              color: textSecondary
+            }
+
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: 10
+
+              AppTextField {
+                id: srcField
+                Layout.fillWidth: true
+                implicitHeight: 34
+                text: (scheduleConfig && scheduleConfig.source) || "~"
+                placeholderText: "Enter directory path (e.g. ~/Projects)"
+              }
+
+              AppButton {
+                text: "~/Projects"
+                variant: "secondary"
+                onClicked: srcField.text = "~/Projects"
+              }
+
+              AppButton {
+                text: "~/Documents"
+                variant: "secondary"
+                onClicked: srcField.text = "~/Documents"
+              }
+
+              AppButton {
+                text: "Home (~)"
+                variant: "secondary"
+                onClicked: srcField.text = "~"
+              }
+            }
+          }
+
+          // Target Destination Selection
+          ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Text {
+              text: "Target Destination Cloud Drive / Remote:"
+              font.pixelSize: 12
+              font.bold: true
+              color: textSecondary
+            }
+
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: 10
+
+              AppComboBox {
+                id: destCombo
+                Layout.fillWidth: true
+                implicitHeight: 34
+                model: destinationList.map(function(d) { return d.name; })
+                currentIndex: {
+                  var savedDest = (scheduleConfig && scheduleConfig.destination) || "storagebox";
+                  for (var i = 0; i < destinationList.length; i++) {
+                    if (destinationList[i].id === savedDest || destinationList[i].name.toLowerCase().includes(savedDest.toLowerCase())) {
+                      return i;
+                    }
+                  }
+                  return 0;
+                }
               }
             }
           }
@@ -111,7 +234,8 @@ Item {
                 return 0;
               }
               onCurrentValueChanged: {
-                ocloud.setBackupSchedule(enableSwitch.checked, currentValue);
+                var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
+                ocloud.setBackupSchedule(enableSwitch.checked, currentValue, srcField.text.trim(), targetDest);
               }
             }
 
@@ -119,6 +243,17 @@ Item {
               text: "Default: Daily at 03:00 AM"
               font.pixelSize: 11
               color: textMuted
+            }
+
+            Item { Layout.fillWidth: true }
+
+            AppButton {
+              text: "Save Schedule Configuration"
+              variant: "primary"
+              onClicked: {
+                var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
+                ocloud.setBackupSchedule(enableSwitch.checked, intervalCombo.currentValue, srcField.text.trim(), targetDest);
+              }
             }
           }
         }
@@ -158,8 +293,13 @@ Item {
               spacing: 28
               ColumnLayout {
                 spacing: 2
+                Text { text: "SOURCE DIRECTORY"; font.pixelSize: 10; font.bold: true; color: textMuted }
+                Text { text: (scheduleConfig && scheduleConfig.source) || "~"; font.pixelSize: 12; color: accentSky }
+              }
+              ColumnLayout {
+                spacing: 2
                 Text { text: "TARGET DESTINATION"; font.pixelSize: 10; font.bold: true; color: textMuted }
-                Text { text: (storageBox && storageBox.mount_point) ? storageBox.mount_point : "~/Cloud"; font.pixelSize: 12; color: accentSky }
+                Text { text: (scheduleConfig && scheduleConfig.destination) ? scheduleConfig.destination : ((storageBox && storageBox.mount_point) ? storageBox.mount_point : "~/Cloud"); font.pixelSize: 12; color: accentSky }
               }
               ColumnLayout {
                 spacing: 2

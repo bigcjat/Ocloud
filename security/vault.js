@@ -203,6 +203,13 @@ class Vault {
   set(key, value) {
     const data = this.load();
     data[key] = value;
+    if (key === 'tailscale_auth_key') {
+      if (value) {
+        data['tailscale_auth_key_added_at'] = Date.now();
+      } else {
+        delete data['tailscale_auth_key_added_at'];
+      }
+    }
     this.save(data);
   }
 

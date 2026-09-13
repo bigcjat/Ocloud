@@ -52,10 +52,10 @@ async function main() {
     } else if (command === 'gui' || command === 'window') {
       cmdGui(subcmd, rest, context);
     } else if (command === 'app') {
-      if (subcmd === 'launch' || subcmd === 'stream') {
-        cmdApp(subcmd, rest);
-      } else {
+      if (subcmd === 'gui' || subcmd === 'open') {
         cmdGui(subcmd, rest, context);
+      } else {
+        await cmdApp(subcmd || 'list', rest, context);
       }
     } else if (command === 'settings' || command === 'config' || command === 'preference') {
       await cmdSettings(subcmd, rest);

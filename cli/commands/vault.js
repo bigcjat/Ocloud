@@ -98,6 +98,24 @@ function cmdVault(subcmd, args, { vault }) {
       return;
     }
     console.log(vault.get(key, ''));
+    return;
+  }
+
+  if (subcmd === 'key-info') {
+    const key = args[0] || 'tailscale_auth_key';
+    const val = vault.get(key, '');
+    const addedAt = vault.get(`${key}_added_at`, null);
+    const hasKey = Boolean(val && String(val).trim().length > 0);
+    const daysSince = addedAt ? Math.floor((Date.now() - Number(addedAt)) / (1000 * 60 * 60 * 24)) : (hasKey ? 0 : null);
+    console.log(JSON.stringify({
+      key,
+      hasKey,
+      masked: hasKey ? '••••••••••••••••••••••••' : '',
+      addedAt,
+      daysSince,
+      isExpiringSoon: daysSince !== null && daysSince >= 75
+    }));
+    return;
   }
 }
 

@@ -21,8 +21,16 @@ async function cmdBackup(subcmd, args, { backupEngine }) {
   }
 
   if (subcmd === 'run') {
-    console.log('Initiating snapshot backup...');
-    const res = await backupEngine.runBackup();
+    let source = null;
+    let destination = null;
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--source' && args[i+1]) source = args[++i];
+      else if (args[i].startsWith('--source=')) source = args[i].split('=')[1];
+      else if (args[i] === '--dest' && args[i+1]) destination = args[++i];
+      else if (args[i].startsWith('--dest=')) destination = args[i].split('=')[1];
+    }
+    console.log(`Initiating snapshot backup${source ? ` (Source: ${source})` : ''}${destination ? ` (Dest: ${destination})` : ''}...`);
+    const res = await backupEngine.runBackup({ source, destination });
     console.log(`Backup finished with status: ${res.status} (ID: ${res.id})`);
     return;
   }
@@ -31,14 +39,24 @@ async function cmdBackup(subcmd, args, { backupEngine }) {
     const enable = args.includes('--enable');
     const disable = args.includes('--disable');
     let interval = 'daily';
-    for (const a of args) {
+    let source = null;
+    let destination = null;
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
       if (a.startsWith('--interval=')) interval = a.split('=')[1];
+      else if (a === '--source' && args[i+1]) source = args[++i];
+      else if (a.startsWith('--source=')) source = a.split('=')[1];
+      else if (a === '--dest' && args[i+1]) destination = args[++i];
+      else if (a.startsWith('--dest=')) destination = a.split('=')[1];
     }
     const sched = backupEngine.setSchedule({
       enabled: enable ? true : disable ? false : true,
-      interval
+      interval,
+      source,
+      destination
     });
     console.log(`Backup schedule updated: ${JSON.stringify(sched, null, 2)}`);
+    return;
   }
 }
 
