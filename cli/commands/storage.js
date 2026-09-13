@@ -211,19 +211,61 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
       return;
     }
 
+    // Pre-flight check: verify remote is reachable before attempting FUSE mount
+    console.log(`Verifying connection to '${remoteName}'...`);
+    try {
+      execSync(`${rcloneBin} lsd "${remoteName}:" --contimeout 3s --timeout 3s --retries 1 --low-level-retries 1`, {
+        env,
+        encoding: 'utf8',
+        timeout: 4500,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+    } catch (probeErr) {
+      const errOut = (probeErr.stderr ? probeErr.stderr.toString() : '') || (probeErr.stdout ? probeErr.stdout.toString() : '') || probeErr.message || '';
+      const lines = errOut.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.includes('DEBUG :'));
+      let lastLine = lines.length > 0 ? lines[lines.length - 1] : 'Remote connection failed or timed out';
+      lastLine = lastLine.replace(/^[\d/:\s]+(ERROR|WARNING|NOTICE)\s*:\s*/i, '');
+      console.error(`Failed to mount ${remoteName}: ${lastLine}`);
+      process.exit(1);
+    }
+
+    const logFile = `/tmp/rclone-mount-${remoteName}.log`;
+    try { if (fs.existsSync(logFile)) fs.unlinkSync(logFile); } catch(e) {}
+
     console.log(`Mounting ${remoteName}: at ${mountPoint}...`);
     try {
-      execSync(`${rcloneBin} mount "${remoteName}:" "${mountPoint}" --vfs-cache-mode full --daemon </dev/null >/dev/null 2>&1`, { env });
+      execSync(`${rcloneBin} mount "${remoteName}:" "${mountPoint}" --vfs-cache-mode full --daemon --log-file="${logFile}" --log-level=NOTICE`, { env, timeout: 10000 });
+      let mounted = false;
       for (let i = 0; i < 16; i++) {
-        if (isDriveMounted(mountPoint)) break;
+        if (isDriveMounted(mountPoint)) {
+          mounted = true;
+          break;
+        }
         execSync('sleep 0.5');
       }
+
+      if (!mounted) {
+        let errDetails = '';
+        try {
+          if (fs.existsSync(logFile)) errDetails = fs.readFileSync(logFile, 'utf8').trim();
+        } catch(e) {}
+        safeUnmount(mountPoint);
+        console.error(`Failed to mount ${remoteName}: ${errDetails || 'Mount verification timed out'}`);
+        process.exit(1);
+      }
+
       console.log(`✔ '${remoteName}' mounted at ${mountPoint}`);
       if (!noOpen && isDriveMounted(mountPoint)) {
         launchFileManager(mountPoint);
       }
     } catch (e) {
-      console.error(`Failed to mount ${remoteName}: ${e.message}`);
+      let errDetails = '';
+      try {
+        if (fs.existsSync(logFile)) errDetails = fs.readFileSync(logFile, 'utf8').trim();
+      } catch(ex) {}
+      safeUnmount(mountPoint);
+      console.error(`Failed to mount ${remoteName}: ${errDetails || e.message}`);
+      process.exit(1);
     }
     return;
   }

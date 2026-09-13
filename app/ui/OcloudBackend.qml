@@ -249,7 +249,8 @@ Item {
     root.busyChanged(true, "Mounting " + name + "...");
     runCli(["storage", "mount", name, path || ""], function(out, ok) {
       root.busyChanged(false, "");
-      root.actionCompleted("mountCloudAccount", ok, "Mounted " + name);
+      var msg = ok ? ("Mounted " + name) : (out || ("Failed to mount " + name));
+      root.actionCompleted("mountCloudAccount", ok, msg);
       root.refreshStatusAsync();
       root.fetchCloudAccountsAsync();
     });
@@ -259,7 +260,8 @@ Item {
     root.busyChanged(true, "Unmounting " + path + "...");
     runCli(["storage", "unmount", path], function(out, ok) {
       root.busyChanged(false, "");
-      root.actionCompleted("unmountCloudAccount", ok, "Unmounted " + path);
+      var msg = ok ? ("Unmounted " + path) : (out || ("Failed to unmount " + path));
+      root.actionCompleted("unmountCloudAccount", ok, msg);
       root.refreshStatusAsync();
       root.fetchCloudAccountsAsync();
     });

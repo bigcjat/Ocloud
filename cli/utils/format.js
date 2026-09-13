@@ -15,9 +15,20 @@ function formatBytes(bytes) {
 }
 
 function isDriveMounted(mountPoint) {
+  const p = resolveMountPath(mountPoint);
   try {
     const out = execSync('mount', { encoding: 'utf8' });
-    return out.includes(mountPoint);
+    if (!out.includes(p)) return false;
+
+    // Verify mount is actually accessible and responsive (not a dead/zombie FUSE mount)
+    try {
+      execSync(`timeout 1 ls -A "${p}"`, { timeout: 1500, stdio: 'ignore' });
+      return true;
+    } catch (err) {
+      // In mount table but unresponsive/hung/ENOTCONN: clean up zombie mount
+      safeUnmount(p, 2000);
+      return false;
+    }
   } catch (e) {
     return false;
   }

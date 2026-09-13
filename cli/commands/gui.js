@@ -13,11 +13,6 @@ function cmdGui(subcmd, args = [], context = {}) {
   const candidates = ['/usr/bin/quickshell', '/usr/local/bin/quickshell'];
   const qsBin = candidates.find(p => fs.existsSync(p)) || 'quickshell';
   const qsArgs = ['-p', shellPath];
-  if (subcmd && subcmd !== 'open' && subcmd !== 'start') {
-    qsArgs.push('--', subcmd, ...(args || []));
-  } else if (args && args.length > 0) {
-    qsArgs.push('--', ...args);
-  }
 
   const vault = context && context.vault ? context.vault : null;
   const env = {

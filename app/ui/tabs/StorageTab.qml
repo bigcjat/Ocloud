@@ -435,6 +435,12 @@ Item {
           }
         }
       }
+
+      // Bottom breathing room
+      Item {
+        Layout.preferredHeight: 40
+        Layout.fillWidth: true
+      }
     }
   }
 }
