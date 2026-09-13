@@ -1,0 +1,49 @@
+{
+  "id": "backblaze_b2",
+  "name": "Backblaze B2",
+  "type": "storage",
+  "category": "cloud",
+  "authType": "s3",
+  "rcloneType": "b2",
+  "defaultRemoteName": "b2",
+  "defaultMount": "~/Backblaze-B2",
+  "badge": "Low Cost S3",
+  "badgeColor": "#e11d48",
+  "brandColor": "#e11d48",
+  "tagline": "Low-cost S3-compatible cloud storage with high bandwidth and low storage fees.",
+  "dashboardUrl": "https://secure.backblaze.com/app_keys.htm",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><rect width=\"48\" height=\"48\" fill=\"#e11d48\" rx=\"10\"/><path fill=\"#fff\" d=\"M24 14c-4.4 0-8 3.6-8 8 0 .4 0 .9.1 1.3-2.9.9-5.1 3.5-5.1 6.7 0 3.9 3.1 7 7 7h13c4.4 0 8-3.6 8-8 0-4.1-3.1-7.5-7.1-7.9-.5-4-3.9-7.1-7.9-7.1\"/></svg>",
+  "instructions": {
+    "navBreadcrumb": "Backblaze Account › App Keys › Add a New Application Key",
+    "step1": "Log in to your Backblaze B2 account and open Application Keys.",
+    "step2": "Create an Application Key with Read and Write access.",
+    "step3": "Enter Key ID, Application Key, and Bucket Name into Ocloud."
+  },
+  "fields": [
+    {
+      "key": "bucket",
+      "label": "B2 Bucket Name",
+      "placeholder": "e.g. my-b2-bucket",
+      "type": "text"
+    },
+    {
+      "key": "key_id",
+      "label": "Key ID",
+      "placeholder": "25-character key ID",
+      "type": "text"
+    },
+    {
+      "key": "app_key",
+      "label": "Application Key",
+      "placeholder": "Application key hash",
+      "type": "password"
+    }
+  ],
+  "allowedDomains": [
+    "*.backblazeb2.com"
+  ],
+  "permissions": {
+    "network": true,
+    "rclone": true
+  }
+}

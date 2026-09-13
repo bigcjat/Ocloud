@@ -1,0 +1,69 @@
+{
+  "id": "gcp",
+  "name": "Google Cloud",
+  "type": "compute",
+  "driver": "driver.js",
+  "badge": "Enterprise API",
+  "badgeColor": "#4285F4",
+  "brandColor": "#4285F4",
+  "currency": "USD",
+  "currencySymbol": "$",
+  "tagline": "Global cloud infrastructure with per-second billing.",
+  "description": "Direct Compute Engine API provisioning with live telemetry and global VPC networking.",
+  "pricingFrom": "$0.0084 / hr",
+  "dashboardUrl": "https://console.cloud.google.com/compute",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><rect width=\"48\" height=\"48\" fill=\"#1e293b\" rx=\"10\"/><path fill=\"#4285f4\" d=\"M34 33H19a6 6 0 0 1-6-6 5.9 5.9 0 0 1 3.5-5.4A8.5 8.5 0 0 1 24 16a8.5 8.5 0 0 1 8.2 6.3 5.5 5.5 0 0 1 5.8 5.2 5.5 5.5 0 0 1-4 5.5\"/></svg>",
+  "auth": {
+    "type": "service_account",
+    "title": "Google Cloud Service Account",
+    "subtitle": "Connect Ocloud directly using a Google Cloud Service Account JSON Key",
+    "guideUrl": "https://console.cloud.google.com/iam-admin/serviceaccounts",
+    "guideButtonText": "Open Console ↗",
+    "guideSteps": [
+      "Open Google Cloud Console > IAM & Admin > Service Accounts",
+      "Create a Service Account and grant the 'Compute Admin' role (roles/compute.admin)",
+      "Click your Service Account > Keys tab > Add Key > Create new key > JSON, and download the file",
+      "Load your downloaded key using the button below or paste the JSON key content directly"
+    ],
+    "fileDrop": {
+      "pattern": "json",
+      "label": "Detected Service Account Key in Downloads:"
+    },
+    "fields": [
+      {
+        "key": "gcp_service_account_json",
+        "label": "Service Account JSON / Credentials",
+        "placeholder": "{\n  \"type\": \"service_account\",\n  \"project_id\": \"your-project-id\",\n  \"private_key\": \"-----BEGIN RSA PRIVATE KEY-----...\"\n}",
+        "type": "textarea",
+        "required": true
+      },
+      {
+        "key": "gcp_project_id",
+        "label": "GCP Project ID",
+        "placeholder": "e.g. my-project-id",
+        "type": "text",
+        "required": false
+      },
+      {
+        "key": "gcp_default_zone",
+        "label": "Default Zone",
+        "placeholder": "us-central1-a",
+        "type": "text",
+        "default": "us-central1-a"
+      }
+    ]
+  },
+  "allowedDomains": [
+    "compute.googleapis.com",
+    "oauth2.googleapis.com",
+    "www.googleapis.com",
+    "console.cloud.google.com",
+    "tailscale.com",
+    "github.com"
+  ],
+  "permissions": {
+    "network": true,
+    "ssh": true,
+    "system_shell": false
+  }
+}

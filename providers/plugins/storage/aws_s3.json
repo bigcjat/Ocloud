@@ -1,0 +1,55 @@
+{
+  "id": "aws_s3",
+  "name": "Amazon AWS S3",
+  "type": "storage",
+  "category": "cloud",
+  "authType": "s3",
+  "rcloneType": "s3",
+  "defaultRemoteName": "aws",
+  "defaultMount": "~/S3-AWS",
+  "badge": "AWS Enterprise",
+  "badgeColor": "#ff9900",
+  "brandColor": "#ff9900",
+  "tagline": "Connect an Amazon Web Services S3 bucket via IAM Access Key and Secret.",
+  "dashboardUrl": "https://console.aws.amazon.com/s3",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><rect width=\"48\" height=\"48\" fill=\"#232f3e\" rx=\"10\"/><text x=\"8\" y=\"24\" fill=\"#fff\" font-family=\"-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif\" font-size=\"14\" font-weight=\"900\" letter-spacing=\"1\">AWS</text><path fill=\"none\" stroke=\"#f90\" stroke-linecap=\"round\" stroke-width=\"2.5\" d=\"M10 32c8 4.5 20 4.5 28 0\"/><path fill=\"#f90\" d=\"m37 30.5 2.5 2-3 1\"/></svg>",
+  "instructions": {
+    "navBreadcrumb": "AWS Console › IAM › Users › Security Credentials › Create Access Key",
+    "step1": "Open the AWS Management Console and navigate to IAM.",
+    "step2": "Create an IAM Access Key for your user or application.",
+    "step3": "Enter your Access Key ID, Secret Access Key, region, and bucket name."
+  },
+  "fields": [
+    {
+      "key": "bucket",
+      "label": "S3 Bucket Name",
+      "placeholder": "e.g. my-app-backups",
+      "type": "text"
+    },
+    {
+      "key": "region",
+      "label": "AWS Region",
+      "placeholder": "e.g. us-east-1, eu-central-1",
+      "type": "text"
+    },
+    {
+      "key": "access_key",
+      "label": "AWS Access Key ID",
+      "placeholder": "AKIA...",
+      "type": "text"
+    },
+    {
+      "key": "secret_key",
+      "label": "AWS Secret Access Key",
+      "placeholder": "40-character secret key",
+      "type": "password"
+    }
+  ],
+  "allowedDomains": [
+    "*.amazonaws.com"
+  ],
+  "permissions": {
+    "network": true,
+    "rclone": true
+  }
+}

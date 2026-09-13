@@ -1,6 +1,6 @@
 # ☁ Ocloud
 
-**The Sovereign Cloud Companion for Omarchy (and Linux).**
+**Personal Cloud & Storage Manager for Omarchy and Linux.**
 
 [https://github.com/bigcjat/Ocloud](https://github.com/bigcjat/Ocloud)
 
@@ -11,6 +11,8 @@ Ocloud bridges personal cloud storage and on-demand cloud compute directly into 
 ## Architecture & Provider Roadmap
 
 Ocloud is built with a **modular provider architecture**. While **Hetzner** is the initial first-class reference implementation, Ocloud is designed to plug into any cloud infrastructure or self-hosted homelab.
+
+> 📋 **Detailed Plugin Inventory & Roadmap:** See [PLUGINS.md](PLUGINS.md) for full status of all tested, unverified, and planned plugins.
 
 ```
                     ┌─────────────────────────┐

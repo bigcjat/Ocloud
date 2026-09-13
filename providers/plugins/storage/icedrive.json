@@ -1,0 +1,55 @@
+{
+  "id": "icedrive",
+  "name": "Icedrive",
+  "type": "storage",
+  "category": "personal",
+  "authType": "webdav",
+  "rcloneType": "webdav",
+  "defaultRemoteName": "icedrive",
+  "defaultMount": "~/Icedrive",
+  "badge": "WebDAV Cloud",
+  "badgeColor": "#0099ff",
+  "brandColor": "#0099ff",
+  "tagline": "Next-generation secure cloud storage with WebDAV sync.",
+  "dashboardUrl": "https://icedrive.net/login",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" xml:space=\"preserve\" viewBox=\"0 0 68.653 68.653\"><defs><linearGradient id=\"d\"><stop offset=\"0\" style=\"stop-color:#06d2d1;stop-opacity:1\"/><stop offset=\"1\" style=\"stop-color:#103a89;stop-opacity:1\"/></linearGradient><linearGradient id=\"c\"><stop offset=\"0\" style=\"stop-color:#4bb8e7;stop-opacity:1\"/><stop offset=\"1\" style=\"stop-color:#fff;stop-opacity:1\"/></linearGradient><linearGradient id=\"b\"><stop offset=\"0\" style=\"stop-color:#127cd3;stop-opacity:1\"/><stop offset=\"1\" style=\"stop-color:#fff;stop-opacity:0\"/></linearGradient><linearGradient id=\"a\"><stop offset=\"0\" style=\"stop-color:#000;stop-opacity:.94845361\"/><stop offset=\"1\" style=\"stop-color:#000;stop-opacity:.18556701\"/></linearGradient><linearGradient xlink:href=\"#a\" id=\"f\" x1=\"113.723\" x2=\"131.026\" y1=\"202.358\" y2=\"202.358\" gradientUnits=\"userSpaceOnUse\"/><linearGradient xlink:href=\"#b\" id=\"h\" x1=\"100.619\" x2=\"88.285\" y1=\"172.717\" y2=\"172.717\" gradientUnits=\"userSpaceOnUse\"/><linearGradient xlink:href=\"#c\" id=\"g\" x1=\"126.347\" x2=\"95.6\" y1=\"203.784\" y2=\"203.784\" gradientUnits=\"userSpaceOnUse\"/><linearGradient xlink:href=\"#d\" id=\"e\" x1=\"115.14\" x2=\"115.14\" y1=\"147.719\" y2=\"215.845\" gradientUnits=\"userSpaceOnUse\"/></defs><g transform=\"translate(-80.813 -147.455)\"><circle cx=\"115.14\" cy=\"181.782\" r=\"34.063\" style=\"opacity:1;fill:url(#e);stroke-width:.527469;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:48.6;paint-order:fill markers stroke\"/><path d=\"m126.92 190.208-7.506 3.973-5.691 9.37 10.864 10.958a34 34 0 0 0 6.44-2.595c-2.807-.12-4.78-1.667-6.756-3.21-2.783-3.142-2.665-6.217-1.717-9.273.816-2.88 4.288-4.831 7.963-7.04z\" style=\"opacity:.5;fill:url(#f);stroke-width:.527469;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:48.6;paint-order:fill markers stroke\"/><path d=\"M119.018 191.891c-15.555.06-20.681 7.675-23.418 17.792a34.06 34.06 0 0 0 14.871 5.84c5.18.5 10.097-.3 14.99-1.28a34 34 0 0 0 .507-.165c-9.637-8.184-9.833-15.452.379-21.735-2.671-.315-5.107-.46-7.329-.452\" style=\"opacity:1;fill:url(#g);stroke-width:.527469;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:48.6;paint-order:fill markers stroke\"/><path d=\"M110.19 164.938c-3.346-.042-6.76.422-10.227 1.263-8.54 3.029-14.646 8.605-18.882 16.135a34.06 34.06 0 0 0 5.138 17.442c1.204 1.876 2.655 3.761 4.412 5.66a34 34 0 0 0 5.157 4.376c3.634-11.622 10.475-19.317 30.544-17.235 5.733.163 9.447-.914 12.753-3.832l2.293-3.12c.932-1.253-.465-2.971-2.698-4.857-3.137-2.11-6.364-3.863-9.713-5.126-.175-2.034-1.503-3.837-2.698-5.666-5.115-3.491-10.502-4.97-16.079-5.04m8.138 8.893c.32-.011.66.02 1.005.112.84.16 1.586.382 2.34.6.575.197 1.027.439.78.93l-.545.63c-.393.099-.896.17-1.405.24l-3.702.044c-.58-.032-.806-.228-1.007-.434-.137-.4.007-.587.096-.817l1.097-.968c.334-.181.808-.319 1.34-.337\" style=\"opacity:1;fill:#f9f9f9;stroke-width:.527469;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:48.6;paint-order:fill markers stroke\"/><path d=\"M94.173 168.844a33 33 0 0 0-5.888 4.291c5.71 5.38 10.251 3.203 12.334 1.88z\" style=\"opacity:.5;fill:url(#h);stroke-width:.527469;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:48.6;paint-order:fill markers stroke\"/><circle cx=\"97.709\" cy=\"170.727\" r=\"5.072\" style=\"opacity:1;fill:#f9f9f9;stroke-width:.493001;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:48.6;paint-order:fill markers stroke\"/></g></svg>",
+  "instructions": {
+    "navBreadcrumb": "Icedrive Web › Settings › Access › WebDAV",
+    "step1": "Log in to your Icedrive account at https://icedrive.net/login.",
+    "step2": "Navigate to Settings › Access › WebDAV to enable access and view your WebDAV password.",
+    "step3": "Enter your Icedrive account email and password to mount ~/Icedrive."
+  },
+  "fields": [
+    {
+      "key": "endpoint",
+      "label": "WebDAV Endpoint URL",
+      "placeholder": "https://webdav.icedrive.io",
+      "default": "https://webdav.icedrive.io",
+      "type": "text",
+      "helper": "Official Icedrive WebDAV gateway"
+    },
+    {
+      "key": "username",
+      "label": "Icedrive Account Email",
+      "placeholder": "user@example.com",
+      "type": "text",
+      "helper": "The email address associated with your Icedrive account"
+    },
+    {
+      "key": "password",
+      "label": "Account Password / WebDAV Key",
+      "placeholder": "Enter your Icedrive password or WebDAV key",
+      "type": "password",
+      "helper": "Your account password or dedicated key from Settings › Access › WebDAV"
+    }
+  ],
+  "allowedDomains": [
+    "webdav.icedrive.io",
+    "icedrive.net",
+    "icedrive.io"
+  ],
+  "permissions": {
+    "network": true,
+    "rclone": true
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "id": "protondrive",
+  "name": "Proton Drive",
+  "type": "storage",
+  "category": "personal",
+  "authType": "credentials",
+  "rcloneType": "protondrive",
+  "defaultRemoteName": "protondrive",
+  "defaultMount": "~/ProtonDrive",
+  "badge": "E2E Encrypted",
+  "badgeColor": "#6d4aff",
+  "brandColor": "#6d4aff",
+  "tagline": "End-to-end encrypted Swiss cloud storage.",
+  "dashboardUrl": "https://drive.proton.me",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"#6d4aff\" d=\"M24 6.595v12.79c0 1.36-1.11 2.462-2.482 2.462h-1.62V9a2.925 2.925 0 0 0-2.93-2.914l-9.42.053a.94.94 0 0 1-.55-.172L4.905 4.493a2.9 2.9 0 0 0-1.694-.536H.1A2.47 2.47 0 0 1 2.482 2.15h4.657c.47 0 .928.148 1.305.424l1.559 1.134c.38.276.837.424 1.308.424h10.207A2.47 2.47 0 0 1 24 6.595M18.897 9v12.85H2.482A2.47 2.47 0 0 1 0 19.387V4.957h3.21c.4 0 .792.122 1.118.353l2.095 1.476a1.94 1.94 0 0 0 1.13.353l9.402-.052A1.92 1.92 0 0 1 18.897 9\"/></svg>",
+  "instructions": {
+    "navBreadcrumb": "Proton Drive › Credentials Setup",
+    "step1": "Enter your Proton Account username or email and password.",
+    "step2": "If two-factor authentication (2FA) is enabled, enter your current 6-digit 2FA code or OTP secret key.",
+    "step3": "Your encrypted drive will mount natively to ~/ProtonDrive."
+  },
+  "disclosure": "This is a third-party application not officially supported by Proton.",
+  "fields": [
+    {
+      "key": "username",
+      "label": "Proton Account Email / Username",
+      "placeholder": "user@proton.me or username",
+      "type": "text",
+      "required": true,
+      "helper": "Your Proton account login username or email address"
+    },
+    {
+      "key": "password",
+      "label": "Account Password",
+      "placeholder": "••••••••••••",
+      "type": "password",
+      "required": true,
+      "helper": "Your primary Proton login password"
+    },
+    {
+      "key": "twofa",
+      "label": "2FA Code / OTP Secret (Optional)",
+      "placeholder": "123456 or OTP Secret Key",
+      "type": "text",
+      "required": false,
+      "helper": "Current 6-digit TOTP code if 2FA is active, or your OTP secret"
+    },
+    {
+      "key": "mailbox_password",
+      "label": "Mailbox Password (Optional)",
+      "placeholder": "Only required for legacy two-password mode",
+      "type": "password",
+      "required": false,
+      "helper": "Leave blank unless your account uses two-password mode"
+    }
+  ],
+  "allowedDomains": [
+    "*.proton.me"
+  ],
+  "permissions": {
+    "network": true,
+    "rclone": true
+  }
+}

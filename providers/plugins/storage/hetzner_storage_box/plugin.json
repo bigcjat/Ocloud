@@ -1,0 +1,55 @@
+{
+  "id": "hetzner_storage_box",
+  "name": "Hetzner Storage Box",
+  "type": "storage",
+  "driver": "driver.js",
+  "category": "cloud",
+  "authType": "webdav",
+  "rcloneType": "sftp",
+  "defaultRemoteName": "storagebox",
+  "defaultMount": "~/Cloud",
+  "badge": "RAID Storage",
+  "badgeColor": "#d50c2d",
+  "brandColor": "#d50c2d",
+  "tagline": "High-capacity RAID storage box with WebDAV, SFTP, and automated snapshots.",
+  "dashboardUrl": "https://robot.hetzner.com/storage",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><rect width=\"48\" height=\"48\" fill=\"#d50c2d\" rx=\"10\"/><path fill=\"#fff\" d=\"M15 13h5.5v9h7v-9H33v22h-5.5v-8h-7v8H15z\"/></svg>",
+  "instructions": {
+    "navBreadcrumb": "Hetzner Robot › Storage Boxes › Manage Credentials",
+    "step1": "Open Hetzner Robot and select your Storage Box from the list.",
+    "step2": "Enable WebDAV and SSH/SFTP access in your Storage Box settings.",
+    "step3": "Enter your username (e.g. u123456), server hostname, and password."
+  },
+  "fields": [
+    {
+      "key": "username",
+      "label": "Storage Box Username",
+      "placeholder": "e.g. u123456",
+      "helper": "Your dedicated Storage Box username assigned by Hetzner Robot",
+      "type": "text"
+    },
+    {
+      "key": "host",
+      "label": "Server Hostname",
+      "placeholder": "e.g. u123456.your-storagebox.de",
+      "helper": "Found in Robot under Server / Host information",
+      "type": "text"
+    },
+    {
+      "key": "password",
+      "label": "Password / App Password",
+      "placeholder": "Enter your Storage Box password",
+      "helper": "Stored securely in AES-256 encrypted vault",
+      "type": "password"
+    }
+  ],
+  "allowedDomains": [
+    "robot.hetzner.com",
+    "*.your-storagebox.de"
+  ],
+  "permissions": {
+    "network": true,
+    "rclone": true,
+    "mount": true
+  }
+}

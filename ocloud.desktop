@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Ocloud
+GenericName=Cloud Storage & Compute Manager
+Comment=Manage Hetzner Cloud VMs, S3 Buckets, FUSE Mounts, and Network Shares
+Exec=ocloud app
+Icon=ocloud
+Terminal=false
+Type=Application
+Categories=System;Utility;Network;FileManager;
+StartupWMClass=ocloud
+Keywords=cloud;storage;rclone;hetzner;drive;dropbox;onedrive;sftp;smb;

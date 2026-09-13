@@ -1,0 +1,31 @@
+name: Ocloud Plugin Security Gate
+
+on:
+  push:
+    paths:
+      - 'providers/plugins/**'
+      - 'providers/registry.js'
+      - 'security/**'
+  pull_request:
+    paths:
+      - 'providers/plugins/**'
+      - 'providers/registry.js'
+      - 'security/**'
+
+jobs:
+  audit-plugins:
+    name: Zero-Trust Plugin Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run Plugin Security Audit (Strict Gate)
+        run: |
+          chmod +x ./ocloud
+          ./ocloud plugin audit all --strict

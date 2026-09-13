@@ -1,48 +1,103 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell
+import "components"
+import "tabs"
+import "wizard"
+import "modals"
 
-ApplicationWindow {
+FloatingWindow {
   id: window
   visible: true
-  width: 1120
-  height: 740
-  minimumWidth: 960
-  minimumHeight: 640
+  implicitWidth: {
+    var tw = Quickshell.env("OCLOUD_TEST_WIDTH");
+    return tw ? parseInt(tw) : 1120;
+  }
+  implicitHeight: {
+    var th = Quickshell.env("OCLOUD_TEST_HEIGHT");
+    return th ? parseInt(th) : 740;
+  }
+  minimumSize: Qt.size(340, 360)
   title: "Ocloud — Cloud Storage & Compute Manager"
-  color: "#080e18"
+  color: theme.background
 
-  // Global Design Tokens
-  readonly property color bgDark: "#080e18"
-  readonly property color cardBg: "#0f172a"
-  readonly property color cardBgAlt: "#131e36"
-  readonly property color borderSubtle: "#1e293b"
-  readonly property color borderActive: "#334155"
-  readonly property color textPrimary: "#f8fafc"
-  readonly property color textSecondary: "#94a3b8"
-  readonly property color textMuted: "#64748b"
-  readonly property color accentSky: "#38bdf8"
-  readonly property color accentHover: "#0284c7"
-  readonly property color homeGreen: "#10b981"
-  readonly property color warningAmber: "#f59e0b"
-  readonly property color dangerRed: "#ef4444"
+  // Live System Theme Provider matching Omarchy OS colors and typography
+  Theme {
+    id: theme
+  }
+
+  // Pure QML/JS Asynchronous Backend
+  OcloudBackend {
+    id: ocloud
+  }
+
+  // Global Design Tokens bound to the OS theme
+  readonly property color bgDark: theme.bgDark
+  readonly property color cardBg: theme.cardBg
+  readonly property color cardBgAlt: theme.cardBgAlt
+  readonly property color borderSubtle: theme.borderSubtle
+  readonly property color borderActive: theme.borderActive
+  readonly property color textPrimary: theme.textPrimary
+  readonly property color textSecondary: theme.textSecondary
+  readonly property color textMuted: theme.textMuted
+  readonly property color accentSky: theme.accentSky
+  readonly property color accentHover: theme.accentHover
+  readonly property color homeGreen: theme.homeGreen
+  readonly property color warningAmber: theme.warningAmber
+  readonly property color dangerRed: theme.dangerRed
+  readonly property string systemFont: theme.fontFamily
+
+  // Responsive layout tiers for Omarchy / Hyprland tiling
+  readonly property bool isQuarter: width < 580 || height < 480
+  readonly property bool isHalf: width >= 580 && width < 980 && !isQuarter
+  readonly property bool isFull: width >= 980 && !isQuarter
 
   // Reactive State
   property var statusData: ({})
   property var serverList: []
   property var storageBox: ({})
+  property var r2Storage: ({})
   property var customStorage: []
   property var backupInfo: ({})
-  property string activeTab: (typeof initialTab !== "undefined" && initialTab) ? initialTab : "fleet"
+  property int cloudAccountsCount: 0
+  property int mountedDrivesCount: 1
+  property int networkSharesCount: 0
+  property string activeTab: {
+    var envTab = Quickshell.env("OCLOUD_TAB");
+    if (envTab) return envTab;
+    if (typeof initialTab !== "undefined" && initialTab) return initialTab;
+    return "accounts";
+  }
   property bool isBusy: false
   property string busyMessage: ""
+
+  readonly property var tabModel: [
+    { id: "fleet", name: "Compute Nodes", shortName: "Fleet", iconSvg: "icons/server.svg", count: serverList.length },
+    { id: "workloads", name: "Workloads & Docker", shortName: "Docker", iconSvg: "icons/box.svg", count: 0 },
+    { id: "storage", name: "Storage & Drives", shortName: "Storage", iconSvg: "icons/hard-drive.svg", count: mountedDrivesCount },
+    { id: "accounts", name: "Cloud Accounts", shortName: "Accounts", iconSvg: "icons/user-circle.svg", count: cloudAccountsCount },
+    { id: "shares", name: "Network Shares", shortName: "Shares", iconSvg: "icons/network.svg", count: networkSharesCount },
+    { id: "apps", name: "App Streaming", shortName: "Apps", iconSvg: "icons/terminal.svg", count: 0 },
+    { id: "backups", name: "Automated Backups", shortName: "Backups", iconSvg: "icons/archive.svg", count: 0 },
+    { id: "settings", name: "Settings & Preferences", shortName: "Settings", iconSvg: "icons/settings.svg", count: 0 }
+  ]
+
+  function getActiveTabName() {
+    for (var i = 0; i < tabModel.length; i++) {
+      if (tabModel[i].id === activeTab) return tabModel[i].name;
+    }
+    return "Ocloud";
+  }
 
   Shortcut { sequence: "Alt+1"; onActivated: activeTab = "fleet" }
   Shortcut { sequence: "Alt+2"; onActivated: activeTab = "workloads" }
   Shortcut { sequence: "Alt+3"; onActivated: activeTab = "storage" }
-  Shortcut { sequence: "Alt+4"; onActivated: activeTab = "apps" }
-  Shortcut { sequence: "Alt+5"; onActivated: activeTab = "backups" }
-  Shortcut { sequence: "Alt+6"; onActivated: activeTab = "settings" }
+  Shortcut { sequence: "Alt+4"; onActivated: activeTab = "accounts" }
+  Shortcut { sequence: "Alt+5"; onActivated: activeTab = "shares" }
+  Shortcut { sequence: "Alt+6"; onActivated: activeTab = "apps" }
+  Shortcut { sequence: "Alt+7"; onActivated: activeTab = "backups" }
+  Shortcut { sequence: "Alt+8"; onActivated: activeTab = "settings" }
 
   function reloadAll() {
     ocloud.refreshStatusAsync();
@@ -55,349 +110,537 @@ ApplicationWindow {
       statusData = data;
       serverList = data.servers || [];
       storageBox = (data.storage && data.storage.storage_box) || {};
+      r2Storage = (data.storage && data.storage.r2_storage) || {};
       customStorage = (data.storage && data.storage.custom_storage) || [];
       backupInfo = data.backups || {};
     } catch (e) {}
 
-    if (typeof openModalOnStart !== "undefined" && openModalOnStart === "taskManager") {
-      var srv = (serverList && serverList.length > 0) ? serverList[0] : { name: "omarchy-companion", ipv4: "167.233.151.104", provider: "hetzner", status: "running", id: 165572435 };
-      taskManagerModal.openForServer(srv);
-    } else if (typeof openModalOnStart !== "undefined" && openModalOnStart === "procure") {
-      procureModal.openModal();
-    } else if (typeof openModalOnStart !== "undefined" && openModalOnStart === "consent") {
-      consentModal.openForServer("omarchy-companion", "165572435");
+    try {
+      var rawAccs = ocloud.fetchCloudAccounts();
+      var accsInit = JSON.parse(rawAccs);
+      cloudAccountsCount = accsInit.filter(function(a) { return a.type !== "smb"; }).length;
+      var mountedClouds = accsInit.filter(function(a) { return a.isMounted; }).length;
+      mountedDrivesCount = mountedClouds + networkSharesCount;
+    } catch (e) {}
+
+    var startModal = Quickshell.env("OCLOUD_MODAL") || (typeof openModalOnStart !== "undefined" ? openModalOnStart : "");
+    if (startModal === "taskManager") {
+      var srv = (serverList && serverList.length > 0) ? serverList[0] : null;
+      if (srv) taskManagerModal.openForServer(srv);
+    } else if (startModal === "procure") {
+      procureModal.openModal(1);
+    } else if (startModal === "procure-step2") {
+      procureModal.openModal(2);
+    } else if (startModal === "procure-step2-dedicated") {
+      procureModal.openModal(2);
+      procureModal.filterTenancy = "dedicated";
+    } else if (startModal === "procure-step2-arm") {
+      procureModal.openModal(2);
+      procureModal.filterArch = "arm";
+    } else if (startModal === "procure-step3") {
+      procureModal.openModal(3);
+    } else if (startModal === "procure-step4") {
+      procureModal.openModal(4);
+    } else if (startModal === "procure-step5") {
+      procureModal.openModal(5);
+    } else if (startModal === "procure-step6") {
+      procureModal.openModal(6);
+    } else if (startModal === "consent") {
+      var srv2 = (serverList && serverList.length > 0) ? serverList[0] : null;
+      if (srv2) consentModal.openForServer(srv2.name, String(srv2.id));
+    } else if (startModal === "storage") {
+      addStorageModal.openModal();
+    } else if (startModal && startModal.indexOf("storage-") === 0) {
+      var sParts = startModal.substring(8).split(":");
+      addStorageModal.openModal(sParts[0]);
+      if (sParts.length > 1) {
+        addStorageModal.stepName = sParts[1];
+      }
     }
+  }
+
+  property string toastMessage: ""
+  property bool toastIsError: false
+  property bool toastVisible: false
+
+  Timer {
+    id: toastTimer
+    interval: 5000
+    onTriggered: window.toastVisible = false
+  }
+
+  function showToast(message, isError) {
+    toastMessage = message;
+    toastIsError = isError;
+    toastVisible = true;
+    toastTimer.restart();
   }
 
   Connections {
     target: ocloud
+    function onActionCompleted(action, success, msg) {
+      if (msg && action !== "setBackupSchedule" && action !== "refresh") {
+        window.showToast(msg, !success);
+      }
+    }
     function onStatusUpdated(jsonStr) {
       try {
         var data = JSON.parse(jsonStr);
         statusData = data;
         serverList = data.servers || [];
         storageBox = (data.storage && data.storage.storage_box) || {};
+        r2Storage = (data.storage && data.storage.r2_storage) || {};
         customStorage = (data.storage && data.storage.custom_storage) || [];
         backupInfo = data.backups || {};
+
+        var startModal = Quickshell.env("OCLOUD_MODAL") || (typeof openModalOnStart !== "undefined" ? openModalOnStart : "");
+        if (startModal === "taskManager" && !taskManagerModal.visible) {
+          var srv = (serverList && serverList.length > 0) ? serverList[0] : null;
+          if (srv) taskManagerModal.openForServer(srv);
+        } else if (startModal === "consent" && !consentModal.visible) {
+          var srv2 = (serverList && serverList.length > 0) ? serverList[0] : null;
+          if (srv2) consentModal.openForServer(srv2.name, String(srv2.id));
+        }
       } catch (e) {}
     }
     function onBusyChanged(busy, text) {
       window.isBusy = busy;
       window.busyMessage = text;
     }
-  }
-
-  // Top Titlebar / Header
-  header: Rectangle {
-    height: 56
-    color: "#0b1325"
-    border.color: borderSubtle
-    border.width: 1
-
-    RowLayout {
-      anchors.fill: parent
-      anchors.leftMargin: 20
-      anchors.rightMargin: 20
-      spacing: 16
-
-      // Brand Logo
-      RowLayout {
-        spacing: 10
-        Rectangle {
-          width: 30
-          height: 30
-          radius: 8
-          gradient: Gradient {
-            GradientStop { position: 0.0; color: "#0284c7" }
-            GradientStop { position: 1.0; color: "#0369a1" }
-          }
-          Image {
-            anchors.centerIn: parent
-            width: 18
-            height: 18
-            source: Qt.resolvedUrl("icons/server.svg")
-            fillMode: Image.PreserveAspectFit
-            smooth: true
-          }
-        }
-        Text {
-          text: "Ocloud"
-          font.pixelSize: 17
-          font.bold: true
-          color: textPrimary
-        }
-        Text {
-          text: "Personal Cloud Hypervisor"
-          font.pixelSize: 12
-          color: textMuted
-        }
-      }
-
-      // Live Busy Indicator Pill
-      Rectangle {
-        visible: window.isBusy
-        height: 28
-        width: busyRow.implicitWidth + 20
-        radius: 14
-        color: Qt.rgba(0.02, 0.52, 0.78, 0.25)
-        border.color: accentSky
-        border.width: 1
-
-        Row {
-          id: busyRow
-          anchors.centerIn: parent
-          spacing: 8
-          Text {
-            text: "󰑐"
-            font.pixelSize: 13
-            color: accentSky
-            RotationAnimator on rotation {
-              from: 0
-              to: 360
-              duration: 900
-              loops: Animation.Infinite
-              running: window.isBusy
-            }
-          }
-          Text {
-            text: window.busyMessage || "Processing..."
-            font.pixelSize: 11
-            font.bold: true
-            color: "#f8fafc"
-          }
-        }
-      }
-
-      Item { Layout.fillWidth: true }
-
-      // Hypervisor Cluster Overview Telemetry
-      RowLayout {
-        spacing: 8
-        Rectangle {
-          height: 28
-          width: coresText.implicitWidth + 20
-          radius: 14
-          color: "#0f172a"
-          border.color: "#1e293b"
-          Text {
-            id: coresText
-            anchors.centerIn: parent
-            text: "CPU 12 Cores (14% Load)"
-            font.pixelSize: 11
-            color: "#38bdf8"
-            font.bold: true
-          }
-        }
-        Rectangle {
-          height: 28
-          width: ramText.implicitWidth + 20
-          radius: 14
-          color: "#0f172a"
-          border.color: "#1e293b"
-          Text {
-            id: ramText
-            anchors.centerIn: parent
-            text: "RAM 24.3 / 88 GB"
-            font.pixelSize: 11
-            color: "#10b981"
-            font.bold: true
-          }
-        }
-        Rectangle {
-          height: 28
-          width: poolText.implicitWidth + 20
-          radius: 14
-          color: "#0f172a"
-          border.color: "#1e293b"
-          Text {
-            id: poolText
-            anchors.centerIn: parent
-            text: "POOL 1.1 / 3.0 TB"
-            font.pixelSize: 11
-            color: "#f59e0b"
-            font.bold: true
-          }
-        }
-      }
-
-      // Refresh Button
-      Button {
-        id: refreshBtn
-        enabled: !window.isBusy
-        implicitWidth: refreshRow.implicitWidth + 24
-        implicitHeight: 32
-        background: Rectangle {
-          radius: 6
-          color: refreshBtn.hovered ? "#1e293b" : "#0f172a"
-          border.color: borderSubtle
-        }
-        contentItem: Row {
-          id: refreshRow
-          anchors.centerIn: parent
-          spacing: 8
-          Text {
-            text: "󰑐"
-            font.pixelSize: 13
-            color: textPrimary
-          }
-          Text {
-            text: "Refresh Fleet"
-            color: textPrimary
-            font.pixelSize: 12
-            font.bold: true
-          }
-        }
-        onClicked: reloadAll()
-      }
+    function onCloudAccountsUpdated(jsonStr) {
+      try {
+        var accs = JSON.parse(jsonStr);
+        cloudAccountsCount = accs.filter(function(a) { return a.type !== "smb"; }).length;
+        var mountedClouds = accs.filter(function(a) { return a.isMounted; }).length;
+        mountedDrivesCount = mountedClouds + networkSharesCount;
+      } catch (e) {}
     }
   }
 
-  // Main Container: Sidebar + Content
-  RowLayout {
+  // Master Column Layout: Top Header + Main Body (Sidebar & Content) + Quarter Bottom Nav
+  ColumnLayout {
     anchors.fill: parent
     spacing: 0
 
-    // Left Navigation Sidebar
+    // Top Titlebar / Header: Matches OS Theme & Adapts Height
     Rectangle {
-      Layout.fillHeight: true
-      Layout.preferredWidth: 220
-      color: "#070c16"
-      border.color: borderSubtle
+      id: headerBar
+      Layout.fillWidth: true
+      Layout.preferredHeight: window.isQuarter ? 42 : (window.isHalf ? 48 : 56)
+      color: theme.headerBg
+      border.color: theme.borderSubtle
       border.width: 1
 
-      ColumnLayout {
+      RowLayout {
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 6
+        anchors.leftMargin: window.isQuarter ? 10 : 16
+        anchors.rightMargin: window.isQuarter ? 10 : 16
+        spacing: window.isQuarter ? 8 : 14
 
-        // Nav Buttons
-        Repeater {
-          model: [
-            { id: "fleet", name: "Compute Nodes", iconSvg: "icons/server.svg", count: serverList.length },
-            { id: "workloads", name: "Workloads & Docker", iconSvg: "icons/box.svg", count: 3 },
-            { id: "storage", name: "Storage Pools", iconSvg: "icons/hard-drive.svg", count: storageBox.mounted ? 1 : 0 },
-            { id: "apps", name: "App Streaming", iconSvg: "icons/terminal.svg", count: 3 },
-            { id: "backups", name: "Automated Backups", iconSvg: "icons/archive.svg", count: 0 },
-            { id: "settings", name: "Vault & Plugins", iconSvg: "icons/shield.svg", count: 0 }
-          ]
-
-          delegate: Rectangle {
-            Layout.fillWidth: true
-            height: 44
-            radius: 8
-            color: activeTab === modelData.id ? "#13233f" : navMouse.containsMouse ? "#0d1527" : "transparent"
-            border.color: activeTab === modelData.id ? "#1d4ed8" : "transparent"
+        // Brand Logo
+        RowLayout {
+          spacing: 8
+          Rectangle {
+            width: window.isQuarter ? 24 : 28
+            height: window.isQuarter ? 24 : 28
+            radius: (typeof theme !== "undefined" && theme.cornerRadius) ? Math.max(4, theme.cornerRadius - 2) : 6
+            color: Qt.rgba(theme.accent.r, theme.accent.g, theme.accent.b, 0.15)
+            border.color: Qt.rgba(theme.accent.r, theme.accent.g, theme.accent.b, 0.35)
             border.width: 1
+
+            Image {
+              anchors.centerIn: parent
+              width: window.isQuarter ? 16 : 18
+              height: window.isQuarter ? 16 : 18
+              source: Qt.resolvedUrl("icons/ocloud.svg")
+              fillMode: Image.PreserveAspectFit
+              smooth: true
+            }
+          }
+
+          Text {
+            text: "Ocloud"
+            font.family: theme.fontFamily
+            font.pixelSize: window.isQuarter ? 13 : 15
+            font.bold: true
+            color: theme.textPrimary
+          }
+
+          Text {
+            visible: window.isFull
+            text: "Personal Cloud Manager"
+            font.family: theme.fontFamily
+            font.pixelSize: 11
+            color: theme.textMuted
+          }
+
+          Text {
+            visible: window.isQuarter
+            text: "· " + getActiveTabName()
+            font.family: theme.fontFamily
+            font.pixelSize: 11
+            font.bold: true
+            color: theme.accentSky
+            elide: Text.ElideRight
+            Layout.maximumWidth: 120
+          }
+        }
+
+        // Live Busy Indicator Pill
+        Rectangle {
+          visible: window.isBusy
+          height: window.isQuarter ? 22 : 26
+          width: window.isQuarter ? 22 : (busyRow.implicitWidth + 16)
+          radius: height / 2
+          color: Qt.rgba(theme.accent.r, theme.accent.g, theme.accent.b, 0.2)
+          border.color: theme.accentSky
+          border.width: 1
+
+          Row {
+            id: busyRow
+            anchors.centerIn: parent
+            spacing: 6
+            Canvas {
+              width: 12
+              height: 12
+              anchors.verticalCenter: parent.verticalCenter
+              onPaint: {
+                var ctx = getContext("2d");
+                ctx.reset();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = theme.accentSky;
+                ctx.beginPath();
+                ctx.arc(6, 6, 4, 0, 1.5 * Math.PI);
+                ctx.stroke();
+              }
+              RotationAnimator on rotation {
+                from: 0
+                to: 360
+                duration: 800
+                loops: Animation.Infinite
+                running: window.isBusy
+              }
+            }
+            Text {
+              visible: !window.isQuarter
+              text: window.busyMessage || "Working..."
+              font.family: theme.fontFamily
+              font.pixelSize: 10
+              font.bold: true
+              color: theme.textPrimary
+            }
+          }
+        }
+
+        Item { Layout.fillWidth: true }
+
+        // Status Badges (Visible in Full and Half mode)
+        RowLayout {
+          visible: !window.isQuarter
+          spacing: 6
+
+          AppBadge {
+            text: serverList.length + (serverList.length === 1 ? (window.isHalf ? " Node" : " Node Online") : (window.isHalf ? " Nodes" : " Nodes Online"))
+            variant: serverList.length > 0 ? "success" : "neutral"
+          }
+
+          AppBadge {
+            visible: !!(storageBox && storageBox.configured) && window.isFull
+            text: (storageBox && storageBox.mounted) ? "Storage Box Mounted" : "Storage Box Offline"
+            variant: (storageBox && storageBox.mounted) ? "info" : "neutral"
+          }
+        }
+
+        // Refresh Button: Responsive text / icon
+        AppButton {
+          id: refreshBtn
+          enabled: !window.isBusy
+          text: window.isQuarter ? "" : (window.isHalf ? "Refresh" : "Refresh Fleet")
+          iconSource: "icons/refresh.svg"
+          variant: "secondary"
+          onClicked: reloadAll()
+        }
+      }
+    }
+
+    // Main Body: Left Sidebar (Full/Half) + Content
+    RowLayout {
+      Layout.fillWidth: true
+      Layout.fillHeight: true
+      spacing: 0
+
+      // Left Navigation Sidebar: Adapts between Full (210px) and Half (56px rail); Hidden in Quarter
+      Rectangle {
+        id: navSidebar
+        visible: !window.isQuarter
+        Layout.fillHeight: true
+        Layout.preferredWidth: window.isHalf ? 56 : 210
+        color: theme.sidebarBg
+        border.color: theme.borderSubtle
+        border.width: 1
+
+        ColumnLayout {
+          anchors.fill: parent
+          anchors.margins: window.isHalf ? 6 : 10
+          spacing: 4
+
+          // Nav Items
+          Repeater {
+            model: window.tabModel
+
+            delegate: Rectangle {
+              Layout.fillWidth: true
+              height: window.isHalf ? 40 : 42
+              radius: (typeof theme !== "undefined" && theme.cornerRadius) ? Math.max(4, theme.cornerRadius - 2) : 6
+              color: activeTab === modelData.id ? Qt.rgba(theme.accent.r, theme.accent.g, theme.accent.b, 0.18) : navMouse.containsMouse ? Qt.rgba(theme.foreground.r, theme.foreground.g, theme.foreground.b, 0.08) : "transparent"
+              border.color: activeTab === modelData.id ? theme.accent : "transparent"
+              border.width: 1
+
+              // Full View: Icon + Full Label + Right Badge
+              RowLayout {
+                visible: !window.isHalf
+                anchors.left: parent.left
+                anchors.leftMargin: 12
+                anchors.right: badgeRect.visible ? badgeRect.left : parent.right
+                anchors.rightMargin: badgeRect.visible ? 6 : 10
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 10
+
+                Image {
+                  width: 16
+                  height: 16
+                  source: Qt.resolvedUrl(modelData.iconSvg)
+                  fillMode: Image.PreserveAspectFit
+                  smooth: true
+                }
+
+                Text {
+                  Layout.fillWidth: true
+                  text: modelData.name
+                  font.family: theme.fontFamily
+                  font.pixelSize: 11
+                  font.bold: activeTab === modelData.id
+                  color: activeTab === modelData.id ? theme.textPrimary : theme.textSecondary
+                  elide: Text.ElideRight
+                }
+              }
+
+              // Pinned Count Badge (Full view)
+              Rectangle {
+                id: badgeRect
+                visible: !window.isHalf && modelData.count > 0 && (modelData.id === "fleet" || modelData.id === "storage" || modelData.id === "accounts" || modelData.id === "shares")
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                height: 16
+                width: Math.max(16, badgeText.implicitWidth + 8)
+                radius: 8
+                color: modelData.id === "fleet" ? theme.accentSky : (modelData.id === "accounts" ? theme.accentSky : theme.homeGreen)
+
+                Text {
+                  id: badgeText
+                  anchors.centerIn: parent
+                  text: String(modelData.count)
+                  font.family: theme.fontFamily
+                  font.pixelSize: 9
+                  font.bold: true
+                  color: "#ffffff"
+                }
+              }
+
+              // Half View: Centered Icon + Dot Badge
+              Item {
+                visible: window.isHalf
+                anchors.fill: parent
+
+                Image {
+                  anchors.centerIn: parent
+                  width: 18
+                  height: 18
+                  source: Qt.resolvedUrl(modelData.iconSvg)
+                  fillMode: Image.PreserveAspectFit
+                  smooth: true
+                }
+
+                // Dot badge for rail mode
+                Rectangle {
+                  visible: modelData.count > 0 && (modelData.id === "fleet" || modelData.id === "storage" || modelData.id === "accounts" || modelData.id === "shares")
+                  anchors.top: parent.top
+                  anchors.right: parent.right
+                  anchors.topMargin: 6
+                  anchors.rightMargin: 6
+                  width: 6
+                  height: 6
+                  radius: 3
+                  color: theme.accentSky
+                }
+              }
+
+              MouseArea {
+                id: navMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: activeTab = modelData.id
+              }
+
+              ToolTip.visible: navMouse.containsMouse && window.isHalf
+              ToolTip.text: modelData.name
+              ToolTip.delay: 300
+            }
+          }
+
+          Item { Layout.fillHeight: true }
+
+          // Bottom Host Machine Card (Full view)
+          Rectangle {
+            visible: !window.isHalf
+            Layout.fillWidth: true
+            Layout.preferredHeight: 48
+            implicitHeight: 48
+            radius: (typeof theme !== "undefined" && theme.cornerRadius) ? Math.max(4, theme.cornerRadius - 2) : 6
+            color: theme.cardBgAlt
+            border.color: theme.borderSubtle
 
             RowLayout {
               anchors.fill: parent
-              anchors.leftMargin: 14
-              anchors.rightMargin: 12
-              spacing: 12
+              anchors.leftMargin: 8
+              anchors.rightMargin: 8
+              spacing: 8
 
               Image {
-                width: 18
-                height: 18
+                Layout.preferredWidth: 22
+                Layout.preferredHeight: 22
+                Layout.alignment: Qt.AlignVCenter
+                source: Qt.resolvedUrl("icons/device-desktop.svg")
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+              }
+
+              ColumnLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
+                spacing: 1
+
+                Text {
+                  text: "Local Host"
+                  font.family: theme.fontFamily
+                  font.pixelSize: 10
+                  font.bold: true
+                  color: theme.textPrimary
+                  elide: Text.ElideRight
+                  Layout.fillWidth: true
+                }
+
+                Text {
+                  text: "Omarchy Linux"
+                  font.family: theme.fontFamily
+                  font.pixelSize: 9
+                  color: theme.textMuted
+                  elide: Text.ElideRight
+                  Layout.fillWidth: true
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Right Multi-Tab Content View
+      Rectangle {
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        color: theme.background
+
+        StackLayout {
+          anchors.fill: parent
+          currentIndex: {
+            if (activeTab === "fleet") return 0;
+            if (activeTab === "workloads") return 1;
+            if (activeTab === "storage") return 2;
+            if (activeTab === "accounts") return 3;
+            if (activeTab === "shares") return 4;
+            if (activeTab === "apps") return 5;
+            if (activeTab === "backups") return 6;
+            if (activeTab === "settings") return 7;
+            return 0;
+          }
+
+          FleetTab { id: fleetView }
+          WorkloadsTab { id: workloadsView }
+          StorageTab { id: storageView }
+          CloudAccountsTab { id: cloudAccountsView }
+          NetworkSharesTab { id: networkSharesView }
+          AppSuiteTab { id: appSuiteView }
+          BackupTab { id: backupView }
+          SettingsTab { id: settingsView }
+        }
+      }
+    }
+
+    // Bottom Navigation Bar (Quarter 1/4 layout only): Gives 100% width to content!
+    Rectangle {
+      id: bottomNavBar
+      visible: window.isQuarter
+      Layout.fillWidth: true
+      Layout.preferredHeight: 44
+      color: theme.sidebarBg
+      border.color: theme.borderSubtle
+      border.width: 1
+
+      RowLayout {
+        anchors.fill: parent
+        spacing: 2
+
+        Repeater {
+          model: window.tabModel
+
+          delegate: Rectangle {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            color: activeTab === modelData.id ? Qt.rgba(theme.accent.r, theme.accent.g, theme.accent.b, 0.22) : bNavMouse.containsMouse ? Qt.rgba(theme.foreground.r, theme.foreground.g, theme.foreground.b, 0.08) : "transparent"
+
+            ColumnLayout {
+              anchors.centerIn: parent
+              spacing: 2
+
+              Image {
+                Layout.alignment: Qt.AlignHCenter
+                width: 16
+                height: 16
                 source: Qt.resolvedUrl(modelData.iconSvg)
                 fillMode: Image.PreserveAspectFit
                 smooth: true
               }
 
               Text {
-                text: modelData.name
-                font.pixelSize: 13
+                Layout.alignment: Qt.AlignHCenter
+                text: modelData.shortName
+                font.family: theme.fontFamily
+                font.pixelSize: 8
                 font.bold: activeTab === modelData.id
-                color: activeTab === modelData.id ? textPrimary : textSecondary
-              }
-
-              Item { Layout.fillWidth: true }
-
-              Rectangle {
-                visible: modelData.count > 0 && (modelData.id === "fleet" || modelData.id === "storage")
-                height: 18
-                width: badgeText.implicitWidth + 12
-                radius: 9
-                color: modelData.id === "fleet" ? "#0284c7" : homeGreen
-                Text {
-                  id: badgeText
-                  anchors.centerIn: parent
-                  text: String(modelData.count)
-                  font.pixelSize: 10
-                  font.bold: true
-                  color: "#ffffff"
-                }
+                color: activeTab === modelData.id ? theme.accentSky : theme.textMuted
               }
             }
 
+            // Top active accent bar
+            Rectangle {
+              visible: activeTab === modelData.id
+              anchors.top: parent.top
+              anchors.left: parent.left
+              anchors.right: parent.right
+              height: 2
+              color: theme.accentSky
+            }
+
             MouseArea {
-              id: navMouse
+              id: bNavMouse
               anchors.fill: parent
-              hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               onClicked: activeTab = modelData.id
             }
           }
         }
-
-        Item { Layout.fillHeight: true }
-
-        // Host Info Card at Bottom of Sidebar
-        Rectangle {
-          Layout.fillWidth: true
-          height: 64
-          radius: 8
-          color: cardBg
-          border.color: borderSubtle
-
-          ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 10
-            spacing: 2
-            RowLayout {
-              spacing: 6
-              Image {
-                width: 14
-                height: 14
-                source: Qt.resolvedUrl("icons/nas.svg")
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-              }
-              Text { text: "Local Machine"; font.pixelSize: 11; font.bold: true; color: textPrimary }
-            }
-            Text {
-              text: "Omarchy Linux (aarch64)"
-              font.pixelSize: 10
-              color: textMuted
-            }
-          }
-        }
-      }
-    }
-
-    // Right Multi-Tab Content View
-    Rectangle {
-      Layout.fillWidth: true
-      Layout.fillHeight: true
-      color: bgDark
-
-      StackLayout {
-        anchors.fill: parent
-        currentIndex: {
-          if (activeTab === "fleet") return 0;
-          if (activeTab === "workloads") return 1;
-          if (activeTab === "storage") return 2;
-          if (activeTab === "apps") return 3;
-          if (activeTab === "backups") return 4;
-          if (activeTab === "settings") return 5;
-          return 0;
-        }
-
-        FleetView { id: fleetView }
-        WorkloadsView { id: workloadsView }
-        StorageView { id: storageView }
-        AppSuiteView { id: appSuiteView }
-        BackupView { id: backupView }
-        SettingsView { id: settingsView }
       }
     }
   }
@@ -413,13 +656,11 @@ ApplicationWindow {
   // Global Add Node Modal
   AddNodeModal {
     id: addNodeModal
-    onNodeAdded: reloadAll()
   }
 
-  // Global Procure VM Modal
-  ProcureModal {
+  // Global Procure VM Wizard
+  ProcureWizard {
     id: procureModal
-    onServerProcured: reloadAll()
   }
 
   // Global Machine Task Manager Modal
@@ -427,9 +668,84 @@ ApplicationWindow {
     id: taskManagerModal
   }
 
-  // Global Add Storage Modal
-  AddStorageModal {
+  // Global Add Storage Wizard
+  AddStorageWizard {
     id: addStorageModal
-    onStorageAdded: reloadAll()
+  }
+
+  // Global Floating Notification Toast
+  Rectangle {
+    id: toastOverlay
+    visible: window.toastVisible
+    opacity: window.toastVisible ? 1.0 : 0.0
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.margins: window.isQuarter ? 8 : 16
+    z: 99999
+    width: Math.min(window.width - 24, Math.max(260, toastRow.implicitWidth + 32))
+    height: Math.max(46, toastRow.implicitHeight + 16)
+    radius: (typeof theme !== "undefined" && theme.cornerRadius) ? theme.cornerRadius : 8
+    color: window.toastIsError ? Qt.rgba(theme.dangerRed.r, theme.dangerRed.g, theme.dangerRed.b, 0.95) : Qt.rgba(theme.cardBg.r, theme.cardBg.g, theme.cardBg.b, 0.95)
+    border.color: window.toastIsError ? theme.dangerRed : theme.homeGreen
+    border.width: 1
+
+    Behavior on opacity { NumberAnimation { duration: 180 } }
+
+    RowLayout {
+      id: toastRow
+      anchors.fill: parent
+      anchors.leftMargin: 12
+      anchors.rightMargin: 12
+      spacing: 10
+
+      Rectangle {
+        Layout.preferredWidth: 24
+        Layout.preferredHeight: 24
+        radius: 5
+        color: window.toastIsError ? Qt.rgba(1, 0, 0, 0.25) : Qt.rgba(theme.homeGreen.r, theme.homeGreen.g, theme.homeGreen.b, 0.25)
+
+        Image {
+          anchors.centerIn: parent
+          width: 14
+          height: 14
+          source: Qt.resolvedUrl(window.toastIsError ? "icons/alert-triangle.svg" : "icons/shield.svg")
+          fillMode: Image.PreserveAspectFit
+          smooth: true
+        }
+      }
+
+      Text {
+        Layout.fillWidth: true
+        text: window.toastMessage
+        color: "#ffffff"
+        font.family: theme.fontFamily
+        font.pixelSize: 11
+        font.bold: true
+        wrapMode: Text.WordWrap
+      }
+
+      Rectangle {
+        Layout.preferredWidth: 18
+        Layout.preferredHeight: 18
+        radius: 9
+        color: toastCloseMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.2) : "transparent"
+
+        Text {
+          anchors.centerIn: parent
+          text: "✕"
+          color: "#ffffff"
+          font.pixelSize: 10
+          font.bold: true
+        }
+
+        MouseArea {
+          id: toastCloseMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: window.toastVisible = false
+        }
+      }
+    }
   }
 }

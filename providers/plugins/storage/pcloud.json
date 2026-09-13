@@ -1,0 +1,134 @@
+{
+  "id": "pcloud",
+  "name": "pCloud",
+  "type": "storage",
+  "category": "personal",
+  "authType": "multi",
+  "rcloneType": "pcloud",
+  "defaultRemoteName": "pcloud",
+  "defaultMount": "~/pCloud",
+  "badge": "Cloud Drive & Sync",
+  "badgeColor": "#1ebcc5",
+  "brandColor": "#1ebcc5",
+  "tagline": "Secure Swiss cloud storage with lifetime plans and native virtual drive.",
+  "dashboardUrl": "https://my.pcloud.com/",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 1 64 43\"><path fill=\"#1ebcc5\" d=\"M63.457 32.629c0-3.183-1.476-6.018-3.774-7.869a8.5 8.5 0 0 1-4.382 4.072 8.46 8.46 0 0 0 4.588-7.518c0-4.675-3.784-8.415-8.459-8.415-.355 0-.689.026-1.034.068a19.9 19.9 0 0 1 1.818 8.347c0 .193-.01.384-.017.576-.336-10.865-9.243-19.571-20.192-19.571-10.916 0-19.806 8.657-20.19 19.481-.004-.163-.019-.323-.019-.486 0-2.992.667-5.822 1.833-8.376C6.253 13.863.543 20.145.543 27.772c0 8.265 6.7 14.965 14.965 14.965h38.054v-.017c5.482-.111 9.895-4.582 9.895-10.091\"/><path fill=\"#fff\" d=\"M31.839 36.634c-7.824 0-14.167-6.343-14.167-14.167S24.015 8.3 31.839 8.3c7.825 0 14.167 6.343 14.167 14.167s-6.342 14.167-14.167 14.167m.007-30.408c-8.984 0-16.266 7.282-16.266 16.265s7.282 16.266 16.266 16.266 16.265-7.283 16.265-16.266S40.83 6.226 31.846 6.226\"/><path fill=\"#fff\" d=\"M34.338 22.349h-4.461v-3.556h4.461a1.778 1.778 0 1 1 0 3.556m-6.727-7.797a2.284 2.284 0 0 0-2.284 2.284v12.392a2.284 2.284 0 1 0 4.568 0v-2.636h4.425v-.009a6.017 6.017 0 1 0 0-12.031\"/></svg>",
+  "instructions": {
+    "navBreadcrumb": "pCloud › Setup Assistant",
+    "step1": "Choose your preferred connection method: OAuth 2.0 (US or EU), WebDAV, or Official App.",
+    "step2": "Follow the tailored instructions for your chosen method.",
+    "step3": "Your virtual drive will mount immediately at ~/pCloud."
+  },
+  "methods": [
+    {
+      "id": "oauth_us",
+      "name": "OAuth 2.0 (United States)",
+      "badge": "Recommended",
+      "badgeColor": "#10b981",
+      "authType": "oauth",
+      "rcloneType": "pcloud",
+      "defaultRemoteName": "pcloud",
+      "extraArgs": "hostname api.pcloud.com",
+      "defaultMount": "~/pCloud",
+      "actionButtonText": "Sign In via Browser ↗",
+      "description": "One-click authorization via browser for accounts on the US / Global data center.",
+      "dashboardUrl": "https://my.pcloud.com/",
+      "instructions": {
+        "navBreadcrumb": "pCloud US › OAuth Authorization",
+        "step1": "Click 'Sign In via Browser' to launch the secure pCloud authorization window.",
+        "step2": "Sign in with your pCloud account and click 'Allow' to grant Ocloud access.",
+        "step3": "Your drive mounts natively to ~/pCloud with real-time change notifications."
+      }
+    },
+    {
+      "id": "oauth_eu",
+      "name": "OAuth 2.0 (European Union)",
+      "badge": "EU Region",
+      "badgeColor": "#3b82f6",
+      "authType": "oauth",
+      "rcloneType": "pcloud",
+      "defaultRemoteName": "pcloud-eu",
+      "extraArgs": "hostname eapi.pcloud.com",
+      "defaultMount": "~/pCloud",
+      "actionButtonText": "Sign In via Browser ↗",
+      "description": "One-click authorization for accounts registered in the European Union data center.",
+      "dashboardUrl": "https://my.pcloud.com/",
+      "instructions": {
+        "navBreadcrumb": "pCloud EU › OAuth Authorization",
+        "step1": "Click 'Sign In via Browser' to launch authorization for the EU gateway (eapi.pcloud.com).",
+        "step2": "Sign in with your EU pCloud account and approve access.",
+        "step3": "Your drive mounts natively to ~/pCloud connected to the European data center."
+      }
+    },
+    {
+      "id": "webdav",
+      "name": "WebDAV Gateway",
+      "badge": "Direct Credentials",
+      "badgeColor": "#8b5cf6",
+      "authType": "webdav",
+      "rcloneType": "webdav",
+      "defaultRemoteName": "pcloud-webdav",
+      "defaultMount": "~/pCloud",
+      "actionButtonText": "Enter Credentials →",
+      "description": "Mount directly using your pCloud email and password over encrypted WebDAV (US or EU).",
+      "dashboardUrl": "https://my.pcloud.com/",
+      "instructions": {
+        "navBreadcrumb": "pCloud › WebDAV Credentials",
+        "step1": "Select your regional WebDAV gateway (webdav.pcloud.com or ewebdav.pcloud.com).",
+        "step2": "Enter your pCloud account email and password.",
+        "step3": "Mount ~/pCloud directly via secure WebDAV."
+      },
+      "fields": [
+        {
+          "key": "endpoint",
+          "label": "WebDAV Gateway Server",
+          "placeholder": "https://webdav.pcloud.com",
+          "default": "https://webdav.pcloud.com",
+          "type": "text",
+          "helper": "Use https://webdav.pcloud.com (US) or https://ewebdav.pcloud.com (EU)"
+        },
+        {
+          "key": "username",
+          "label": "pCloud Account Email",
+          "placeholder": "user@example.com",
+          "type": "text",
+          "helper": "The email address associated with your pCloud account"
+        },
+        {
+          "key": "password",
+          "label": "Account Password",
+          "placeholder": "••••••••••••",
+          "type": "password",
+          "helper": "Your pCloud account password"
+        }
+      ]
+    },
+    {
+      "id": "linux_app",
+      "name": "Official pCloud Linux App",
+      "badge": "Desktop Client",
+      "badgeColor": "#06b6d4",
+      "authType": "app",
+      "actionButtonText": "Download Linux Client ↗",
+      "description": "Official pCloud Drive desktop client with local sync and Crypto folder support.",
+      "dashboardUrl": "https://www.pcloud.com/how-to-install-pcloud-drive-linux.html",
+      "instructions": {
+        "navBreadcrumb": "pCloud › Official Linux Client",
+        "step1": "Download the official pCloud Drive Linux AppImage or install pcloudcc from the AUR.",
+        "step2": "Make the AppImage executable: chmod +x pcloud.AppImage && ./pcloud.AppImage",
+        "step3": "Log in with your pCloud credentials for native virtual drive and system tray sync."
+      }
+    }
+  ],
+  "allowedDomains": [
+    "*.pcloud.com",
+    "api.pcloud.com",
+    "eapi.pcloud.com",
+    "webdav.pcloud.com",
+    "ewebdav.pcloud.com"
+  ],
+  "permissions": {
+    "network": true,
+    "rclone": true
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "id": "hetzner",
+  "name": "Hetzner Cloud",
+  "type": "compute",
+  "driver": "driver.js",
+  "badge": "Integrated API",
+  "badgeColor": "#d50c2d",
+  "brandColor": "#d50c2d",
+  "tagline": "Ultra-fast European, US & Singapore cloud infrastructure with hourly billing.",
+  "description": "Direct API provisioning with live server telemetry, instant NVMe storage, and low hourly rates.",
+  "pricingFrom": "€0.005 / hr",
+  "dashboardUrl": "https://console.hetzner.cloud",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 48 48\"><rect width=\"48\" height=\"48\" fill=\"#d50c2d\" rx=\"10\"/><path fill=\"#fff\" d=\"M15 13h5.5v9h7v-9H33v22h-5.5v-8h-7v8H15z\"/></svg>",
+  "auth": {
+    "type": "token",
+    "title": "Hetzner Cloud API Token",
+    "subtitle": "Connect your Hetzner Cloud project using a personal API token",
+    "guideUrl": "https://console.hetzner.cloud/projects",
+    "guideButtonText": "Open Console ↗",
+    "guideSteps": [
+      "Open Hetzner Cloud Console > Choose your Project",
+      "Navigate to Security > API Tokens > Generate API Token with Read & Write permissions",
+      "Paste the token into the field below and click 'Verify & Connect Account'"
+    ],
+    "fields": [
+      {
+        "key": "api_token",
+        "label": "Hetzner Cloud API Token",
+        "placeholder": "Enter your Hetzner Cloud API token",
+        "type": "password",
+        "required": true
+      }
+    ]
+  },
+  "allowedDomains": [
+    "api.hetzner.cloud",
+    "tailscale.com",
+    "github.com"
+  ],
+  "permissions": {
+    "network": true,
+    "ssh": true,
+    "system_shell": false
+  }
+}

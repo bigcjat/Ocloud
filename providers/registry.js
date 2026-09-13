@@ -1,229 +1,320 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { CloudProvider, StorageProvider } = require('./base');
+const { PluginAuditor } = require('../security/plugin_auditor');
 
 /**
- * Provider Registry for Ocloud.
- * Discovers and manages both Cloud Compute providers (VMs/servers) and Storage providers (Object/File stores).
- * Allows community plugins to be dropped into ~/.config/omarchy/ocloud/providers/ or providers/plugins/.
+ * Universal Plugin Registry for Ocloud.
+ * Dynamically discovers, audits, loads, and manages Compute and Storage plugins.
+ * 
+ * Zero-Trust Guarantees:
+ * - Automatically audits all manifests and drivers before instantiation.
+ * - Quarantines any plugin containing malicious code, unauthorized shell execution, or undeclared domains.
+ * - Delivers strictly isolated scoped credentials to drivers (never exposes the full Vault).
+ * - Sanitizes all embedded SVG logos against XXE, scripts, and XML bombs.
  */
-class ProviderRegistry {
+class PluginRegistry {
   constructor() {
-    this.cloudProviders = new Map();
-    this.storageProviders = new Map();
+    this.computePlugins = new Map();
+    this.storagePlugins = new Map();
+    this.quarantinedPlugins = new Map();
     this._initialized = false;
-  }
-
-  registerCloudProvider(id, providerClass) {
-    this.cloudProviders.set(id, providerClass);
-  }
-
-  registerStorageProvider(id, providerClass) {
-    this.storageProviders.set(id, providerClass);
+    this.vault = null;
   }
 
   init(vault) {
     if (this._initialized) return;
+    this.vault = vault;
+    this.computePlugins.clear();
+    this.storagePlugins.clear();
+    this.quarantinedPlugins.clear();
 
-    // 1. Built-in Compute Providers
-    const { HetznerCloudProvider } = require('./hetzner');
-    const { CustomComputeProvider } = require('./custom');
+    // 1. Built-in plugins directory
+    const builtinDir = path.join(__dirname, 'plugins');
+    this._loadFromDirectory(builtinDir);
 
-    this.registerCloudProvider('hetzner', HetznerCloudProvider);
-    this.registerCloudProvider('custom', CustomComputeProvider);
-
-    // 2. Built-in Storage Providers
-    const { HetznerStorageProvider } = require('./hetzner');
-    const { CustomStorageProvider } = require('./custom');
-
-    this.registerStorageProvider('hetzner_box', HetznerStorageProvider);
-    this.registerStorageProvider('custom', CustomStorageProvider);
-
-    // 3. Load Internal & External Plugins
-    this._loadPluginsFromDir(path.join(__dirname, 'plugins'), vault);
-    this._loadPluginsFromDir(path.join(os.homedir(), '.config', 'omarchy', 'ocloud', 'providers'), vault);
+    // 2. User / Community plugins directory (~/.config/ocloud/plugins/)
+    const userDir = path.join(os.homedir(), '.config', 'ocloud', 'plugins');
+    this._loadFromDirectory(userDir);
 
     this._initialized = true;
   }
 
-  _loadPluginsFromDir(dirPath, vault) {
+  _loadFromDirectory(dirPath) {
     if (!fs.existsSync(dirPath)) return;
+
+    let entries = [];
     try {
-      const files = fs.readdirSync(dirPath).filter((f) => f.endsWith('.js'));
-      for (const file of files) {
+      entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    } catch (e) {
+      console.warn(`[PluginRegistry] Cannot read ${dirPath}: ${e.message}`);
+      return;
+    }
+
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue;
+      const fullPath = path.join(dirPath, entry.name);
+      try {
+        if (entry.isFile() && entry.name.endsWith('.json')) {
+          // Pure declarative JSON plugin
+          this._loadJsonPlugin(fullPath);
+        } else if (entry.isDirectory()) {
+          // Check if this directory is an individual plugin (contains plugin.json)
+          if (fs.existsSync(path.join(fullPath, 'plugin.json'))) {
+            this._loadDirPlugin(fullPath);
+          } else {
+            // Category subfolder (e.g. compute/, storage/) -> recurse
+            this._loadFromDirectory(fullPath);
+          }
+        }
+      } catch (err) {
+        console.warn(`[PluginRegistry] Failed to load plugin ${entry.name}: ${err.message}`);
+      }
+    }
+  }
+
+  _loadJsonPlugin(filePath) {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const manifest = JSON.parse(raw);
+    if (!manifest.id || !manifest.name) return;
+
+    // Security Audit
+    const auditReport = PluginAuditor.auditJsonPluginFile(filePath);
+    manifest.securityStatus = auditReport.status;
+    manifest.securityViolations = auditReport.violations;
+    manifest.securityWarnings = auditReport.warnings;
+
+    if (auditReport.status === 'BLOCKED') {
+      console.warn(`[PluginRegistry] QUARANTINED: Storage plugin "${manifest.id}" blocked by security audit: ${auditReport.violations.join('; ')}`);
+      this.quarantinedPlugins.set(manifest.id, { manifest, report: auditReport });
+      return;
+    }
+
+    this._normalizeManifest(manifest, path.dirname(filePath));
+
+    if (manifest.type === 'compute') {
+      this.computePlugins.set(manifest.id, { manifest, driver: null });
+    } else {
+      this.storagePlugins.set(manifest.id, { manifest, driver: null });
+    }
+  }
+
+  _loadDirPlugin(dirPath) {
+    const manifestPath = path.join(dirPath, 'plugin.json');
+    if (!fs.existsSync(manifestPath)) return;
+
+    const raw = fs.readFileSync(manifestPath, 'utf8');
+    const manifest = JSON.parse(raw);
+    if (!manifest.id || !manifest.name) return;
+
+    // Security Audit
+    const auditReport = PluginAuditor.auditPluginDir(dirPath);
+    manifest.securityStatus = auditReport.status;
+    manifest.securityViolations = auditReport.violations;
+    manifest.securityWarnings = auditReport.warnings;
+    manifest.extractedDomains = auditReport.extractedDomains;
+
+    if (auditReport.status === 'BLOCKED') {
+      console.warn(`\x1b[31m[PluginRegistry] SECURITY BLOCKED: Plugin "${manifest.id}" failed audit and was quarantined:\x1b[0m`);
+      for (const v of auditReport.violations) {
+        console.warn(`  - ${v}`);
+      }
+      this.quarantinedPlugins.set(manifest.id, { manifest, report: auditReport });
+      return;
+    }
+
+    this._normalizeManifest(manifest, dirPath);
+
+    let driverInstance = null;
+    if (manifest.driver) {
+      const driverPath = path.join(dirPath, manifest.driver);
+      if (fs.existsSync(driverPath)) {
         try {
-          const pluginModule = require(path.join(dirPath, file));
-          if (pluginModule.CloudProviderClass && pluginModule.id) {
-            this.registerCloudProvider(pluginModule.id, pluginModule.CloudProviderClass);
-          }
-          if (pluginModule.StorageProviderClass && pluginModule.id) {
-            this.registerStorageProvider(pluginModule.id, pluginModule.StorageProviderClass);
-          }
-        } catch (err) {
-          console.warn(`[Ocloud Plugin] Failed to load ${file}: ${err.message}`);
+          const DriverClass = require(driverPath);
+
+          // Build isolated capability context (Never pass raw Vault)
+          const scopedCreds = this.vault && typeof this.vault.getScopedCredentials === 'function'
+            ? this.vault.getScopedCredentials(manifest.id)
+            : {};
+          
+          const scopedContext = {
+            credentials: scopedCreds,
+            saveCredentials: (updated) => {
+              if (this.vault && typeof this.vault.setScopedCredentials === 'function') {
+                this.vault.setScopedCredentials(manifest.id, updated);
+              }
+            }
+          };
+
+          driverInstance = new DriverClass(manifest, scopedContext);
+        } catch (driverErr) {
+          console.warn(`[PluginRegistry] Failed to instantiate driver for ${manifest.id}: ${driverErr.message}`);
         }
       }
-    } catch (e) {}
+    }
+
+    if (manifest.type === 'compute') {
+      this.computePlugins.set(manifest.id, { manifest, driver: driverInstance });
+    } else {
+      this.storagePlugins.set(manifest.id, { manifest, driver: driverInstance });
+    }
   }
 
-  getCloudCatalog() {
-    return [
-      {
-        id: 'hetzner',
-        name: 'Hetzner Cloud',
-        type: 'api',
-        logoSvg: 'icons/hetzner.svg',
-        description: 'Cost-effective high-performance European & US cloud compute',
-        authFields: [{ key: 'api_token', label: 'Hetzner API Token', type: 'password' }],
-        serverTypes: ['cx23', 'cx33', 'cpx31', 'cpx41', 'cax11'],
-        locations: ['nbg1', 'fsn1', 'hel1', 'ash', 'hil']
-      },
-      {
-        id: 'aws',
-        name: 'Amazon Web Services (Lightsail / EC2)',
-        type: 'api',
-        logoSvg: 'icons/aws.svg',
-        description: 'Industry standard compute with global availability',
-        authFields: [
-          { key: 'aws_access_key', label: 'Access Key ID', type: 'text' },
-          { key: 'aws_secret_key', label: 'Secret Access Key', type: 'password' },
-          { key: 'aws_region', label: 'Default Region (e.g. us-east-1)', type: 'text' }
-        ],
-        serverTypes: ['lightsail_micro', 'lightsail_small', 't4g.micro', 't3.small'],
-        locations: ['us-east-1', 'us-west-2', 'eu-central-1', 'ap-southeast-1']
-      },
-      {
-        id: 'oracle',
-        name: 'Oracle Cloud Infrastructure (OCI)',
-        type: 'api',
-        logoSvg: 'icons/oracle.svg',
-        description: 'Generous Always-Free tier (up to 4 ARM cores, 24GB RAM)',
-        authFields: [
-          { key: 'oci_tenancy', label: 'Tenancy OCID', type: 'text' },
-          { key: 'oci_user', label: 'User OCID', type: 'text' },
-          { key: 'oci_fingerprint', label: 'Key Fingerprint', type: 'text' }
-        ],
-        serverTypes: ['VM.Standard.A1.Flex', 'VM.Standard.E2.1.Micro'],
-        locations: ['eu-frankfurt-1', 'us-ashburn-1', 'us-phoenix-1']
-      },
-      {
-        id: 'digitalocean',
-        name: 'DigitalOcean',
-        type: 'api',
-        logoSvg: 'icons/digitalocean.svg',
-        description: 'Developer cloud with turnkey Droplets and predictable pricing',
-        authFields: [{ key: 'do_api_token', label: 'Personal Access Token', type: 'password' }],
-        serverTypes: ['s-1vcpu-1gb', 's-1vcpu-2gb', 's-2vcpu-4gb'],
-        locations: ['nyc1', 'sfo3', 'fra1', 'lon1']
-      },
-      {
-        id: 'vultr',
-        name: 'Vultr',
-        type: 'api',
-        logoSvg: 'icons/vultr.svg',
-        description: 'Worldwide cloud compute and bare-metal nodes across 32 datacenters',
-        authFields: [{ key: 'vultr_api_key', label: 'Vultr API Key', type: 'password' }],
-        serverTypes: ['vc2-1c-1gb', 'vc2-1c-2gb', 'vc2-2c-4gb'],
-        locations: ['ewr', 'ord', 'fra', 'nrt']
-      },
-      {
-        id: 'custom',
-        name: 'Bare-Metal / Custom SSH Server',
-        type: 'manual',
-        logoSvg: 'icons/server.svg',
-        description: 'Connect any existing Linux box, home lab, or unmanaged VPS via SSH',
-        authFields: [
-          { key: 'host', label: 'Hostname / IP Address', type: 'text' },
-          { key: 'port', label: 'SSH Port', type: 'number', default: '22' },
-          { key: 'user', label: 'SSH Username', type: 'text', default: 'root' },
-          { key: 'key_path', label: 'Private Key Path', type: 'text', default: '~/.ssh/id_ed25519' }
-        ]
+  _normalizeManifest(manifest, baseDir) {
+    // Sanitize and generate base64 data URI for SVG icon if provided
+    if (manifest.iconSvg) {
+      const { safeSvg } = PluginAuditor.sanitizeSvg(manifest.iconSvg);
+      if (safeSvg) {
+        manifest.iconSvg = safeSvg;
+        manifest.iconDataUri = `data:image/svg+xml;base64,${Buffer.from(safeSvg).toString('base64')}`;
       }
-    ];
+    }
+    manifest.baseDir = baseDir;
+
+    // Normalize instructions & field labels for seamless QML usage
+    if (manifest.instructions) {
+      manifest.step1Desc = manifest.instructions.step1 || '';
+      manifest.step2Desc = manifest.instructions.step2 || '';
+      manifest.step3Desc = manifest.instructions.step3 || '';
+      manifest.navBreadcrumb = manifest.instructions.navBreadcrumb || '';
+    }
+    if (Array.isArray(manifest.fields)) {
+      for (const f of manifest.fields) {
+        if (f.key === 'endpoint') {
+          manifest.endpointLabel = f.label;
+          manifest.endpointPlaceholder = f.placeholder;
+          manifest.endpointHelper = f.helper;
+        } else if (f.key === 'bucket') {
+          manifest.bucketLabel = f.label;
+          manifest.bucketPlaceholder = f.placeholder;
+          manifest.bucketHelper = f.helper;
+        } else if (f.key === 'access_key' || f.key === 'key' || f.key === 'username') {
+          manifest.keyLabel = f.label;
+          manifest.keyPlaceholder = f.placeholder;
+          manifest.keyHelper = f.helper;
+        } else if (f.key === 'secret_key' || f.key === 'secret' || f.key === 'password') {
+          manifest.secretLabel = f.label;
+          manifest.secretPlaceholder = f.placeholder;
+          manifest.secretHelper = f.helper;
+        }
+      }
+    }
+    if (!manifest.defaultName) {
+      manifest.defaultName = manifest.name;
+    }
   }
 
-  getStorageCatalog() {
-    return [
-      {
-        id: 'hetzner_box',
-        name: 'Hetzner Storage Box',
-        protocol: 'webdav/sftp',
-        logoSvg: 'icons/hetzner.svg',
-        description: 'High-capacity RAID storage with WebDAV, SFTP, and snapshot capabilities',
-        defaultMount: '~/Cloud',
-        fields: [
-          { key: 'username', label: 'Storage Box Username (e.g. u123456)', type: 'text' },
-          { key: 'host', label: 'Host (e.g. u123456.your-storagebox.de)', type: 'text' },
-          { key: 'password', label: 'Storage Box Password', type: 'password' }
-        ]
-      },
-      {
-        id: 's3_generic',
-        name: 'S3 / Cloudflare R2 / Backblaze B2 / Wasabi',
-        protocol: 's3',
-        logoSvg: 'icons/cloudflare.svg',
-        description: 'Universal S3-compatible object storage mount with zero/low egress',
-        defaultMount: '~/S3-Storage',
-        fields: [
-          { key: 'endpoint', label: 'S3 Endpoint URL (leave blank for AWS S3)', type: 'text' },
-          { key: 'bucket', label: 'Bucket Name', type: 'text' },
-          { key: 'access_key', label: 'Access Key ID', type: 'text' },
-          { key: 'secret_key', label: 'Secret Access Key', type: 'password' }
-        ]
-      },
-      {
-        id: 'webdav_generic',
-        name: 'Nextcloud / ownCloud / WebDAV',
-        protocol: 'webdav',
-        logoSvg: 'icons/hard-drive.svg',
-        description: 'Mount any self-hosted Nextcloud, ownCloud, or standard WebDAV share',
-        defaultMount: '~/Nextcloud',
-        fields: [
-          { key: 'url', label: 'WebDAV Server URL (e.g. https://cloud.example.com/remote.php/dav/files/user/)', type: 'text' },
-          { key: 'user', label: 'Username', type: 'text' },
-          { key: 'password', label: 'Password / App Password', type: 'password' }
-        ]
-      },
-      {
-        id: 'google_drive',
-        name: 'Google Drive',
-        protocol: 'rest_api',
-        logoSvg: 'icons/gcp.svg',
-        description: 'Mount Google Drive personal or workspace storage',
-        defaultMount: '~/Google-Drive',
-        fields: [
-          { key: 'client_id', label: 'OAuth Client ID (optional)', type: 'text' },
-          { key: 'client_secret', label: 'OAuth Client Secret (optional)', type: 'password' }
-        ]
-      },
-      {
-        id: 'dropbox',
-        name: 'Dropbox',
-        protocol: 'rest_api',
-        logoSvg: 'icons/hard-drive.svg',
-        description: 'Mount Dropbox cloud files with automated syncing',
-        defaultMount: '~/Dropbox-Cloud',
-        fields: [
-          { key: 'access_token', label: 'Dropbox API Access Token', type: 'password' }
-        ]
-      },
-      {
-        id: 'home_nas',
-        name: 'Home NAS (SMB / NFS / Local)',
-        protocol: 'smb_nfs',
-        logoSvg: 'icons/nas.svg',
-        description: 'Local network attached storage (Synology, TrueNAS, Unraid, Raspberry Pi)',
-        defaultMount: '~/Home-NAS',
-        fields: [
-          { key: 'host', label: 'NAS IP Address or Hostname', type: 'text' },
-          { key: 'share', label: 'Share Name / Path (e.g. /volume1/data)', type: 'text' },
-          { key: 'user', label: 'Username', type: 'text' },
-          { key: 'password', label: 'Password', type: 'password' }
-        ]
+  // ------------------------------------------------------------- Security Audit APIs
+  auditPlugin(pluginId) {
+    const compute = this.computePlugins.get(pluginId);
+    if (compute) {
+      return compute.manifest.baseDir 
+        ? PluginAuditor.auditPluginDir(compute.manifest.baseDir)
+        : { status: 'PASSED', violations: [], warnings: [] };
+    }
+    const storage = this.storagePlugins.get(pluginId);
+    if (storage) {
+      if (storage.manifest.driver) {
+        return PluginAuditor.auditPluginDir(storage.manifest.baseDir);
       }
-    ];
+      const res = PluginAuditor.auditManifest(storage.manifest);
+      return { id: pluginId, ...res };
+    }
+    const quarantined = this.quarantinedPlugins.get(pluginId);
+    if (quarantined) {
+      return quarantined.report;
+    }
+    return null;
+  }
+
+  auditAll() {
+    const reports = [];
+    const builtinDir = path.join(__dirname, 'plugins');
+    const userDir = path.join(os.homedir(), '.config', 'ocloud', 'plugins');
+
+    const scanDir = (dir) => {
+      if (!fs.existsSync(dir)) return;
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const e of entries) {
+        if (e.name.startsWith('.')) continue;
+        const full = path.join(dir, e.name);
+        if (e.isFile() && e.name.endsWith('.json')) {
+          reports.push(PluginAuditor.auditJsonPluginFile(full));
+        } else if (e.isDirectory()) {
+          if (fs.existsSync(path.join(full, 'plugin.json'))) {
+            reports.push(PluginAuditor.auditPluginDir(full));
+          } else {
+            scanDir(full);
+          }
+        }
+      }
+    };
+
+    scanDir(builtinDir);
+    scanDir(userDir);
+    return reports;
+  }
+
+  // ------------------------------------------------------------- Compute APIs
+  listComputePlugins() {
+    const list = [];
+    for (const [id, item] of this.computePlugins.entries()) {
+      const isConfigured = item.driver && typeof item.driver.isConfigured === 'function'
+        ? item.driver.isConfigured()
+        : true;
+      list.push({
+        ...item.manifest,
+        isConfigured
+      });
+    }
+    return list;
+  }
+
+  getComputePlugin(id) {
+    return this.computePlugins.get(id) || null;
+  }
+
+  async getCatalog(providerId, forceRefresh = false) {
+    const plugin = this.getComputePlugin(providerId);
+    if (!plugin || !plugin.driver) {
+      throw new Error(`Compute provider '${providerId}' has no active driver or catalog.`);
+    }
+    if (typeof plugin.driver.getCatalog === 'function') {
+      return await plugin.driver.getCatalog(forceRefresh);
+    }
+    if (typeof plugin.driver.fetchCatalog === 'function') {
+      return await plugin.driver.fetchCatalog({ forceRefresh });
+    }
+    throw new Error(`Provider '${providerId}' does not support catalog querying.`);
+  }
+
+  async listAllServers() {
+    const allServers = [];
+    for (const [id, item] of this.computePlugins.entries()) {
+      if (item.driver && typeof item.driver.listServers === 'function') {
+        try {
+          const srvs = await item.driver.listServers();
+          allServers.push(...(srvs || []));
+        } catch (e) {
+          console.warn(`[PluginRegistry] listServers failed for ${id}: ${e.message}`);
+        }
+      }
+    }
+    return allServers;
+  }
+
+  // ------------------------------------------------------------- Storage APIs
+  listStoragePlugins() {
+    const list = [];
+    for (const [id, item] of this.storagePlugins.entries()) {
+      list.push(item.manifest);
+    }
+    return list;
+  }
+
+  getStoragePlugin(id) {
+    return this.storagePlugins.get(id) || null;
   }
 }
 
-module.exports = new ProviderRegistry();
+module.exports = new PluginRegistry();

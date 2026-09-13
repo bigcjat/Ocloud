@@ -1,0 +1,29 @@
+{
+  "id": "dropbox",
+  "name": "Dropbox",
+  "type": "storage",
+  "category": "personal",
+  "authType": "oauth",
+  "rcloneType": "dropbox",
+  "defaultRemoteName": "dropbox",
+  "defaultMount": "~/Dropbox",
+  "badge": "OAuth 2.0",
+  "badgeColor": "#0061ff",
+  "brandColor": "#0061ff",
+  "tagline": "Direct native mount for personal and team Dropbox folders.",
+  "dashboardUrl": "https://www.dropbox.com",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"#0061fe\" d=\"M6 2 0 5.9l6 3.9 6-3.9zm12 0-6 3.9 6 3.9 6-3.9zM0 13.8l6 3.9 6-3.9-6-3.9zm18-3.9-6 3.9 6 3.9 6-3.9zm-6 4.9-6 3.9 6 3.9 6-3.9z\"/></svg>",
+  "instructions": {
+    "step1": "Click 'Sign In' to open Dropbox authentication in your browser.",
+    "step2": "Allow Ocloud to access your files and folders.",
+    "step3": "Your files will instantly sync to your native Linux file manager at ~/Dropbox."
+  },
+  "allowedDomains": [
+    "*.dropbox.com",
+    "*.dropboxapi.com"
+  ],
+  "permissions": {
+    "network": true,
+    "rclone": true
+  }
+}

@@ -1,5 +1,26 @@
+# Python / System artifacts
 __pycache__/
 *.pyc
 .DS_Store
-config.json
 *.log
+
+# Local configs and sensitive runtime data
+config.json
+*.enc
+*.vault
+*vault*.json
+
+# Credentials, tokens, keys
+*.pem
+*.key
+*.pkcs12
+*.p12
+*.pfx
+*.id_rsa
+*.id_ed25519
+*.session
+.env*
+*.env
+
+# Dependencies
+node_modules/

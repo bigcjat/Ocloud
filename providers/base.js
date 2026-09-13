@@ -1,13 +1,20 @@
 /**
  * Base interfaces for Pluggable Cloud and Storage Providers in Ocloud.
- * Allows easy extension to Hetzner, Custom SSH / Home Workstations, Vultr, AWS, etc.
+ * Every provider is either:
+ * 1. A pure declarative JSON manifest (for standard storage protocols), or
+ * 2. A manifest + JS driver (for compute clouds or custom APIs).
  */
 
-class CloudProvider {
-  constructor(id, name, config = {}) {
-    this.id = id;
-    this.name = name;
-    this.config = config;
+class BaseComputeDriver {
+  constructor(manifest, vault) {
+    this.manifest = manifest;
+    this.vault = vault;
+    this.id = manifest.id;
+    this.name = manifest.name;
+  }
+
+  async fetchCatalog(options = {}) {
+    throw new Error(`fetchCatalog() not implemented in ${this.constructor.name}`);
   }
 
   async listServers() {
@@ -39,18 +46,19 @@ class CloudProvider {
   }
 }
 
-class StorageProvider {
-  constructor(id, name, config = {}) {
-    this.id = id;
-    this.name = name;
-    this.config = config;
+class BaseStorageDriver {
+  constructor(manifest, vault) {
+    this.manifest = manifest;
+    this.vault = vault;
+    this.id = manifest.id;
+    this.name = manifest.name;
   }
 
-  async getStats() {
+  async getStats(options = {}) {
     throw new Error(`getStats() not implemented in ${this.constructor.name}`);
   }
 
-  async mount(mountPoint) {
+  async mount(mountPoint, openFileManager = false) {
     throw new Error(`mount() not implemented in ${this.constructor.name}`);
   }
 
@@ -59,4 +67,4 @@ class StorageProvider {
   }
 }
 
-module.exports = { CloudProvider, StorageProvider };
+module.exports = { BaseComputeDriver, BaseStorageDriver };
