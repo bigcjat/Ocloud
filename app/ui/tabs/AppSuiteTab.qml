@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "../components"
+import "../modals"
 
 Item {
   id: root
@@ -17,6 +18,18 @@ Item {
     ocloud.fetchAppShortcuts(function(list) {
       if (list && list.length > 0) {
         root.appList = list;
+      }
+    });
+  }
+
+  function requestLaunch(cmd, name) {
+    if (!root.selectedServerId) return;
+    ocloud.probeApp(root.selectedServerId, cmd, function(res, ok) {
+      if (res && res.installed) {
+        ocloud.launchApp(root.selectedServerId, cmd);
+      } else {
+        var srvName = (res && res.serverName) ? res.serverName : targetCombo.currentText;
+        installModal.openForApp(name || cmd, cmd, srvName, root.selectedServerId);
       }
     });
   }
@@ -151,7 +164,7 @@ Item {
                 text: "Launch " + (modelData.name || modelData.cmd)
                 variant: modelData.featured ? "primary" : "secondary"
                 iconSource: "icons/terminal.svg"
-                onClicked: ocloud.launchApp(root.selectedServerId, modelData.cmd)
+                onClicked: root.requestLaunch(modelData.cmd, modelData.name)
               }
             }
           }
@@ -210,9 +223,11 @@ Item {
               text: "Stream App"
               iconSource: "icons/terminal.svg"
               variant: "primary"
+              enabled: customCmdField.text.trim().length > 0
               onClicked: {
-                if (customCmdField.text.trim()) {
-                  ocloud.launchApp(root.selectedServerId, customCmdField.text.trim());
+                var cmd = customCmdField.text.trim();
+                if (cmd) {
+                  root.requestLaunch(cmd, cmd);
                   customCmdField.text = "";
                 }
               }
@@ -220,6 +235,24 @@ Item {
           }
         }
       }
+    }
+  }
+
+  // Confirmation Modal for Missing Packages
+  InstallAppModal {
+    id: installModal
+    onInstallConfirmed: function(srvId, command, appName) {
+      installModal.isInstalling = true;
+      installModal.statusMessage = "Installing " + appName + " on " + installModal.targetServerName + "...";
+      ocloud.installApp(srvId, command, function(ok, out) {
+        installModal.isInstalling = false;
+        if (ok) {
+          installModal.visible = false;
+          ocloud.launchApp(srvId, command);
+        } else {
+          installModal.statusMessage = "Installation failed: " + (out || "Unknown error");
+        }
+      });
     }
   }
 }

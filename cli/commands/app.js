@@ -61,8 +61,145 @@ const BUILTIN_APPS = [
   { id: 'mpv', name: 'MPV Player', cmd: 'mpv', tag: 'MEDIA', desc: 'High performance media player with hardware acceleration over Waypipe.', featured: false }
 ];
 
+async function resolveServer(targetServer, registry) {
+  let server = null;
+  let allServers = [];
+  if (registry) {
+    try {
+      allServers = await registry.listAllServers();
+    } catch (e) {}
+  }
+
+  if (targetServer) {
+    server = allServers.find(s => 
+      String(s.id) === String(targetServer) || 
+      s.name.toLowerCase() === targetServer.toLowerCase() ||
+      s.ipv4 === targetServer ||
+      s.tailscale_ip === targetServer
+    );
+  }
+
+  if (!server && allServers.length > 0) {
+    server = allServers.find(s => s.status === 'running') || allServers[0];
+  }
+
+  if (!server) {
+    server = {
+      name: targetServer || 'Remote Node',
+      ipv4: targetServer || '127.0.0.1',
+      tailscale_ip: null,
+      user: 'root',
+      port: 22
+    };
+  }
+
+  const host = server.tailscale_ip || server.ipv4 || server.ip;
+  const user = server.user || (server.isHomeWorkstation ? (process.env.USER || 'bigcjat') : 'root');
+  const port = server.port || 22;
+
+  const keyCandidates = [
+    server.keyPath,
+    path.join(os.homedir(), '.ssh', 'id_ed25519'),
+    path.join(os.homedir(), '.ssh', 'id_rsa')
+  ].filter(Boolean);
+  const keyPath = keyCandidates.find(p => fs.existsSync(p)) || path.join(os.homedir(), '.ssh', 'id_ed25519');
+
+  return { server, host, user, port, keyPath };
+}
+
+function getInstallScriptForApp(rawCmd) {
+  const binary = rawCmd.trim().split(' ')[0].split('/').pop();
+
+  if (binary === 'arcade') {
+    return `
+      if [ -f "/root/.local/bin/arcade" ]; then
+        echo "arcade already installed";
+      else
+        curl -sSL https://raw.githubusercontent.com/bigcjat/omarchyarcade/main/install.sh | bash
+      fi
+    `.replace(/\n\s+/g, ' ').trim();
+  }
+
+  let debianPkg = binary;
+  if (binary === 'firefox') debianPkg = 'firefox-esr firefox';
+
+  return `
+    if command -v apt-get >/dev/null 2>&1; then
+      export DEBIAN_FRONTEND=noninteractive && apt-get update -qq && apt-get install -y -qq ${debianPkg} waypipe
+    elif command -v pacman >/dev/null 2>&1; then
+      pacman -Sy --noconfirm ${binary} waypipe
+    elif command -v dnf >/dev/null 2>&1; then
+      dnf install -y -q ${binary} waypipe
+    elif command -v apk >/dev/null 2>&1; then
+      apk add --no-cache ${binary} waypipe
+    elif command -v zypper >/dev/null 2>&1; then
+      zypper --non-interactive install ${binary} waypipe
+    fi
+  `.replace(/\n\s+/g, ' ').trim();
+}
+
 async function cmdApp(subcmd, rest, context = {}) {
   const { registry } = context;
+
+  if (subcmd === 'probe' || subcmd === 'check') {
+    const targetServer = rest[0];
+    const cmd = rest[1];
+    if (!cmd) {
+      console.error('Usage: ocloud app probe <server_id_or_name> <command>');
+      process.exit(1);
+    }
+    const { server, host, user, port, keyPath } = await resolveServer(targetServer, registry);
+    const binary = cmd.trim().split(' ')[0].split('/').pop();
+
+    const probeCmd = `PATH=/root/.local/bin:/home/${user}/.local/bin:/usr/local/bin:/usr/bin:$PATH command -v ${binary} || echo "NOT_FOUND"`;
+    try {
+      const out = execSync(
+        `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=4 -o StrictHostKeyChecking=no ${user}@${host} "${probeCmd}"`,
+        { timeout: 6000, encoding: 'utf8' }
+      ).trim();
+      const installed = out.length > 0 && !out.includes('NOT_FOUND');
+      console.log(JSON.stringify({
+        installed,
+        serverName: server.name,
+        serverId: server.id,
+        cmd: binary,
+        binPath: installed ? out : null
+      }));
+      return;
+    } catch (e) {
+      console.log(JSON.stringify({
+        installed: false,
+        serverName: server.name,
+        serverId: server.id,
+        cmd: binary,
+        error: e.message
+      }));
+      return;
+    }
+  }
+
+  if (subcmd === 'install') {
+    const targetServer = rest[0];
+    const cmd = rest[1];
+    if (!cmd) {
+      console.error('Usage: ocloud app install <server_id_or_name> <command>');
+      process.exit(1);
+    }
+    const { server, host, user, port, keyPath } = await resolveServer(targetServer, registry);
+    const installScript = getInstallScriptForApp(cmd);
+    console.log(`Installing ${cmd} on ${server.name}...`);
+    try {
+      execSync(
+        `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${user}@${host} "${installScript}"`,
+        { timeout: 180000, stdio: 'inherit' }
+      );
+      console.log(`✔ Successfully installed ${cmd} on ${server.name}.`);
+      return;
+    } catch (e) {
+      console.error(`Failed to install ${cmd} on ${server.name}: ${e.message}`);
+      process.exit(1);
+    }
+  }
 
   if (subcmd === 'list' || subcmd === 'shortcuts') {
     const settings = loadSettings();
@@ -94,57 +231,12 @@ async function cmdApp(subcmd, rest, context = {}) {
       process.exit(1);
     }
 
-    // 1. Resolve server
-    let server = null;
-    let allServers = [];
-    if (registry) {
-      try {
-        allServers = await registry.listAllServers();
-      } catch(e) {}
-    }
+    const { server, host, user, port, keyPath } = await resolveServer(targetServer, registry);
 
-    if (targetServer) {
-      server = allServers.find(s => 
-        String(s.id) === String(targetServer) || 
-        s.name.toLowerCase() === targetServer.toLowerCase() ||
-        s.ipv4 === targetServer ||
-        s.tailscale_ip === targetServer
-      );
-    }
-
-    if (!server && allServers.length > 0) {
-      // Pick first running server or first server
-      server = allServers.find(s => s.status === 'running') || allServers[0];
-    }
-
-    // If still no server object, create fallback using targetServer as host
-    if (!server) {
-      server = {
-        name: targetServer || 'Remote Node',
-        ipv4: targetServer || '127.0.0.1',
-        tailscale_ip: null,
-        user: 'root',
-        port: 22
-      };
-    }
-
-    // Prefer Tailscale IP for private, encrypted peer-to-peer streaming
-    const host = server.tailscale_ip || server.ipv4 || server.ip;
     if (!host || host === '-' || host === 'no IP') {
       console.error(`Error: Server '${server.name}' does not have a reachable IPv4 or Tailscale IP.`);
       process.exit(1);
     }
-
-    const user = server.user || (server.isHomeWorkstation ? (process.env.USER || 'bigcjat') : 'root');
-    const port = server.port || 22;
-
-    // Resolve SSH Key
-    const keyCandidates = [
-      server.keyPath,
-      path.join(os.homedir(), '.ssh', 'id_ed25519'),
-      path.join(os.homedir(), '.ssh', 'id_rsa')
-    ].filter(Boolean);
-    const keyPath = keyCandidates.find(p => fs.existsSync(p)) || path.join(os.homedir(), '.ssh', 'id_ed25519');
 
     // Verify waypipe binary
     const waypipeBin = getWaypipeBin();

@@ -524,6 +524,22 @@ Item {
     });
   }
 
+  function probeApp(serverId, app, callback) {
+    runCli(["app", "probe", serverId, app], function(out, ok) {
+      var res = null;
+      try { res = JSON.parse(out.trim()); } catch (e) {
+        res = { installed: false, error: out };
+      }
+      if (callback) callback(res, ok);
+    });
+  }
+
+  function installApp(serverId, app, callback) {
+    runCli(["app", "install", serverId, app], function(out, ok) {
+      if (callback) callback(ok, out);
+    });
+  }
+
   function launchApp(serverId, app) {
     runCli(["app", "launch", serverId, app], function(out, ok) {
       root.actionCompleted("launchApp", ok, out);
