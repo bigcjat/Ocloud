@@ -191,7 +191,15 @@ Item {
         // Hetzner Storage Box Drive
         NativeDriveCard {
           id: hetznerCard
-          property var sbRemote: getRemoteByName("storagebox")
+          property var sbRemote: {
+            var list = root.cloudAccounts;
+            for (var i = 0; i < list.length; i++) {
+              if (list[i].name === "storagebox" || list[i].type === "storagebox" || list[i].providerId === "hetzner_storage_box") {
+                return list[i];
+              }
+            }
+            return null;
+          }
           driveName: "Hetzner Storage Box"
           driveType: "Persistent Cloud RAID Storage"
           iconSource: (sbRemote && sbRemote.iconDataUri && sbRemote.iconDataUri.length > 0) ? sbRemote.iconDataUri : (storageBox.iconDataUri || "icons/cloud.svg")
@@ -214,7 +222,7 @@ Item {
         // Google Drive
         NativeDriveCard {
           id: gdriveDriveCard
-          property var remote: getRemoteByName("gdrive")
+          property var remote: { var l = root.cloudAccounts; return getRemoteByName("gdrive"); }
           visible: !!remote
           driveName: "Google Drive"
           driveType: "Virtual Cloud Drive (FUSE)"
@@ -237,7 +245,7 @@ Item {
         // Microsoft OneDrive
         NativeDriveCard {
           id: onedriveDriveCard
-          property var remote: getRemoteByName("onedrive")
+          property var remote: { var l = root.cloudAccounts; return getRemoteByName("onedrive"); }
           visible: !!remote
           driveName: "Microsoft OneDrive"
           driveType: "Virtual Cloud Drive (FUSE)"
@@ -260,7 +268,7 @@ Item {
         // Dropbox
         NativeDriveCard {
           id: dropboxDriveCard
-          property var remote: getRemoteByName("dropbox")
+          property var remote: { var l = root.cloudAccounts; return getRemoteByName("dropbox"); }
           visible: !!remote
           driveName: "Dropbox"
           driveType: "Virtual Cloud Drive (FUSE)"
