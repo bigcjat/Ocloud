@@ -252,8 +252,8 @@ async function cmdApp(subcmd, rest, context = {}) {
     // Pre-flight probe SSH connectivity
     console.log(`Connecting to ${server.name} (${user}@${host}:${port})...`);
     try {
-      execSync(`ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=4 -o StrictHostKeyChecking=no ${user}@${host} "echo ready"`, {
-        timeout: 5000,
+      execSync(`ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=no ${user}@${host} "echo ready"`, {
+        timeout: 10000,
         stdio: 'pipe'
       });
     } catch (sshErr) {
@@ -263,12 +263,14 @@ async function cmdApp(subcmd, rest, context = {}) {
     }
 
     // Ensure waypipe exists on remote node, auto-install silently if missing
+    let hasDrm = false;
     try {
-      const hasWaypipe = execSync(
-        `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=4 -o StrictHostKeyChecking=no ${user}@${host} "command -v waypipe >/dev/null 2>&1 && echo FOUND || echo NOT_FOUND"`,
-        { timeout: 5000, encoding: 'utf8' }
+      const nodeCheck = execSync(
+        `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=no ${user}@${host} "command -v waypipe >/dev/null 2>&1 && echo FOUND || echo NOT_FOUND; test -e /dev/dri/renderD128 && echo DRM_OK || echo NO_DRM"`,
+        { timeout: 10000, encoding: 'utf8' }
       ).trim();
-      if (!hasWaypipe.includes('FOUND')) {
+      hasDrm = nodeCheck.includes('DRM_OK');
+      if (!nodeCheck.includes('FOUND')) {
         console.log(`Auto-installing missing waypipe dependency on ${server.name}...`);
         const wpInstallScript = [
           'if command -v apt-get >/dev/null 2>&1; then',
@@ -286,7 +288,7 @@ async function cmdApp(subcmd, rest, context = {}) {
           'fi'
         ].join('\n');
         execSync(
-          `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no ${user}@${host} "bash -s"`,
+          `ssh -p ${port} -i "${keyPath}" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=no ${user}@${host} "bash -s"`,
           { input: wpInstallScript, timeout: 60000, stdio: ['pipe', 'inherit', 'inherit'] }
         );
       }
@@ -314,7 +316,7 @@ async function cmdApp(subcmd, rest, context = {}) {
       : `[☁ ${providerLabel} · ${server.name}] `;
     const remoteExec = `env PATH=/root/.local/bin:/home/${user}/.local/bin:/usr/local/bin:/usr/bin:$PATH OCLOUD_PROVIDER="${providerLabel}" OCLOUD_SERVER="${server.name}" PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${cmd}`;
 
-    console.log(`\x1b[36m🚀 Streaming "${cmd}" from ${server.name} via Waypipe...\x1b[0m`);
+    console.log(`\x1b[36m🚀 Streaming "${cmd}" from ${server.name} via Waypipe (${hasDrm ? 'Hardware DRM' : 'Software SHM'})...\x1b[0m`);
     console.log(`Window Prefix: "${titlePrefix}"`);
 
     const env = {
@@ -323,21 +325,23 @@ async function cmdApp(subcmd, rest, context = {}) {
       XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR || path.join('/run', 'user', String(process.getuid ? process.getuid() : 1000))
     };
 
+    const waypipeArgs = [
+      '--title-prefix', titlePrefix,
+      ...(hasDrm ? ['--video=h264'] : ['--no-gpu', '--compress=lz4']),
+      '--threads', '4',
+      'ssh',
+      '-p', String(port),
+      '-i', keyPath,
+      '-o', 'BatchMode=yes',
+      '-o', 'StrictHostKeyChecking=no',
+      '-R', '4713:localhost:4713',
+      `${user}@${host}`,
+      remoteExec
+    ];
+
     const child = spawn(
       waypipeBin,
-      [
-        '--title-prefix', titlePrefix,
-        '--video=h264',
-        '--threads', '4',
-        'ssh',
-        '-p', String(port),
-        '-i', keyPath,
-        '-o', 'BatchMode=yes',
-        '-o', 'StrictHostKeyChecking=no',
-        '-R', '4713:localhost:4713',
-        `${user}@${host}`,
-        remoteExec
-      ],
+      waypipeArgs,
       {
         env,
         stdio: 'inherit',
