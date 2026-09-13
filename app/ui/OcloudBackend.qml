@@ -293,7 +293,7 @@ Item {
   }
 
   function unmountStorageBox() {
-    unmountCloudAccount("~/Cloud");
+    unmountCloudAccount("storagebox");
   }
 
   // ==========================================

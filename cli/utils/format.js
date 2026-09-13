@@ -47,18 +47,15 @@ function safeUnmount(mountPoint, timeoutMs = 8000) {
       timeout: timeoutMs,
       stdio: 'ignore'
     });
-    return true;
   } catch (e) {
     try {
       execSync(`fusermount3 -u -z "${p}" 2>/dev/null || fusermount -u -z "${p}" 2>/dev/null || umount -l "${p}" 2>/dev/null`, {
         timeout: timeoutMs,
         stdio: 'ignore'
       });
-      return true;
-    } catch (err) {
-      return false;
-    }
+    } catch (err) {}
   }
+  return !isDriveMounted(p);
 }
 
 module.exports = {

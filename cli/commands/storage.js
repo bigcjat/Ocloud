@@ -304,8 +304,21 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     if (target === 'box' || target === 'hetzner_storage_box') target = 'storagebox';
 
     const accounts = getCloudAccounts(registry, vault);
-    const acc = accounts.find(a => a.name.toLowerCase() === target.toLowerCase() || a.providerId === target.toLowerCase());
-    const mountPoint = acc ? acc.mountPath : resolveMountPath(target === 'storagebox' ? '~/Cloud' : `~/Cloud-${target}`);
+    const resolvedTarget = resolveMountPath(target);
+    const acc = accounts.find(a => 
+      a.name.toLowerCase() === target.toLowerCase() || 
+      a.providerId === target.toLowerCase() ||
+      resolveMountPath(a.mountPath).toLowerCase() === resolvedTarget.toLowerCase()
+    );
+
+    let mountPoint;
+    if (acc) {
+      mountPoint = acc.mountPath;
+    } else if (target.startsWith('/') || target.startsWith('~') || target.includes('/')) {
+      mountPoint = resolveMountPath(target);
+    } else {
+      mountPoint = resolveMountPath(target === 'storagebox' ? '~/Cloud' : `~/Cloud-${target}`);
+    }
 
     if (!isDriveMounted(mountPoint)) {
       console.log(`Drive at ${mountPoint} is not mounted.`);
@@ -316,6 +329,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
       console.log(`✔ Unmounted ${mountPoint}`);
     } else {
       console.error(`Failed to unmount ${mountPoint}`);
+      process.exit(1);
     }
     return;
   }
