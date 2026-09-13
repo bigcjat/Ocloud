@@ -10,7 +10,15 @@ function getWaypipeBin() {
     '/usr/bin/waypipe',
     '/usr/local/bin/waypipe'
   ];
-  return candidates.find(p => fs.existsSync(p)) || 'waypipe';
+  const found = candidates.find(p => fs.existsSync(p));
+  if (found) return found;
+
+  try {
+    const out = execSync('command -v waypipe 2>/dev/null', { encoding: 'utf8' }).trim();
+    if (out) return out;
+  } catch (e) {}
+
+  return null;
 }
 
 function getSettingsPath() {
@@ -140,9 +148,7 @@ async function cmdApp(subcmd, rest, context = {}) {
 
     // Verify waypipe binary
     const waypipeBin = getWaypipeBin();
-    try {
-      execSync(`which ${waypipeBin} 2>/dev/null || which waypipe 2>/dev/null`, { stdio: 'ignore' });
-    } catch(e) {
+    if (!waypipeBin) {
       console.error(`Error: 'waypipe' is not installed on this system.`);
       console.error(`Please install it with: sudo pacman -S waypipe`);
       process.exit(1);
@@ -171,6 +177,12 @@ async function cmdApp(subcmd, rest, context = {}) {
     console.log(`\x1b[36m🚀 Streaming "${cmd}" from ${server.name} via Waypipe...\x1b[0m`);
     console.log(`Window Prefix: "${titlePrefix}"`);
 
+    const env = {
+      ...process.env,
+      WAYLAND_DISPLAY: process.env.WAYLAND_DISPLAY || 'wayland-1',
+      XDG_RUNTIME_DIR: process.env.XDG_RUNTIME_DIR || path.join('/run', 'user', String(process.getuid ? process.getuid() : 1000))
+    };
+
     const child = spawn(
       waypipeBin,
       [
@@ -187,6 +199,7 @@ async function cmdApp(subcmd, rest, context = {}) {
         remoteExec
       ],
       {
+        env,
         stdio: 'inherit',
         detached: true
       }

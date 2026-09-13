@@ -60,9 +60,10 @@ Item {
           AppComboBox {
             id: targetCombo
             implicitHeight: 32
-            implicitWidth: 240
+            implicitWidth: 260
             model: serverList.map(function(s) {
-              return s.name + (s.isHomeWorkstation ? " [Home]" : " [Cloud]");
+              var prov = s.providerName || (s.isHomeWorkstation ? "Home Workstation" : (s.provider ? s.provider.toUpperCase() : "Cloud"));
+              return s.name + " [" + prov + "]";
             })
             onCurrentIndexChanged: {
               if (currentIndex >= 0 && currentIndex < serverList.length) {
