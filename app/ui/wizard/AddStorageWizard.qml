@@ -558,7 +558,7 @@ Rectangle {
                 text: modal.stepName === "providers" ? "Choose cloud object storage or personal sync account to mount" :
                       modal.stepName === "method" ? "Choose how you'd like to connect. Different methods support different regions & protocols." :
                       modal.stepName === "walkthrough" ? (modal.isOAuth ? "Authorize Ocloud via standard browser sign-in" : (modal.isApp ? "Official desktop client setup instructions" : "Follow this 60-second walkthrough to get your access credentials")) :
-                      modal.stepName === "credentials" ? (modal.isDirectLogin ? "Enter your Proton username, password, and optional 2FA code to mount your drive via rclone." : "Enter your keys to securely connect to your storage bucket") :
+                      modal.stepName === "credentials" ? (modal.isDirectLogin ? ("Enter your " + (modal.selectedMethod ? modal.selectedMethod.name : (modal.selectedPlatform ? modal.selectedPlatform.name : "account")) + " login credentials to mount your drive via rclone.") : "Enter your keys to securely connect to your storage bucket") :
                       "Review drive name and choose where files will mount on your system"
                 font.pixelSize: 12
                 color: "#94a3b8"
@@ -2026,17 +2026,21 @@ Rectangle {
             // Next Button on Method selection
             AppButton {
               visible: modal.stepName === "method"
-              text: "Continue to Setup →"
+              text: (modal.selectedMethod && modal.selectedMethod.authType === "credentials") ? "Continue to Sign In →" : "Continue to Setup →"
               variant: "primary"
               onClicked: {
-                modal.stepName = "walkthrough";
+                if (modal.selectedMethod && modal.selectedMethod.authType === "credentials") {
+                  modal.stepName = "credentials";
+                } else {
+                  modal.stepName = "walkthrough";
+                }
               }
             }
 
             // Next Button on Walkthrough
             AppButton {
               visible: modal.stepName === "walkthrough"
-              text: modal.isOAuth ? "Continue to Mount Location →" : (modal.isApp ? "Open Download Page ↗" : (((modal.selectedPlatform && (modal.selectedPlatform.authType === "webdav" || modal.selectedPlatform.rcloneType === "webdav")) || (modal.selectedMethod && modal.selectedMethod.authType === "webdav")) ? "Continue to Login →" : "I Have My Keys, Continue →"))
+              text: modal.isOAuth ? "Continue to Mount Location →" : (modal.isApp ? "Open Download Page ↗" : (((modal.selectedPlatform && (modal.selectedPlatform.authType === "webdav" || modal.selectedPlatform.rcloneType === "webdav" || modal.selectedPlatform.authType === "credentials")) || (modal.selectedMethod && (modal.selectedMethod.authType === "webdav" || modal.selectedMethod.authType === "credentials"))) ? "Continue to Sign In →" : "I Have My Keys, Continue →"))
               variant: "primary"
               onClicked: {
                 if (modal.isOAuth) {
@@ -2082,7 +2086,6 @@ Rectangle {
                   if (ok) {
                     modal.testSuccess = true;
                     modal.testMessage = "Drive successfully verified and mounted!";
-                    ocloud.openCloudFolder(mPath);
                     modal.storageAdded();
                     modal.visible = false;
                   } else {
