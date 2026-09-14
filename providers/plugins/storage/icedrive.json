@@ -12,7 +12,7 @@
   "brandColor": "#0099ff",
   "tagline": "Next-generation secure cloud storage with WebDAV sync.",
   "dashboardUrl": "https://icedrive.net/login",
-  "iconSvg": "<svg fill=\"#ffffff\" role=\"img\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><title>Icedrive</title><path  d=\"M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.2c5.412 0 9.8 4.388 9.8 9.8s-4.388 9.8-9.8 9.8S2.2 17.412 2.2 12 6.588 2.2 12 2.2zm1.5 4.5h-3v3h3v-3zm0 4.5h-3v6.3h3V11.2z\"/></svg>",
+  "iconSvg": "<svg role=\"img\" viewBox=\"0 0 24 24\" xmlns=\"http://www.w3.org/2000/svg\"><title>Icedrive</title><path fill=\"currentColor\" d=\"M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.2c5.412 0 9.8 4.388 9.8 9.8s-4.388 9.8-9.8 9.8S2.2 17.412 2.2 12 6.588 2.2 12 2.2zm1.5 4.5h-3v3h3v-3zm0 4.5h-3v6.3h3V11.2z\"/></svg>",
   "instructions": {
     "navBreadcrumb": "Icedrive Web › Settings › Access › WebDAV",
     "step1": "Log in at https://icedrive.net/login. (Note: Icedrive requires an active Pro plan for WebDAV access).",

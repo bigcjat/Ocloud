@@ -22,22 +22,14 @@ function cleanSvg(rawSvg, title) {
                   .replace(/<!--.*?-->/gs, '')
                   .trim();
   
-  if (title === 'storj') {
-    svg = svg.replace(/stroke="[^"]*"/g, '');
-    svg = svg.replace(/fill="[^"]*"/g, '');
-    return svg.replace('<svg', '<svg fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"');
-  }
-
-  // Strip any old fills / strokes
-  svg = svg.replace(/fill="[^"]*"/g, '');
-  svg = svg.replace(/stroke="[^"]*"/g, '');
+  // Ensure fill="currentColor" or remove hardcoded fills
+  svg = svg.replace(/fill="((?!none|currentColor)[^"]+)"/g, 'fill="currentColor"');
+  svg = svg.replace(/stroke="((?!none|currentColor)[^"]+)"/g, 'stroke="currentColor"');
   
+  // If no fill or stroke at all on svg or path, ensure standard viewBox
   if (!svg.includes('viewBox')) {
     svg = svg.replace('<svg', '<svg viewBox="0 0 24 24"');
   }
-
-  // Set default fill to #ffffff (full white luminance) so MultiEffect can tint it to theme.textPrimary / theme.accent
-  svg = svg.replace('<svg', '<svg fill="#ffffff"');
   return svg;
 }
 
