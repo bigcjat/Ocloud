@@ -2063,10 +2063,12 @@ Rectangle {
               visible: modal.stepName === "mount"
               text: modal.isTesting ? "Configuring & Mounting..." : "Mount Drive & Open Files"
               variant: "success"
+              loading: modal.isTesting
               enabled: !modal.isTesting
               onClicked: {
                 modal.isTesting = true;
-                modal.testMessage = "Configuring rclone and mounting native drive...";
+                modal.testMessage = "Configuring rclone and verifying mount...";
+                modal.testSuccess = false;
 
                 var platform = modal.selectedPlatform;
                 var method = modal.selectedMethod;
@@ -2075,30 +2077,36 @@ Rectangle {
                 var rType = (method && method.rcloneType) ? method.rcloneType : (platform ? platform.rcloneType : "");
                 var aType = (method && method.authType) ? method.authType : (platform ? platform.authType : "");
 
-                if (modal.isOAuth) {
-                  var remoteName = (method && method.defaultRemoteName) ? method.defaultRemoteName : platform.defaultRemoteName;
-                  ocloud.mountCloudAccount(remoteName, mPath);
-                  ocloud.openCloudFolder(mPath);
-                } else if (rType === "protondrive" || (platform && platform.id === "protondrive")) {
-                  ocloud.addProtonDriveStorage(sName, keyField.text.trim(), secretField.text.trim(), twofaField.text.trim(), mailboxPassField.text.trim(), mPath);
-                  ocloud.openCloudFolder(mPath);
-                } else if (aType === "webdav" || rType === "webdav") {
-                  var vendor = (method && method.vendor) ? method.vendor : (platform ? platform.vendor || "" : "");
-                  ocloud.addWebdavStorage(sName, endpointField.text.trim(), keyField.text.trim(), secretField.text.trim(), vendor, mPath);
-                  ocloud.openCloudFolder(mPath);
-                } else if (aType === "s3" || (platform && platform.type === "s3")) {
-                  ocloud.addS3Storage(sName, endpointField.text.trim(), bucketField.text.trim(), keyField.text.trim(), secretField.text.trim(), mPath);
-                  ocloud.openCloudFolder(mPath);
-                } else if (aType === "sftp" || (platform && platform.type === "sftp")) {
-                  ocloud.addSftpStorage(sName, endpointField.text.trim(), keyField.text.trim(), secretField.text.trim(), mPath);
-                  ocloud.openCloudFolder(mPath);
+                function handleResult(ok, msg) {
+                  modal.isTesting = false;
+                  if (ok) {
+                    modal.testSuccess = true;
+                    modal.testMessage = "Drive successfully verified and mounted!";
+                    ocloud.openCloudFolder(mPath);
+                    modal.storageAdded();
+                    modal.visible = false;
+                  } else {
+                    modal.testSuccess = false;
+                    modal.testMessage = "Mount Failed: " + (msg || "Unknown error verifying mount point");
+                  }
                 }
 
-                modal.testSuccess = true;
-                modal.testMessage = "Drive successfully configured and mounted!";
-                modal.isTesting = false;
-                modal.storageAdded();
-                modal.visible = false;
+                if (modal.isOAuth) {
+                  var remoteName = (method && method.defaultRemoteName) ? method.defaultRemoteName : platform.defaultRemoteName;
+                  ocloud.mountCloudAccount(remoteName, mPath, handleResult);
+                } else if (rType === "protondrive" || (platform && platform.id === "protondrive")) {
+                  ocloud.addProtonDriveStorage(sName, keyField.text.trim(), secretField.text.trim(), twofaField.text.trim(), mailboxPassField.text.trim(), mPath, handleResult);
+                } else if (aType === "webdav" || rType === "webdav") {
+                  var vendor = (method && method.vendor) ? method.vendor : (platform ? platform.vendor || "" : "");
+                  ocloud.addWebdavStorage(sName, endpointField.text.trim(), keyField.text.trim(), secretField.text.trim(), vendor, mPath, handleResult);
+                } else if (aType === "s3" || (platform && platform.type === "s3")) {
+                  ocloud.addS3Storage(sName, endpointField.text.trim(), bucketField.text.trim(), keyField.text.trim(), secretField.text.trim(), mPath, handleResult);
+                } else if (aType === "sftp" || (platform && platform.type === "sftp")) {
+                  ocloud.addSftpStorage(sName, endpointField.text.trim(), keyField.text.trim(), secretField.text.trim(), mPath, handleResult);
+                } else {
+                  modal.isTesting = false;
+                  modal.testMessage = "Unknown storage provider configuration";
+                }
               }
             }
           }

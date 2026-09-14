@@ -25,6 +25,25 @@ Rectangle {
   property bool showDisconnect: false
   property bool showSettings: true
 
+  property bool isBusy: false
+  property string busyAction: ""
+  property string lastError: ""
+
+  Connections {
+    target: (typeof ocloud !== "undefined") ? ocloud : null
+    function onActionCompleted(action, success, msg) {
+      if (action === "mountCloudAccount" || action === "unmountCloudAccount" || action === "mountStorageBox" || action === "unmountStorageBox") {
+        root.isBusy = false;
+        root.busyAction = "";
+        if (!success) {
+          root.lastError = msg || "Operation failed";
+        } else {
+          root.lastError = "";
+        }
+      }
+    }
+  }
+
   signal openClicked()
   signal unmountClicked()
   signal settingsClicked()
@@ -189,10 +208,17 @@ Rectangle {
       // Unmount
       AppButton {
         visible: root.isMounted && root.mountPath !== "/" && root.driveType.indexOf("Internal") < 0
-        text: "Unmount"
-        iconSource: "icons/eject.svg"
+        text: (root.isBusy && root.busyAction === "unmounting") ? "Unmounting..." : "Unmount"
+        iconSource: (root.isBusy && root.busyAction === "unmounting") ? "" : "icons/eject.svg"
+        loading: root.isBusy && root.busyAction === "unmounting"
+        enabled: !root.isBusy
         variant: "danger"
-        onClicked: root.unmountClicked()
+        onClicked: {
+          root.isBusy = true;
+          root.busyAction = "unmounting";
+          root.lastError = "";
+          root.unmountClicked();
+        }
       }
 
       // Open Folder
@@ -215,10 +241,17 @@ Rectangle {
       // Mount Drive
       AppButton {
         visible: root.isConnected && !root.isMounted
-        text: "Mount Drive"
-        iconSource: "icons/hard-drive.svg"
+        text: (root.isBusy && root.busyAction === "mounting") ? "Mounting..." : "Mount Drive"
+        iconSource: (root.isBusy && root.busyAction === "mounting") ? "" : "icons/hard-drive.svg"
+        loading: root.isBusy && root.busyAction === "mounting"
+        enabled: !root.isBusy
         variant: "success"
-        onClicked: root.mountClicked()
+        onClicked: {
+          root.isBusy = true;
+          root.busyAction = "mounting";
+          root.lastError = "";
+          root.mountClicked();
+        }
       }
 
       // Disconnect
@@ -236,6 +269,41 @@ Rectangle {
         iconSource: "icons/plus.svg"
         variant: "primary"
         onClicked: root.connectClicked()
+      }
+    }
+
+    // Visible Error Message on Card
+    Rectangle {
+      Layout.fillWidth: true
+      visible: root.lastError.length > 0
+      radius: 6
+      color: "#2d1215"
+      border.color: "#ef4444"
+      border.width: 1
+      implicitHeight: errLayout.implicitHeight + 16
+
+      RowLayout {
+        id: errLayout
+        anchors.fill: parent
+        anchors.margins: 8
+        spacing: 8
+
+        Text {
+          text: "⚠ " + root.lastError
+          color: "#fca5a5"
+          font.pixelSize: 11
+          font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+          wrapMode: Text.WordWrap
+          Layout.fillWidth: true
+        }
+
+        AppButton {
+          text: "✕"
+          variant: "secondary"
+          customWidth: 28
+          implicitHeight: 22
+          onClicked: root.lastError = ""
+        }
       }
     }
   }

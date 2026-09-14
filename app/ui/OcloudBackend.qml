@@ -385,7 +385,7 @@ Item {
     }
   }
 
-  function mountCloudAccount(name, path) {
+  function mountCloudAccount(name, path, callback) {
     root.busyChanged(true, "Mounting " + name + "...");
     runCli(["storage", "mount", name, path || ""], function(out, ok) {
       root.busyChanged(false, "");
@@ -393,10 +393,11 @@ Item {
       root.actionCompleted("mountCloudAccount", ok, msg);
       root.refreshStatusAsync();
       root.fetchCloudAccountsAsync();
-    }, 30000);
+      if (callback) callback(ok, msg);
+    }, 35000);
   }
 
-  function unmountCloudAccount(path) {
+  function unmountCloudAccount(path, callback) {
     root.busyChanged(true, "Unmounting " + path + "...");
     runCli(["storage", "unmount", path], function(out, ok) {
       root.busyChanged(false, "");
@@ -404,6 +405,7 @@ Item {
       root.actionCompleted("unmountCloudAccount", ok, msg);
       root.refreshStatusAsync();
       root.fetchCloudAccountsAsync();
+      if (callback) callback(ok, msg);
     }, 20000);
   }
 
@@ -573,7 +575,7 @@ Item {
   // ==========================================
   // PROVIDER REGISTRATION (Proton, S3, WebDAV, SFTP, OAuth)
   // ==========================================
-  function addProtonDriveStorage(name, username, password, twofa, mailboxPass, mountPath) {
+  function addProtonDriveStorage(name, username, password, twofa, mailboxPass, mountPath, callback) {
     root.busyChanged(true, "Configuring Proton Drive in Vault & mounting...");
     var args = ["storage", "add-proton", name, username, password];
     args.push(twofa ? twofa : "");
@@ -581,40 +583,48 @@ Item {
     args.push(mountPath ? mountPath : "");
     runCli(args, function(out, ok) {
       root.busyChanged(false, "");
-      root.actionCompleted("addProtonDriveStorage", ok, ok ? ("Mounted " + name + " to " + (mountPath || "~/ProtonDrive")) : "Failed to add Proton Drive");
+      var msg = ok ? ("Mounted " + name + " to " + (mountPath || "~/ProtonDrive")) : (out || "Failed to add Proton Drive");
+      root.actionCompleted("addProtonDriveStorage", ok, msg);
       root.refreshStatusAsync();
       root.fetchCloudAccountsAsync();
-    });
+      if (callback) callback(ok, msg);
+    }, 45000);
   }
 
-  function addS3Storage(name, endpoint, bucket, key, secret, mountPath) {
+  function addS3Storage(name, endpoint, bucket, key, secret, mountPath, callback) {
     root.busyChanged(true, "Configuring S3 in Vault & mounting...");
     runCli(["storage", "add-s3", name, endpoint, bucket || "", key, secret, mountPath || ""], function(out, ok) {
       root.busyChanged(false, "");
-      root.actionCompleted("addS3Storage", ok, ok ? ("Mounted " + name) : "Failed to add S3 storage");
+      var msg = ok ? ("Mounted " + name) : (out || "Failed to add S3 storage");
+      root.actionCompleted("addS3Storage", ok, msg);
       root.refreshStatusAsync();
       root.fetchCloudAccountsAsync();
-    });
+      if (callback) callback(ok, msg);
+    }, 45000);
   }
 
-  function addWebdavStorage(name, endpoint, user, pass, vendor, mountPath) {
+  function addWebdavStorage(name, endpoint, user, pass, vendor, mountPath, callback) {
     root.busyChanged(true, "Configuring WebDAV in Vault & mounting...");
     runCli(["storage", "add-webdav", name, endpoint, user, pass, vendor || "other", mountPath || ""], function(out, ok) {
       root.busyChanged(false, "");
-      root.actionCompleted("addWebdavStorage", ok, ok ? ("Mounted " + name) : "Failed to add WebDAV storage");
+      var msg = ok ? ("Mounted " + name) : (out || "Failed to add WebDAV storage");
+      root.actionCompleted("addWebdavStorage", ok, msg);
       root.refreshStatusAsync();
       root.fetchCloudAccountsAsync();
-    });
+      if (callback) callback(ok, msg);
+    }, 45000);
   }
 
-  function addSftpStorage(name, host, user, pass, mountPath) {
+  function addSftpStorage(name, host, user, pass, mountPath, callback) {
     root.busyChanged(true, "Configuring SFTP in Vault & mounting...");
     runCli(["storage", "add-sftp", name, host, user, pass, mountPath || ""], function(out, ok) {
       root.busyChanged(false, "");
-      root.actionCompleted("addSftpStorage", ok, ok ? ("Mounted " + name) : "Failed to add SFTP storage");
+      var msg = ok ? ("Mounted " + name) : (out || "Failed to add SFTP storage");
+      root.actionCompleted("addSftpStorage", ok, msg);
       root.refreshStatusAsync();
       root.fetchCloudAccountsAsync();
-    });
+      if (callback) callback(ok, msg);
+    }, 45000);
   }
 
   function connectCloudAccount(type, name, extraArgs) {

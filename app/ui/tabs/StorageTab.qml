@@ -327,11 +327,12 @@ Item {
             showAutoMount: true
             statusVariant: modelData.isMounted ? "success" : "neutral"
             statusText: modelData.isMounted ? "Mounted" : "Not Mounted"
-            showDisconnect: false
+            showDisconnect: true
             showSettings: false
             onOpenClicked: ocloud.openCloudFolder(modelData.mountPath)
             onUnmountClicked: ocloud.unmountCloudAccount(modelData.mountPath)
             onMountClicked: ocloud.mountCloudAccount(modelData.name, modelData.mountPath)
+            onDisconnectClicked: ocloud.disconnectCloudAccount(modelData.name)
             onAutoMountToggled: ocloud.toggleAutoMount(modelData.name)
           }
         }

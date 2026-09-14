@@ -118,6 +118,73 @@ function getCloudAccounts(registry, vault = null) {
   return remotes;
 }
 
+async function mountAndVerifyRemote(remoteTarget, mountPoint, rcloneBin, env, remoteName, noOpen = false) {
+  fs.mkdirSync(mountPoint, { recursive: true });
+  if (isDriveMounted(mountPoint)) {
+    console.log(`Drive '${remoteName}' is already mounted at ${mountPoint}`);
+    return true;
+  }
+
+  // Pre-flight check: verify remote is reachable before attempting FUSE mount
+  console.log(`Verifying connection to '${remoteName}'...`);
+  try {
+    execSync(`${rcloneBin} lsd "${remoteTarget}" --contimeout 8s --timeout 8s --retries 1 --low-level-retries 1 --log-level=ERROR`, {
+      env,
+      encoding: 'utf8',
+      timeout: 12000,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+  } catch (probeErr) {
+    const errOut = (probeErr.stderr ? probeErr.stderr.toString() : '') || (probeErr.stdout ? probeErr.stdout.toString() : '') || probeErr.message || '';
+    const lines = errOut.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.includes('DEBUG :') && !l.includes('NOTICE :'));
+    let lastLine = lines.length > 0 ? lines[lines.length - 1] : 'Remote connection failed or timed out';
+    lastLine = lastLine.replace(/^[\d/:\s]+(ERROR|WARNING|NOTICE)\s*:\s*/i, '');
+    throw new Error(`Connection verification failed: ${lastLine}`);
+  }
+
+  const logFile = `/tmp/rclone-mount-${remoteName.replace(/[^a-zA-Z0-9_-]/g, '_')}.log`;
+  try { if (fs.existsSync(logFile)) fs.unlinkSync(logFile); } catch(e) {}
+
+  console.log(`Mounting ${remoteTarget} at ${mountPoint}...`);
+  const child = spawn(rcloneBin, [
+    'mount', remoteTarget, mountPoint,
+    '--vfs-cache-mode', 'full',
+    '--daemon',
+    `--log-file=${logFile}`,
+    '--log-level=NOTICE'
+  ], {
+    env,
+    detached: true,
+    stdio: 'ignore'
+  });
+  child.unref();
+
+  let mounted = false;
+  for (let i = 0; i < 30; i++) {
+    if (isDriveMounted(mountPoint)) {
+      mounted = true;
+      break;
+    }
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  if (!mounted) {
+    let errDetails = '';
+    try {
+      if (fs.existsSync(logFile)) errDetails = fs.readFileSync(logFile, 'utf8').trim();
+    } catch(e) {}
+    safeUnmount(mountPoint);
+    const cleanErr = errDetails ? errDetails.split('\n').pop().replace(/^[\d/:\s]+(ERROR|WARNING|NOTICE)\s*:\s*/i, '') : 'Drive did not appear in system mount table';
+    throw new Error(`Mount verification timed out: ${cleanErr}`);
+  }
+
+  console.log(`✔ '${remoteName}' mounted at ${mountPoint}`);
+  if (!noOpen && isDriveMounted(mountPoint)) {
+    launchFileManager(mountPoint);
+  }
+  return true;
+}
+
 async function cmdStorage(subcmd, args, { registry, vault }) {
   const sbPlugin = registry ? registry.getStoragePlugin('hetzner_storage_box') : null;
   const sbDriver = sbPlugin ? sbPlugin.driver : null;
@@ -222,78 +289,14 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     const remoteName = acc ? acc.name : target;
     const mountPoint = acc ? acc.mountPath : resolveMountPath(target === 'storagebox' ? '~/Cloud' : `~/Cloud-${target}`);
 
-    fs.mkdirSync(mountPoint, { recursive: true });
-    if (isDriveMounted(mountPoint)) {
-      console.log(`Drive '${remoteName}' is already mounted at ${mountPoint}`);
-      return;
-    }
+    const scoped = vault ? vault.getScopedCredentials(remoteName) : null;
+    const bucket = (scoped && scoped.bucket) ? scoped.bucket : '';
+    const remoteTarget = bucket ? `${remoteName}:${bucket}` : `${remoteName}:`;
 
-    // Pre-flight check: verify remote is reachable before attempting FUSE mount
-    console.log(`Verifying connection to '${remoteName}'...`);
     try {
-      execSync(`${rcloneBin} lsd "${remoteName}:" --contimeout 8s --timeout 8s --retries 1 --low-level-retries 1 --log-level=ERROR`, {
-        env,
-        encoding: 'utf8',
-        timeout: 12000,
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-    } catch (probeErr) {
-      const errOut = (probeErr.stderr ? probeErr.stderr.toString() : '') || (probeErr.stdout ? probeErr.stdout.toString() : '') || probeErr.message || '';
-      const lines = errOut.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.includes('DEBUG :') && !l.includes('NOTICE :'));
-      let lastLine = lines.length > 0 ? lines[lines.length - 1] : 'Remote connection failed or timed out';
-      lastLine = lastLine.replace(/^[\d/:\s]+(ERROR|WARNING|NOTICE)\s*:\s*/i, '');
-      console.error(`Failed to mount ${remoteName}: ${lastLine}`);
-      process.exit(1);
-    }
-
-    const logFile = `/tmp/rclone-mount-${remoteName}.log`;
-    try { if (fs.existsSync(logFile)) fs.unlinkSync(logFile); } catch(e) {}
-
-    console.log(`Mounting ${remoteName}: at ${mountPoint}...`);
-    try {
-      const child = spawn(rcloneBin, [
-        'mount', `${remoteName}:`, mountPoint,
-        '--vfs-cache-mode', 'full',
-        '--daemon',
-        `--log-file=${logFile}`,
-        '--log-level=NOTICE'
-      ], {
-        env,
-        detached: true,
-        stdio: 'ignore'
-      });
-      child.unref();
-
-      let mounted = false;
-      for (let i = 0; i < 30; i++) {
-        if (isDriveMounted(mountPoint)) {
-          mounted = true;
-          break;
-        }
-        await new Promise(r => setTimeout(r, 500));
-      }
-
-      if (!mounted) {
-        let errDetails = '';
-        try {
-          if (fs.existsSync(logFile)) errDetails = fs.readFileSync(logFile, 'utf8').trim();
-        } catch(e) {}
-        safeUnmount(mountPoint);
-        console.error(`Failed to mount ${remoteName}: ${errDetails || 'Mount verification timed out'}`);
-        process.exit(1);
-      }
-
-      console.log(`✔ '${remoteName}' mounted at ${mountPoint}`);
-      if (!noOpen && isDriveMounted(mountPoint)) {
-        launchFileManager(mountPoint);
-      }
+      await mountAndVerifyRemote(remoteTarget, mountPoint, rcloneBin, env, remoteName, noOpen);
     } catch (e) {
-      let errDetails = '';
-      try {
-        if (fs.existsSync(logFile)) errDetails = fs.readFileSync(logFile, 'utf8').trim();
-      } catch(ex) {}
-      safeUnmount(mountPoint);
-      console.error(`Failed to mount ${remoteName}: ${errDetails || e.message}`);
+      console.error(`Failed to mount ${remoteName}: ${e.message}`);
       process.exit(1);
     }
     return;
@@ -435,13 +438,20 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
 
     fs.mkdirSync(expMount, { recursive: true });
     try {
-      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'inherit' });
+      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
       console.log(`✔ Configured Proton Drive remote '${remoteName}' in Rclone.`);
-      // Mount
-      execSync(`${rcloneBin} mount "${remoteName}:" "${expMount}" --vfs-cache-mode full --daemon </dev/null >/dev/null 2>&1`, { env });
-      console.log(`✔ Mounted '${remoteName}' to ${expMount}`);
     } catch(e) {
-      console.error(`Error adding Proton Drive: ${e.message}`);
+      console.error(`Error configuring Proton Drive: ${e.message}`);
+      process.exit(1);
+    }
+
+    try {
+      await mountAndVerifyRemote(`${remoteName}:`, expMount, rcloneBin, env, remoteName);
+      console.log(`✔ Mounted Proton Drive '${remoteName}' to ${expMount}`);
+    } catch(e) {
+      try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
+      try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
+      console.error(`Failed to mount Proton Drive '${remoteName}': ${e.message}`);
       process.exit(1);
     }
     return;
@@ -457,9 +467,18 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
       vault.ensureRcloneEncrypted(rcloneBin);
     }
 
+    let s3Provider = 'Other';
+    if ((endpoint && (endpoint.includes('storj') || endpoint.includes('storjshare.io'))) || remoteName.includes('storj')) {
+      s3Provider = 'Storj';
+    } else if (endpoint && endpoint.includes('backblaze')) {
+      s3Provider = 'Backblaze';
+    } else if (endpoint && (endpoint.includes('cloudflare') || endpoint.includes('r2.cloudflarestorage.com'))) {
+      s3Provider = 'Cloudflare';
+    }
+
     const cmdArgs = [
       rcloneBin, 'config', 'create', remoteName, 's3',
-      'provider', 'Other',
+      'provider', s3Provider,
       'endpoint', endpoint,
       'access_key_id', key,
       'secret_access_key', secret,
@@ -467,11 +486,20 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     ];
     fs.mkdirSync(expMount, { recursive: true });
     try {
-      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'inherit' });
-      execSync(`${rcloneBin} mount "${remoteName}:${bucket || ''}" "${expMount}" --vfs-cache-mode full --daemon </dev/null >/dev/null 2>&1`, { env });
+      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
+    } catch(e) {
+      console.error(`Error configuring S3 remote '${remoteName}': ${e.message}`);
+      process.exit(1);
+    }
+
+    const remoteTarget = bucket ? `${remoteName}:${bucket}` : `${remoteName}:`;
+    try {
+      await mountAndVerifyRemote(remoteTarget, expMount, rcloneBin, env, remoteName);
       console.log(`✔ Configured and mounted S3 remote '${remoteName}' to ${expMount}`);
     } catch(e) {
-      console.error(`Error adding S3 storage: ${e.message}`);
+      try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
+      try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
+      console.error(`Failed to mount S3 remote '${remoteName}': ${e.message}`);
       process.exit(1);
     }
     return;
@@ -497,11 +525,19 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     ];
     fs.mkdirSync(expMount, { recursive: true });
     try {
-      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'inherit' });
-      execSync(`${rcloneBin} mount "${remoteName}:" "${expMount}" --vfs-cache-mode full --daemon </dev/null >/dev/null 2>&1`, { env });
+      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
+    } catch(e) {
+      console.error(`Error configuring WebDAV remote '${remoteName}': ${e.message}`);
+      process.exit(1);
+    }
+
+    try {
+      await mountAndVerifyRemote(`${remoteName}:`, expMount, rcloneBin, env, remoteName);
       console.log(`✔ Configured and mounted WebDAV remote '${remoteName}' to ${expMount}`);
     } catch(e) {
-      console.error(`Error adding WebDAV storage: ${e.message}`);
+      try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
+      try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
+      console.error(`Failed to mount WebDAV remote '${remoteName}': ${e.message}`);
       process.exit(1);
     }
     return;
@@ -526,11 +562,19 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     ];
     fs.mkdirSync(expMount, { recursive: true });
     try {
-      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'inherit' });
-      execSync(`${rcloneBin} mount "${remoteName}:" "${expMount}" --vfs-cache-mode full --daemon </dev/null >/dev/null 2>&1`, { env });
+      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
+    } catch(e) {
+      console.error(`Error configuring SFTP remote '${remoteName}': ${e.message}`);
+      process.exit(1);
+    }
+
+    try {
+      await mountAndVerifyRemote(`${remoteName}:`, expMount, rcloneBin, env, remoteName);
       console.log(`✔ Configured and mounted SFTP remote '${remoteName}' to ${expMount}`);
     } catch(e) {
-      console.error(`Error adding SFTP storage: ${e.message}`);
+      try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
+      try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
+      console.error(`Failed to mount SFTP remote '${remoteName}': ${e.message}`);
       process.exit(1);
     }
     return;
@@ -556,11 +600,19 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
 
     fs.mkdirSync(expMount, { recursive: true });
     try {
-      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'inherit' });
-      execSync(`${rcloneBin} mount "${remoteName}:${share}" "${expMount}" --vfs-cache-mode full --daemon </dev/null >/dev/null 2>&1`, { env });
+      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
+    } catch(e) {
+      console.error(`Error configuring SMB remote '${remoteName}': ${e.message}`);
+      process.exit(1);
+    }
+
+    try {
+      await mountAndVerifyRemote(`${remoteName}:${share}`, expMount, rcloneBin, env, remoteName);
       console.log(`✔ Mounted SMB share //${host}/${share} to ${expMount}`);
     } catch(e) {
-      console.error(`Error mounting SMB share: ${e.message}`);
+      try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
+      try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
+      console.error(`Failed to mount SMB share //${host}/${share}: ${e.message}`);
       process.exit(1);
     }
     return;
