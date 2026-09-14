@@ -59,8 +59,8 @@ QtObject {
   readonly property color borderActive: accent
 
   readonly property color textPrimary: brightForeground
-  readonly property color textSecondary: foreground
-  readonly property color textMuted: isDark ? darkForeground : Qt.rgba(foreground.r, foreground.g, foreground.b, 0.55)
+  readonly property color textSecondary: isDark ? lightForeground : foreground
+  readonly property color textMuted: isDark ? foreground : Qt.rgba(foreground.r, foreground.g, foreground.b, 0.70)
 
   readonly property color accentSky: accent
   readonly property color accentHover: Qt.lighter(accent, 1.15)

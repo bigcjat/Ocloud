@@ -168,9 +168,9 @@ Rectangle {
             ? "Unmounting..."
             : (root.showDisconnect ? "Disconnect" : "Unmount")
           font.family: root.appFontFamily
-          font.pixelSize: 10
+          font.pixelSize: 11
           font.bold: true
-          color: unmMouse.containsMouse ? root.accentColor : root.mutedColor
+          color: unmMouse.containsMouse ? root.accentColor : root.textColor
         }
 
         MouseArea {
@@ -268,7 +268,7 @@ Rectangle {
           Text {
             text: root.driveName
             font.family: root.appFontFamily
-            font.pixelSize: 12
+            font.pixelSize: 13
             font.bold: true
             color: root.textColor
             elide: Text.ElideRight
@@ -277,7 +277,7 @@ Rectangle {
           Text {
             text: "· " + (root.isMounted ? "mounted" : "unmounted")
             font.family: root.appFontFamily
-            font.pixelSize: 10
+            font.pixelSize: 11
             color: root.isMounted
               ? ((typeof theme !== "undefined" && theme.homeGreen) ? theme.homeGreen : root.accentColor)
               : root.mutedColor
@@ -290,7 +290,7 @@ Rectangle {
           Layout.fillWidth: true
           text: (root.mountPath ? root.mountPath : root.driveType) + (root.capacityText ? (" · " + root.capacityText) : "")
           font.family: root.appFontFamily
-          font.pixelSize: 10
+          font.pixelSize: 11
           color: root.mutedColor
           elide: Text.ElideRight
         }

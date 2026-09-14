@@ -77,16 +77,17 @@ Item {
           Text {
             text: "STORAGE & DRIVES"
             font.family: root.appFontFamily
-            font.pixelSize: 10
+            font.pixelSize: 11
             font.bold: true
-            color: root.mutedColor
+            color: root.accentColor
             font.letterSpacing: 1.2
           }
 
           Text {
             text: (1 + root.cloudAccounts.length) + " storage volumes available"
             font.family: root.appFontFamily
-            font.pixelSize: 12
+            font.pixelSize: 13
+            font.bold: true
             color: root.textColor
           }
         }
@@ -176,9 +177,9 @@ Item {
         Text {
           text: "LOCAL STORAGE"
           font.family: root.appFontFamily
-          font.pixelSize: 10
+          font.pixelSize: 11
           font.bold: true
-          color: root.mutedColor
+          color: root.textColor
         }
 
         NativeDriveCard {
@@ -221,9 +222,9 @@ Item {
         Text {
           text: "CONNECTED CLOUD DRIVES (" + root.cloudAccounts.length + ")"
           font.family: root.appFontFamily
-          font.pixelSize: 10
+          font.pixelSize: 11
           font.bold: true
-          color: root.mutedColor
+          color: root.textColor
         }
 
         GridLayout {

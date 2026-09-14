@@ -235,19 +235,35 @@ FloatingWindow {
     }
   }
 
-  // Master Column Layout: Top Header + Main Body (Sidebar & Content) + Quarter Bottom Nav
-  ColumnLayout {
+  // Master Seamless Window Surface: Zero gaps, perfectly unified container
+  Rectangle {
+    id: windowRootFrame
     anchors.fill: parent
-    spacing: 0
+    color: theme.bgDark
+    radius: (typeof theme !== "undefined" && theme.cornerRadius) ? theme.cornerRadius : 8
+    border.color: theme.borderSubtle
+    border.width: 1
+    clip: true
 
-    // Top Titlebar / Header: Matches OS Theme & Adapts Height
-    Rectangle {
-      id: headerBar
-      Layout.fillWidth: true
-      Layout.preferredHeight: window.isQuarter ? 42 : (window.isHalf ? 48 : 56)
-      color: theme.headerBg
-      border.color: theme.borderSubtle
-      border.width: 1
+    ColumnLayout {
+      anchors.fill: parent
+      spacing: 0
+
+      // Top Titlebar / Header: Matches OS Theme & Adapts Height
+      Rectangle {
+        id: headerBar
+        Layout.fillWidth: true
+        Layout.preferredHeight: window.isQuarter ? 42 : (window.isHalf ? 48 : 56)
+        color: theme.headerBg
+
+        // Seamless bottom hairline divider
+        Rectangle {
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 1
+          color: theme.borderSubtle
+        }
 
       RowLayout {
         anchors.fill: parent
@@ -421,8 +437,15 @@ FloatingWindow {
         Layout.fillHeight: true
         Layout.preferredWidth: window.isHalf ? 56 : 210
         color: theme.sidebarBg
-        border.color: theme.borderSubtle
-        border.width: 1
+
+        // Seamless right hairline divider
+        Rectangle {
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.right: parent.right
+          width: 1
+          color: theme.borderSubtle
+        }
 
         ColumnLayout {
           anchors.fill: parent
@@ -584,7 +607,7 @@ FloatingWindow {
       Rectangle {
         Layout.fillWidth: true
         Layout.fillHeight: true
-        color: Qt.rgba(theme.background.r, theme.background.g, theme.background.b, 0.88)
+        color: "transparent"
 
         StackLayout {
           anchors.fill: parent
@@ -617,8 +640,15 @@ FloatingWindow {
       Layout.fillWidth: true
       Layout.preferredHeight: 44
       color: theme.sidebarBg
-      border.color: theme.borderSubtle
-      border.width: 1
+
+      // Seamless top hairline divider
+      Rectangle {
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 1
+        color: theme.borderSubtle
+      }
 
       RowLayout {
         anchors.fill: parent
@@ -674,6 +704,7 @@ FloatingWindow {
         }
       }
     }
+  }
   }
 
   // Global Ephemeral Consent Modal
