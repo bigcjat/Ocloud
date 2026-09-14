@@ -187,7 +187,7 @@ Item {
             font.pixelSize: 10
             font.bold: true
             color: root.mutedColor
-            letterSpacing: 1.2
+            font.letterSpacing: 1.2
           }
 
           Text {

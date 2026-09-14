@@ -84,7 +84,7 @@ Item {
             font.pixelSize: 10
             font.bold: true
             color: root.mutedColor
-            letterSpacing: 1.2
+            font.letterSpacing: 1.2
           }
 
           Text {
@@ -178,7 +178,7 @@ Item {
           font.pixelSize: 10
           font.bold: true
           color: root.mutedColor
-          letterSpacing: 1.2
+            font.letterSpacing: 1.2
         }
 
         Repeater {
@@ -215,7 +215,7 @@ Item {
             font.pixelSize: 10
             font.bold: true
             color: root.mutedColor
-            letterSpacing: 1.2
+            font.letterSpacing: 1.2
           }
           Item { Layout.fillWidth: true }
           Text {
@@ -459,7 +459,7 @@ Item {
             font.pixelSize: 10
             font.bold: true
             color: root.textColor
-            letterSpacing: 1.2
+            font.letterSpacing: 1.2
           }
 
           Item { Layout.fillWidth: true }
