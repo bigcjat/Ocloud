@@ -5,9 +5,11 @@ import QtQuick.Layouts
 Rectangle {
   id: root
   Layout.fillWidth: true
-  radius: (typeof theme !== "undefined" && theme.cornerRadius) ? theme.cornerRadius : 8
-  color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "#24283b"
-  border.color: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#414868"
+  radius: 4
+  color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
+  border.color: driveMouse.containsMouse
+    ? ((typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7")
+    : ((typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333")
   border.width: 1
 
   property string driveName: "Drive"
@@ -28,6 +30,12 @@ Rectangle {
   property bool isBusy: false
   property string busyAction: ""
   property string lastError: ""
+
+  readonly property string appFontFamily: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+  readonly property color textColor: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
+  readonly property color mutedColor: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89"
+  readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
+  readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
 
   Connections {
     target: (typeof ocloud !== "undefined") ? ocloud : null
@@ -52,259 +60,252 @@ Rectangle {
   signal disconnectClicked()
   signal autoMountToggled(bool enabled)
 
-  readonly property bool isNarrow: width < 480
+  implicitHeight: cardContent.implicitHeight + 20
 
-  implicitHeight: cardContent.implicitHeight + 24
+  MouseArea {
+    id: driveMouse
+    anchors.fill: parent
+    hoverEnabled: true
+    acceptedButtons: Qt.NoButton
+  }
 
   ColumnLayout {
     id: cardContent
-    anchors.top: parent.top
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.margins: root.isNarrow ? 10 : 14
-    spacing: root.isNarrow ? 8 : 12
+    anchors.fill: parent
+    anchors.margins: 12
+    spacing: 8
 
-    // Top Row: Icon + Info + Capacity
+    // Row: Status Dot, Icon, Details, Actions
     RowLayout {
       Layout.fillWidth: true
-      spacing: root.isNarrow ? 10 : 12
+      spacing: 10
 
-      // Drive Icon Container
+      // 6px Flea Status Dot
       Rectangle {
-        Layout.preferredWidth: root.isNarrow ? 36 : 44
-        Layout.preferredHeight: root.isNarrow ? 36 : 44
-        radius: (typeof theme !== "undefined" && theme.cornerRadius) ? Math.max(4, theme.cornerRadius - 2) : 6
-        color: (typeof theme !== "undefined" && theme.cardBgAlt) ? theme.cardBgAlt : "#13141c"
-        border.color: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#414868"
-
-        Image {
-          anchors.centerIn: parent
-          width: root.isNarrow ? 22 : 28
-          height: root.isNarrow ? 22 : 28
-          source: {
-            if (!root.iconSource) return Qt.resolvedUrl("../icons/cloud.svg");
-            if (root.iconSource.indexOf("data:") === 0) return root.iconSource;
-            if (root.iconSource.indexOf("<svg") === 0) {
-              return "data:image/svg+xml;utf8," + encodeURIComponent(root.iconSource);
-            }
-            if (root.iconSource.indexOf("icons/") === 0) return Qt.resolvedUrl("../" + root.iconSource);
-            if (root.iconSource.indexOf(":") >= 0) return root.iconSource;
-            return Qt.resolvedUrl(root.iconSource);
-          }
-          fillMode: Image.PreserveAspectFit
-          smooth: true
-        }
+        Layout.preferredWidth: 6
+        Layout.preferredHeight: 6
+        Layout.alignment: Qt.AlignVCenter
+        color: root.isMounted
+          ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
+          : root.mutedColor
       }
 
-      // Drive Details
+      // Drive ThemeIcon
+      ThemeIcon {
+        Layout.preferredWidth: 20
+        Layout.preferredHeight: 20
+        Layout.alignment: Qt.AlignVCenter
+        source: root.iconSource
+        color: driveMouse.containsMouse ? root.accentColor : root.textColor
+      }
+
+      // Drive Details (Zero badges, pure typography)
       ColumnLayout {
         Layout.fillWidth: true
         spacing: 2
 
         RowLayout {
           spacing: 6
-          Layout.fillWidth: true
-
           Text {
             text: root.driveName
-            font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-            font.pixelSize: root.isNarrow ? 13 : 14
+            font.family: root.appFontFamily
+            font.pixelSize: 13
             font.bold: true
-            color: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
+            color: root.textColor
             elide: Text.ElideRight
-            Layout.maximumWidth: root.isNarrow ? 140 : 260
           }
 
-          AppBadge {
-            variant: root.statusVariant
-            text: root.statusText
-          }
-
-          AppBadge {
-            visible: root.showAutoMount && root.autoMount
-            variant: "info"
-            text: "Auto-Mount"
+          Text {
+            text: "· " + (root.isMounted ? "mounted" : "unmounted")
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            color: root.isMounted
+              ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
+              : root.mutedColor
           }
         }
 
         Text {
-          text: root.mountPath ? ("Mount: " + root.mountPath) : root.driveType
-          font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+          text: (root.mountPath ? root.mountPath : root.driveType) + (root.capacityText ? (" · " + root.capacityText) : "")
+          font.family: root.appFontFamily
           font.pixelSize: 10
-          color: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89"
+          color: root.mutedColor
           elide: Text.ElideRight
-          Layout.fillWidth: true
-        }
-
-        // In narrow mode, capacity displays directly under the path
-        Text {
-          visible: root.isNarrow
-          text: root.capacityText || (root.isMounted ? "Active Volume" : "Ready to Mount")
-          font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-          font.pixelSize: 10
-          font.bold: true
-          color: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
         }
       }
 
-      // Capacity Info (Visible on wide / half screens)
-      ColumnLayout {
-        visible: !root.isNarrow
-        spacing: 2
+      // Compact Desktop Action Toolbar
+      RowLayout {
         Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+        spacing: 6
 
-        Text {
-          text: root.capacityText || (root.isMounted ? "Active Volume" : (root.isConnected ? "Ready to Mount" : "Not Linked"))
-          font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-          font.pixelSize: 12
-          font.bold: true
-          color: root.isMounted ? ((typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5") : ((typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89")
-          horizontalAlignment: Text.AlignRight
-          Layout.alignment: Qt.AlignRight
+        // Open in File Manager Button
+        Rectangle {
+          visible: root.isMounted && !!root.mountPath
+          implicitWidth: opnText.implicitWidth + 14
+          implicitHeight: 22
+          radius: 2
+          color: opnMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: opnMouse.containsMouse ? root.accentColor : root.borderCol
+          border.width: 1
+
+          Text {
+            id: opnText
+            anchors.centerIn: parent
+            text: "Open"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: opnMouse.containsMouse ? root.accentColor : root.textColor
+          }
+
+          MouseArea {
+            id: opnMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.openClicked()
+          }
         }
 
-        Text {
-          text: root.usedPercent >= 0 ? (Math.round(root.usedPercent * 100) + "% used") : ""
-          visible: root.usedPercent >= 0
-          font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-          font.pixelSize: 10
-          color: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89"
-          horizontalAlignment: Text.AlignRight
-          Layout.alignment: Qt.AlignRight
+        // Mount Drive Button
+        Rectangle {
+          visible: root.isConnected && !root.isMounted
+          implicitWidth: mntText.implicitWidth + 14
+          implicitHeight: 22
+          radius: 2
+          color: mntMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: mntMouse.containsMouse ? root.accentColor : root.borderCol
+          border.width: 1
+
+          Text {
+            id: mntText
+            anchors.centerIn: parent
+            text: (root.isBusy && root.busyAction === "mounting") ? "Mounting..." : "Mount"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: mntMouse.containsMouse ? root.accentColor : root.textColor
+          }
+
+          MouseArea {
+            id: mntMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: !root.isBusy
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+              root.isBusy = true;
+              root.busyAction = "mounting";
+              root.lastError = "";
+              root.mountClicked();
+            }
+          }
+        }
+
+        // Unmount Drive Button
+        Rectangle {
+          visible: root.isMounted && root.mountPath !== "/" && root.driveType.indexOf("Internal") < 0
+          implicitWidth: unmText.implicitWidth + 14
+          implicitHeight: 22
+          radius: 2
+          color: unmMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: unmMouse.containsMouse ? root.accentColor : root.borderCol
+          border.width: 1
+
+          Text {
+            id: unmText
+            anchors.centerIn: parent
+            text: (root.isBusy && root.busyAction === "unmounting") ? "Unmounting..." : "Unmount"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: unmMouse.containsMouse ? root.accentColor : root.mutedColor
+          }
+
+          MouseArea {
+            id: unmMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: !root.isBusy
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+              root.isBusy = true;
+              root.busyAction = "unmounting";
+              root.lastError = "";
+              root.unmountClicked();
+            }
+          }
+        }
+
+        // Auto-Mount Toggle Button
+        Rectangle {
+          visible: root.showAutoMount && root.isConnected
+          implicitWidth: autoText.implicitWidth + 14
+          implicitHeight: 22
+          radius: 2
+          color: autoMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: autoMouse.containsMouse ? root.accentColor : root.borderCol
+          border.width: 1
+
+          Text {
+            id: autoText
+            anchors.centerIn: parent
+            text: root.autoMount ? "Auto: ON" : "Auto: OFF"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: root.autoMount
+              ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
+              : root.mutedColor
+          }
+
+          MouseArea {
+            id: autoMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.autoMountToggled(!root.autoMount)
+          }
         }
       }
     }
 
-    // Capacity Gauge Bar
+    // Capacity Gauge Hairline (Subtle 2px line)
     Rectangle {
       Layout.fillWidth: true
-      height: 4
-      radius: 2
-      color: (typeof theme !== "undefined" && theme.cardBgAlt) ? theme.cardBgAlt : "#13141c"
+      height: 2
+      radius: 1
+      color: root.borderCol
       visible: root.isMounted && root.usedPercent >= 0
 
       Rectangle {
         height: parent.height
-        radius: 2
-        width: Math.max(4, parent.width * Math.min(1.0, Math.max(0.0, root.usedPercent)))
-        color: root.usedPercent > 0.9 ? ((typeof theme !== "undefined" && theme.dangerRed) ? theme.dangerRed : "#f7768e") : ((typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7")
+        radius: 1
+        width: Math.max(2, parent.width * Math.min(1.0, Math.max(0.0, root.usedPercent)))
+        color: root.usedPercent > 0.9
+          ? ((typeof theme !== "undefined" && theme.red) ? theme.red : root.accentColor)
+          : root.accentColor
       }
     }
 
-    // Actions Footer: Flow wrapping handles 1/4 layout perfectly!
-    Flow {
-      Layout.fillWidth: true
-      spacing: 6
-      layoutDirection: root.isNarrow ? Qt.LeftToRight : Qt.RightToLeft
-
-      // Settings
-      AppButton {
-        visible: root.showSettings
-        text: root.isNarrow ? "Settings" : "Storage Settings..."
-        variant: "secondary"
-        onClicked: root.settingsClicked()
-      }
-
-      // Unmount
-      AppButton {
-        visible: root.isMounted && root.mountPath !== "/" && root.driveType.indexOf("Internal") < 0
-        text: (root.isBusy && root.busyAction === "unmounting") ? "Unmounting..." : "Unmount"
-        iconSource: (root.isBusy && root.busyAction === "unmounting") ? "" : "icons/eject.svg"
-        loading: root.isBusy && root.busyAction === "unmounting"
-        enabled: !root.isBusy
-        variant: "danger"
-        onClicked: {
-          root.isBusy = true;
-          root.busyAction = "unmounting";
-          root.lastError = "";
-          root.unmountClicked();
-        }
-      }
-
-      // Open Folder
-      AppButton {
-        visible: root.isMounted && !!root.mountPath
-        text: "Open Folder"
-        iconSource: "icons/external-link.svg"
-        variant: "secondary"
-        onClicked: root.openClicked()
-      }
-
-      // Auto-mount Toggle
-      AppButton {
-        visible: root.showAutoMount && root.isConnected
-        text: root.autoMount ? (root.isNarrow ? "Auto: ON" : "Auto-Mount: ON") : (root.isNarrow ? "Auto: OFF" : "Auto-Mount: OFF")
-        variant: root.autoMount ? "primary" : "secondary"
-        onClicked: root.autoMountToggled(!root.autoMount)
-      }
-
-      // Mount Drive
-      AppButton {
-        visible: root.isConnected && !root.isMounted
-        text: (root.isBusy && root.busyAction === "mounting") ? "Mounting..." : "Mount Drive"
-        iconSource: (root.isBusy && root.busyAction === "mounting") ? "" : "icons/hard-drive.svg"
-        loading: root.isBusy && root.busyAction === "mounting"
-        enabled: !root.isBusy
-        variant: "success"
-        onClicked: {
-          root.isBusy = true;
-          root.busyAction = "mounting";
-          root.lastError = "";
-          root.mountClicked();
-        }
-      }
-
-      // Disconnect
-      AppButton {
-        visible: !root.isMounted && root.showDisconnect
-        text: "Disconnect"
-        variant: "secondary"
-        onClicked: root.disconnectClicked()
-      }
-
-      // Connect
-      AppButton {
-        visible: !root.isConnected
-        text: "Connect Account"
-        iconSource: "icons/plus.svg"
-        variant: "primary"
-        onClicked: root.connectClicked()
-      }
-    }
-
-    // Visible Error Message on Card
-    Rectangle {
-      Layout.fillWidth: true
+    // Error Message Banner (if any)
+    Text {
       visible: root.lastError.length > 0
-      radius: 6
-      color: "#2d1215"
-      border.color: "#ef4444"
-      border.width: 1
-      implicitHeight: errLayout.implicitHeight + 16
-
-      RowLayout {
-        id: errLayout
-        anchors.fill: parent
-        anchors.margins: 8
-        spacing: 8
-
-        Text {
-          text: "⚠ " + root.lastError
-          color: "#fca5a5"
-          font.pixelSize: 11
-          font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-          wrapMode: Text.WordWrap
-          Layout.fillWidth: true
-        }
-
-        AppButton {
-          text: "✕"
-          variant: "secondary"
-          customWidth: 28
-          implicitHeight: 22
-          onClicked: root.lastError = ""
-        }
-      }
+      text: "⚠ " + root.lastError
+      color: (typeof theme !== "undefined" && theme.red) ? theme.red : "#f7768e"
+      font.family: root.appFontFamily
+      font.pixelSize: 10
+      wrapMode: Text.WordWrap
+      Layout.fillWidth: true
     }
   }
 }

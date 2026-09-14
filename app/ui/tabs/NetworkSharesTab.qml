@@ -8,7 +8,12 @@ Item {
   Layout.fillWidth: true
   Layout.fillHeight: true
 
-  readonly property bool isNarrow: width < 520
+  readonly property string appFontFamily: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+  readonly property color textColor: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
+  readonly property color mutedColor: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89"
+  readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
+  readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
+  readonly property color cardBg: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "#111111"
 
   property var mountedShares: []
   property var discoveredDevices: []
@@ -54,101 +59,126 @@ Item {
 
   ScrollView {
     anchors.fill: parent
-    anchors.margins: root.isNarrow ? 12 : 20
+    anchors.margins: 16
     contentWidth: availableWidth
     clip: true
 
     ColumnLayout {
       width: parent.width
-      spacing: 20
+      spacing: 12
 
-      // Section Header
-      AppHeader {
-        title: "Network Shares (SMB / CIFS)"
-        subtitle: "Discover, browse, and mount shared folders from Macs, Windows PCs, and home NAS devices"
+      // =========================================================
+      // HEADER
+      // =========================================================
+      RowLayout {
+        Layout.fillWidth: true
+        spacing: 12
 
-        RowLayout {
-          spacing: 8
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: 2
 
-          AppButton {
+          Text {
+            text: "NETWORK SHARES (SMB / CIFS)"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: root.mutedColor
+            letterSpacing: 1.2
+          }
+
+          Text {
+            text: root.mountedShares.length + " active mounts · " + root.discoveredDevices.length + " discovered"
+            font.family: root.appFontFamily
+            font.pixelSize: 12
+            color: root.textColor
+          }
+        }
+
+        // Scan Network Button
+        Rectangle {
+          implicitWidth: scanText.implicitWidth + 16
+          implicitHeight: 24
+          radius: 2
+          color: scanMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: scanMouse.containsMouse ? root.accentColor : root.borderCol
+          border.width: 1
+
+          Text {
+            id: scanText
+            anchors.centerIn: parent
             text: root.isScanning ? "Scanning..." : "Scan Network"
-            iconSource: "icons/refresh.svg"
-            variant: "secondary"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: scanMouse.containsMouse ? root.accentColor : root.textColor
+          }
+
+          MouseArea {
+            id: scanMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
             enabled: !root.isScanning
             onClicked: root.startScan()
           }
+        }
 
-          AppButton {
-            text: "Connect to Server..."
-            iconSource: "icons/plus.svg"
-            variant: "primary"
+        // Connect to Server Button
+        Rectangle {
+          implicitWidth: connText.implicitWidth + 16
+          implicitHeight: 24
+          radius: 2
+          color: connMouse.containsMouse ? root.accentColor : "transparent"
+          border.color: root.accentColor
+          border.width: 1
+
+          Text {
+            id: connText
+            anchors.centerIn: parent
+            text: "+ Connect to Server"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: connMouse.containsMouse
+              ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+              : root.accentColor
+          }
+
+          MouseArea {
+            id: connMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
             onClicked: smbConnectModal.openModal("", "", "")
           }
         }
       }
 
-      // Banner: How Network Sharing Works in Omarchy
+      // Thin separator
       Rectangle {
         Layout.fillWidth: true
-        implicitHeight: bannerCol.implicitHeight + 24
-        radius: 12
-        color: "#0a1529"
-        border.color: "#182a4a"
-        border.width: 1
-
-        RowLayout {
-          id: bannerCol
-          anchors.fill: parent
-          anchors.margins: 14
-          spacing: 14
-
-          Rectangle {
-            Layout.preferredWidth: 38
-            Layout.preferredHeight: 38
-            radius: 8
-            color: "#142542"
-            Image {
-              anchors.centerIn: parent
-              width: 20
-              height: 20
-              source: Qt.resolvedUrl("../icons/network.svg")
-              fillMode: Image.PreserveAspectFit
-            }
-          }
-
-          ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 2
-            Text {
-              text: "Local & Tailscale Network File Sharing"
-              font.pixelSize: 13
-              font.bold: true
-              color: "#38bdf8"
-            }
-            Text {
-              text: "Connect to shared folders on your Mac, Windows PC, or NAS directly over your Wi-Fi or Tailscale network. Mounts appear in your file manager as local folders."
-              font.pixelSize: 11
-              color: "#94a3b8"
-              wrapMode: Text.WordWrap
-              Layout.fillWidth: true
-            }
-          }
-        }
+        height: 1
+        color: root.borderCol
       }
 
-      // ==========================================
-      // ACTIVE MOUNTED SHARES SECTION
-      // ==========================================
+      // =========================================================
+      // MOUNTED SHARES (IF ANY)
+      // =========================================================
       ColumnLayout {
         Layout.fillWidth: true
-        spacing: 12
+        spacing: 8
         visible: root.mountedShares.length > 0
 
         Text {
-          text: "Mounted Network Shares (" + root.mountedShares.length + ")"
-          font.pixelSize: 15
+          text: "MOUNTED SHARES"
+          font.family: root.appFontFamily
+          font.pixelSize: 10
           font.bold: true
-          color: "#f8fafc"
+          color: root.mutedColor
+          letterSpacing: 1.2
         }
 
         Repeater {
@@ -170,169 +200,196 @@ Item {
         }
       }
 
-      // ==========================================
+      // =========================================================
       // DISCOVERED COMPUTERS & SERVERS
-      // ==========================================
+      // =========================================================
       ColumnLayout {
         Layout.fillWidth: true
-        spacing: 12
+        spacing: 8
 
         RowLayout {
           Layout.fillWidth: true
           Text {
-            text: "Discovered Computers & Servers"
-            font.pixelSize: 15
+            text: "DISCOVERED DEVICES"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
             font.bold: true
-            color: "#f8fafc"
+            color: root.mutedColor
+            letterSpacing: 1.2
           }
           Item { Layout.fillWidth: true }
           Text {
-            text: root.isScanning ? "Searching network..." : (root.discoveredDevices.length + " devices found")
-            font.pixelSize: 11
-            color: "#94a3b8"
+            text: root.isScanning ? "Scanning local network & Tailscale..." : (root.discoveredDevices.length + " detected")
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            color: root.mutedColor
           }
         }
 
-        // Scanning indicator if empty
+        // Empty state
         Rectangle {
           Layout.fillWidth: true
-          height: 90
-          radius: 12
-          color: "#0f172a"
-          border.color: "#1e293b"
+          height: 50
+          radius: 2
+          color: "transparent"
+          border.color: root.borderCol
+          border.width: 1
           visible: root.discoveredDevices.length === 0
 
-          ColumnLayout {
-            anchors.centerIn: parent
-            spacing: 6
-            Text {
-              text: root.isScanning ? "Scanning local subnet & Tailscale for file shares..." : "No SMB shares detected automatically"
-              font.pixelSize: 13
-              font.bold: true
-              color: "#94a3b8"
-              horizontalAlignment: Text.AlignHCenter
+          RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            spacing: 8
+
+            Rectangle {
+              width: 6
+              height: 6
+              radius: 3
+              color: root.isScanning ? root.accentColor : root.mutedColor
             }
+
             Text {
-              text: root.isScanning ? "Checking mDNS, Bonjour, and SMB ports" : "Click 'Connect to Server...' to enter your computer's IP address directly"
+              Layout.fillWidth: true
+              text: root.isScanning
+                ? "Scanning local subnet & Tailscale for active SMB shares..."
+                : "No network shares detected automatically on local network."
+              font.family: root.appFontFamily
               font.pixelSize: 11
-              color: "#64748b"
-              horizontalAlignment: Text.AlignHCenter
+              color: root.mutedColor
+            }
+
+            Rectangle {
+              visible: !root.isScanning
+              implicitWidth: manConnText.implicitWidth + 12
+              implicitHeight: 22
+              radius: 2
+              color: manConnMouse.containsMouse ? root.accentColor : "transparent"
+              border.color: root.accentColor
+              border.width: 1
+
+              Text {
+                id: manConnText
+                anchors.centerIn: parent
+                text: "Connect Manually"
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                font.bold: true
+                color: manConnMouse.containsMouse
+                  ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+                  : root.accentColor
+              }
+
+              MouseArea {
+                id: manConnMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: smbConnectModal.openModal("", "", "")
+              }
             }
           }
         }
 
-        Item {
+        // Single-column Discovered Device Rows
+        ColumnLayout {
           Layout.fillWidth: true
-          implicitHeight: devGrid.height
+          spacing: 6
           visible: root.discoveredDevices.length > 0
 
-          Grid {
-            id: devGrid
-            width: parent.width
-            columns: 2
-            columnSpacing: 14
-            rowSpacing: 14
+          Repeater {
+            model: root.discoveredDevices
+            delegate: Rectangle {
+              Layout.fillWidth: true
+              implicitHeight: 38
+              radius: 2
+              color: devMouse.containsMouse
+                ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : root.cardBg)
+                : root.cardBg
+              border.color: devMouse.containsMouse ? root.accentColor : root.borderCol
+              border.width: 1
 
-            Repeater {
-              model: root.discoveredDevices
-              delegate: Rectangle {
-                width: Math.max(100, Math.floor((devGrid.width - 14) / 2))
-                height: 104
-                radius: 12
-                color: "#0f172a"
-                border.color: "#1e293b"
-
-              // Card contents
-              Item {
+              RowLayout {
                 anchors.fill: parent
-                anchors.margins: 14
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                spacing: 8
 
-                // Device Icon
+                // Status dot
                 Rectangle {
-                  id: devIconRect
-                  anchors.left: parent.left
-                  anchors.top: parent.top
-                  width: 40
-                  height: 40
-                  radius: 8
-                  color: "#141e30"
-                  border.color: "#1e293b"
+                  width: 6
+                  height: 6
+                  radius: 3
+                  color: modelData.isOnline
+                    ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+                    : root.mutedColor
+                }
 
-                  Image {
+                // Sharp Theme Icon
+                ThemeIcon {
+                  width: 14
+                  height: 14
+                  source: modelData.isMac ? "icons/monitor.svg" : "icons/server.svg"
+                  color: root.textColor
+                }
+
+                // Name & Host
+                Text {
+                  text: modelData.name || modelData.host
+                  font.family: root.appFontFamily
+                  font.pixelSize: 11
+                  font.bold: true
+                  color: root.textColor
+                  elide: Text.ElideRight
+                  Layout.maximumWidth: 160
+                }
+
+                // IP / Share detail
+                Text {
+                  Layout.fillWidth: true
+                  text: modelData.host + (modelData.shareHint ? (" · " + modelData.shareHint) : "")
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  color: root.mutedColor
+                  elide: Text.ElideRight
+                }
+
+                // Connect Action
+                Rectangle {
+                  implicitWidth: btnText.implicitWidth + 14
+                  implicitHeight: 22
+                  radius: 2
+                  color: btnMouse.containsMouse ? root.accentColor : "transparent"
+                  border.color: root.accentColor
+                  border.width: 1
+
+                  Text {
+                    id: btnText
                     anchors.centerIn: parent
-                    width: 24
-                    height: 24
-                    source: modelData.isMac ? Qt.resolvedUrl("../icons/monitor.svg") : Qt.resolvedUrl("../icons/server.svg")
-                    fillMode: Image.PreserveAspectFit
-                  }
-                }
-
-                // Connect Button (PINNED TO RIGHT EDGE)
-                AppButton {
-                  id: connBtn
-                  anchors.right: parent.right
-                  anchors.top: parent.top
-                  text: "Connect"
-                  variant: "primary"
-                  onClicked: smbConnectModal.openModal(modelData.host, modelData.name || "", modelData.defaultShare || "")
-                }
-
-                // Middle Text & Badge (Between Icon and Connect Button)
-                ColumnLayout {
-                  anchors.left: devIconRect.right
-                  anchors.leftMargin: 12
-                  anchors.right: connBtn.left
-                  anchors.rightMargin: 12
-                  anchors.top: parent.top
-                  spacing: 3
-
-                  RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 6
-
-                    Text {
-                      text: modelData.name || modelData.host
-                      font.pixelSize: 14
-                      font.bold: true
-                      color: "#f8fafc"
-                      elide: Text.ElideRight
-                      Layout.maximumWidth: 150
-                    }
-
-                    AppBadge {
-                      variant: modelData.isOnline ? "success" : "neutral"
-                      text: modelData.os || "SMB"
-                    }
-                  }
-
-                  Text {
-                    Layout.fillWidth: true
-                    text: "IP: " + modelData.host + (modelData.shareHint ? (" • " + modelData.shareHint) : "")
-                    font.pixelSize: 11
-                    color: "#94a3b8"
-                    elide: Text.ElideRight
-                  }
-                }
-
-                // Bottom Status Bar
-                RowLayout {
-                  anchors.left: parent.left
-                  anchors.bottom: parent.bottom
-                  spacing: 6
-
-                  Rectangle {
-                    width: 8
-                    height: 8
-                    radius: 4
-                    color: modelData.isOnline ? "#22c55e" : "#94a3b8"
-                  }
-
-                  Text {
-                    text: modelData.isOnline ? "SMB Service Detected (Port 445 Open)" : "Peer online via Tailscale / LAN"
+                    text: "Connect"
+                    font.family: root.appFontFamily
                     font.pixelSize: 10
-                    color: modelData.isOnline ? "#22c55e" : "#94a3b8"
+                    font.bold: true
+                    color: btnMouse.containsMouse
+                      ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+                      : root.accentColor
+                  }
+
+                  MouseArea {
+                    id: btnMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: smbConnectModal.openModal(modelData.host, modelData.name || "", modelData.defaultShare || "")
                   }
                 }
+              }
+
+              MouseArea {
+                id: devMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.NoButton
               }
             }
           }
@@ -340,11 +397,10 @@ Item {
       }
     }
   }
-}
 
-  // ==========================================
+  // =========================================================
   // SMB CONNECT MODAL
-  // ==========================================
+  // =========================================================
   Rectangle {
     id: smbConnectModal
     visible: false
@@ -372,149 +428,230 @@ Item {
     }
 
     Rectangle {
-      width: Math.min(parent.width - 48, 500)
-      implicitHeight: smbModalCol.implicitHeight + 48
-      radius: 16
-      color: "#0b1325"
-      border.color: "#1e293b"
+      width: Math.min(parent.width - 24, 440)
+      implicitHeight: smbModalCol.implicitHeight + 28
+      radius: 2
+      color: root.cardBg
+      border.color: root.borderCol
+      border.width: 1
       anchors.centerIn: parent
 
       ColumnLayout {
         id: smbModalCol
         anchors.fill: parent
-        anchors.margins: 24
-        spacing: 16
+        anchors.margins: 14
+        spacing: 12
 
         RowLayout {
           Layout.fillWidth: true
-          spacing: 10
-          Image {
-            width: 24
-            height: 24
-            source: Qt.resolvedUrl("../icons/network.svg")
-            fillMode: Image.PreserveAspectFit
+          spacing: 8
+
+          ThemeIcon {
+            width: 14
+            height: 14
+            source: "icons/network.svg"
+            color: root.textColor
           }
-          ColumnLayout {
-            spacing: 2
-            Text {
-              text: "Connect to Network Share"
-              font.pixelSize: 16
-              font.bold: true
-              color: "#f8fafc"
-            }
-            Text {
-              text: "Mount a shared folder over SMB / CIFS into ~/NetworkShares"
-              font.pixelSize: 11
-              color: "#94a3b8"
-            }
+
+          Text {
+            text: "CONNECT TO NETWORK SHARE"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: root.textColor
+            letterSpacing: 1.2
           }
+
           Item { Layout.fillWidth: true }
-          AppButton {
-            text: "✕"
-            variant: "secondary"
-            onClicked: smbConnectModal.visible = false
+
+          Rectangle {
+            width: 20
+            height: 20
+            radius: 2
+            color: "transparent"
+            border.color: closeMouse.containsMouse ? root.accentColor : root.borderCol
+
+            Text {
+              anchors.centerIn: parent
+              text: "✕"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              color: closeMouse.containsMouse ? root.accentColor : root.mutedColor
+            }
+
+            MouseArea {
+              id: closeMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: smbConnectModal.visible = false
+            }
           }
+        }
+
+        Rectangle {
+          Layout.fillWidth: true
+          height: 1
+          color: root.borderCol
         }
 
         ColumnLayout {
           Layout.fillWidth: true
-          spacing: 10
+          spacing: 8
 
           ColumnLayout {
             Layout.fillWidth: true
-            spacing: 2
-            Text { text: "Server IP or Hostname"; font.pixelSize: 11; font.bold: true; color: "#94a3b8" }
+            spacing: 3
+            Text { text: "SERVER IP OR HOSTNAME"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
             TextField {
               id: smbHostField
               Layout.fillWidth: true
-              placeholderText: "e.g. 192.168.1.100 or chriss-macbook-air"
-              color: "#f8fafc"
-              background: Rectangle { color: "#0f172a"; border.color: "#1e293b"; radius: 6 }
+              implicitHeight: 26
+              font.family: root.appFontFamily
+              font.pixelSize: 11
+              placeholderText: "e.g. 192.168.1.100"
+              color: root.textColor
+              background: Rectangle { color: "transparent"; border.color: root.borderCol; radius: 2 }
             }
           }
 
           ColumnLayout {
             Layout.fillWidth: true
-            spacing: 2
-            Text { text: "Share Folder Name"; font.pixelSize: 11; font.bold: true; color: "#94a3b8" }
+            spacing: 3
+            Text { text: "SHARE FOLDER NAME"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
             TextField {
               id: smbShareField
               Layout.fillWidth: true
+              implicitHeight: 26
+              font.family: root.appFontFamily
+              font.pixelSize: 11
               placeholderText: "e.g. Shared, Public, or Mac-Drive"
-              color: "#f8fafc"
-              background: Rectangle { color: "#0f172a"; border.color: "#1e293b"; radius: 6 }
+              color: root.textColor
+              background: Rectangle { color: "transparent"; border.color: root.borderCol; radius: 2 }
             }
           }
 
           RowLayout {
             Layout.fillWidth: true
-            spacing: 10
+            spacing: 8
 
             ColumnLayout {
               Layout.fillWidth: true
-              spacing: 2
-              Text { text: "Username"; font.pixelSize: 11; font.bold: true; color: "#94a3b8" }
+              spacing: 3
+              Text { text: "USERNAME"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
               TextField {
                 id: smbUserField
                 Layout.fillWidth: true
-                placeholderText: "Computer username"
-                color: "#f8fafc"
-                background: Rectangle { color: "#0f172a"; border.color: "#1e293b"; radius: 6 }
+                implicitHeight: 26
+                font.family: root.appFontFamily
+                font.pixelSize: 11
+                placeholderText: "Username"
+                color: root.textColor
+                background: Rectangle { color: "transparent"; border.color: root.borderCol; radius: 2 }
               }
             }
 
             ColumnLayout {
               Layout.fillWidth: true
-              spacing: 2
-              Text { text: "Password"; font.pixelSize: 11; font.bold: true; color: "#94a3b8" }
+              spacing: 3
+              Text { text: "PASSWORD"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
               TextField {
                 id: smbPassField
                 Layout.fillWidth: true
+                implicitHeight: 26
                 echoMode: TextInput.Password
-                placeholderText: "Login password"
-                color: "#f8fafc"
-                background: Rectangle { color: "#0f172a"; border.color: "#1e293b"; radius: 6 }
+                font.family: root.appFontFamily
+                font.pixelSize: 11
+                placeholderText: "Password"
+                color: root.textColor
+                background: Rectangle { color: "transparent"; border.color: root.borderCol; radius: 2 }
               }
             }
           }
 
           ColumnLayout {
             Layout.fillWidth: true
-            spacing: 2
-            Text { text: "Mount Name"; font.pixelSize: 11; font.bold: true; color: "#94a3b8" }
+            spacing: 3
+            Text { text: "MOUNT IDENTIFIER"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
             TextField {
               id: smbNameField
               Layout.fillWidth: true
+              implicitHeight: 26
+              font.family: root.appFontFamily
+              font.pixelSize: 11
               placeholderText: "e.g. mac-share"
-              color: "#38bdf8"
-              background: Rectangle { color: "#0f172a"; border.color: "#1e293b"; radius: 6 }
+              color: root.accentColor
+              background: Rectangle { color: "transparent"; border.color: root.borderCol; radius: 2 }
             }
           }
         }
 
         RowLayout {
           Layout.fillWidth: true
-          spacing: 10
+          spacing: 8
           Item { Layout.fillWidth: true }
-          AppButton {
-            text: "Cancel"
-            variant: "secondary"
-            onClicked: smbConnectModal.visible = false
+
+          Rectangle {
+            implicitWidth: cancelText.implicitWidth + 14
+            implicitHeight: 24
+            radius: 2
+            color: "transparent"
+            border.color: root.borderCol
+
+            Text {
+              id: cancelText
+              anchors.centerIn: parent
+              text: "Cancel"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              color: root.textColor
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: smbConnectModal.visible = false
+            }
           }
-          AppButton {
-            text: "Connect & Mount"
-            variant: "primary"
+
+          Rectangle {
+            implicitWidth: mountText.implicitWidth + 14
+            implicitHeight: 24
+            radius: 2
+            color: mountMouse.containsMouse ? root.accentColor : "transparent"
+            border.color: root.accentColor
             enabled: smbHostField.text.trim().length > 0 && smbShareField.text.trim().length > 0
-            onClicked: {
-              ocloud.mountSmbShare(
-                smbHostField.text.trim(),
-                smbShareField.text.trim(),
-                smbUserField.text.trim(),
-                smbPassField.text.trim(),
-                smbNameField.text.trim() || "network-share"
-              );
-              smbConnectModal.visible = false;
-              root.refreshShares();
+            opacity: enabled ? 1.0 : 0.4
+
+            Text {
+              id: mountText
+              anchors.centerIn: parent
+              text: "Mount Share"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              font.bold: true
+              color: mountMouse.containsMouse
+                ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+                : root.accentColor
+            }
+
+            MouseArea {
+              id: mountMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                ocloud.mountSmbShare(
+                  smbHostField.text.trim(),
+                  smbShareField.text.trim(),
+                  smbUserField.text.trim(),
+                  smbPassField.text.trim(),
+                  smbNameField.text.trim() || "network-share"
+                );
+                smbConnectModal.visible = false;
+                root.refreshShares();
+              }
             }
           }
         }

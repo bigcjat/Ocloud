@@ -8,11 +8,15 @@ Item {
   Layout.fillWidth: true
   Layout.fillHeight: true
 
-  readonly property bool isNarrow: width < 520
-
   property var rootCapacities: ({})
   property var cloudAccounts: []
   property var mountedShares: []
+
+  readonly property string appFontFamily: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+  readonly property color textColor: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
+  readonly property color mutedColor: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89"
+  readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
+  readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
 
   function refreshCapacities() {
     try {
@@ -69,54 +73,71 @@ Item {
     }
   }
 
-  function getRemoteByName(nameStr) {
-    for (var i = 0; i < cloudAccounts.length; i++) {
-      if (cloudAccounts[i].name === nameStr || cloudAccounts[i].type === nameStr) {
-        return cloudAccounts[i];
-      }
-    }
-    return null;
-  }
-
   ScrollView {
     id: storageScroll
     anchors.fill: parent
-    anchors.margins: root.isNarrow ? 12 : 20
+    anchors.margins: 16
     contentWidth: availableWidth
     clip: true
 
-    ScrollBar.vertical: ScrollBar {
-      policy: ScrollBar.AsNeeded
-      contentItem: Rectangle {
-        implicitWidth: 6
-        radius: 3
-        color: parent.pressed ? "#60a5fa" : parent.hovered ? "#3b82f6" : "#334155"
-      }
-    }
-
     ColumnLayout {
       width: parent.width
-      spacing: 20
+      spacing: 12
 
-      // Section Header
-      AppHeader {
-        title: "Storage & Drives"
-        subtitle: "Overview of all active connected disks, mounted cloud drives, and network shares"
+      // =========================================================
+      // STORAGE HEADER
+      // =========================================================
+      RowLayout {
+        Layout.fillWidth: true
+        spacing: 12
 
-        RowLayout {
-          spacing: 10
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: 2
 
-          AppButton {
-            text: "Add Cloud Storage"
-            iconSource: "icons/plus.svg"
-            variant: "primary"
-            onClicked: activeTab = "accounts"
+          Text {
+            text: "STORAGE & DRIVES"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: root.mutedColor
+            letterSpacing: 1.2
           }
 
-          AppButton {
-            text: "Refresh Disks"
-            iconSource: "icons/refresh.svg"
-            variant: "secondary"
+          Text {
+            text: (1 + root.cloudAccounts.length + root.mountedShares.length) + " storage volumes available"
+            font.family: root.appFontFamily
+            font.pixelSize: 12
+            color: root.textColor
+          }
+        }
+
+        // Refresh Disks Button
+        Rectangle {
+          implicitWidth: refText.implicitWidth + 14
+          implicitHeight: 24
+          radius: 2
+          color: refMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: refMouse.containsMouse ? root.accentColor : root.borderCol
+          border.width: 1
+
+          Text {
+            id: refText
+            anchors.centerIn: parent
+            text: "Refresh"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: refMouse.containsMouse ? root.accentColor : root.textColor
+          }
+
+          MouseArea {
+            id: refMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
             onClicked: {
               root.refreshCapacities();
               root.reloadCloudAccounts();
@@ -125,6 +146,43 @@ Item {
             }
           }
         }
+
+        // Add Cloud Storage Button
+        Rectangle {
+          implicitWidth: addText.implicitWidth + 16
+          implicitHeight: 24
+          radius: 2
+          color: addMouse.containsMouse ? root.accentColor : "transparent"
+          border.color: root.accentColor
+          border.width: 1
+
+          Text {
+            id: addText
+            anchors.centerIn: parent
+            text: "+ Add Storage"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: addMouse.containsMouse
+              ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+              : root.accentColor
+          }
+
+          MouseArea {
+            id: addMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: activeTab = "accounts"
+          }
+        }
+      }
+
+      // Thin separator hairline
+      Rectangle {
+        Layout.fillWidth: true
+        height: 1
+        color: root.borderCol
       }
 
       // =========================================================
@@ -132,28 +190,29 @@ Item {
       // =========================================================
       ColumnLayout {
         Layout.fillWidth: true
-        spacing: 10
+        spacing: 8
 
         Text {
-          text: "INTERNAL STORAGE DISK"
-          font.pixelSize: 11
+          text: "LOCAL STORAGE"
+          font.family: root.appFontFamily
+          font.pixelSize: 10
           font.bold: true
-          color: "#94a3b8"
+          color: root.mutedColor
         }
 
         NativeDriveCard {
-          driveName: "Omarchy System HD"
+          driveName: "System Volume"
           driveType: "Internal NVMe Storage (/)"
           iconSource: "icons/hard-drive.svg"
           mountPath: "/"
           capacityText: {
             var rootData = rootCapacities["/"];
             if (rootData && rootData.free && rootData.total) {
-              var freeGb = (rootData.free / (1024*1024*1024)).toFixed(2);
-              var totalGb = (rootData.total / (1024*1024*1024)).toFixed(2);
-              return freeGb + " GB available of " + totalGb + " GB";
+              var freeGb = (rootData.free / (1024*1024*1024)).toFixed(1);
+              var totalGb = (rootData.total / (1024*1024*1024)).toFixed(1);
+              return freeGb + " GB free of " + totalGb + " GB";
             }
-            return "Local Storage Volume";
+            return "Internal Drive";
           }
           usedPercent: {
             var rootData = rootCapacities["/"];
@@ -163,8 +222,6 @@ Item {
             return 0.35;
           }
           isMounted: true
-          statusVariant: "success"
-          statusText: "System Volume"
           showDisconnect: false
           showSettings: false
           onOpenClicked: ocloud.openCloudFolder("/")
@@ -176,294 +233,95 @@ Item {
       // =========================================================
       ColumnLayout {
         Layout.fillWidth: true
-        spacing: 10
+        spacing: 8
+        visible: root.cloudAccounts.length > 0
 
         Text {
-          text: "CONNECTED CLOUD DRIVES"
-          font.pixelSize: 11
+          text: "CONNECTED CLOUD DRIVES (" + root.cloudAccounts.length + ")"
+          font.family: root.appFontFamily
+          font.pixelSize: 10
           font.bold: true
-          color: "#94a3b8"
+          color: root.mutedColor
         }
 
-        // Hetzner Storage Box Drive
-        NativeDriveCard {
-          id: hetznerCard
-          property var sbRemote: {
-            var list = root.cloudAccounts;
-            for (var i = 0; i < list.length; i++) {
-              if (list[i].name === "storagebox" || list[i].type === "storagebox" || list[i].providerId === "hetzner_storage_box") {
-                return list[i];
-              }
-            }
-            return null;
-          }
-          driveName: "Hetzner Storage Box"
-          driveType: "Persistent Cloud RAID Storage"
-          iconSource: (sbRemote && sbRemote.iconDataUri && sbRemote.iconDataUri.length > 0) ? sbRemote.iconDataUri : (storageBox.iconDataUri || "icons/cloud.svg")
-          mountPath: storageBox.mount_point || "~/Cloud"
-          capacityText: storageBox.configured ? (Math.round((storageBox.used_bytes || 0) / (1024*1024*1024)) + " GB / " + Math.round((storageBox.total_bytes || 1073741824000) / (1024*1024*1024)) + " GB") : "1000 GB RAID"
-          usedPercent: storageBox.used_percent ? (storageBox.used_percent / 100.0) : 0.01
-          isMounted: storageBox.mounted || (sbRemote && sbRemote.isMounted)
-          autoMount: !!(sbRemote && sbRemote.autoMount)
-          showAutoMount: true
-          statusVariant: (storageBox.mounted || (sbRemote && sbRemote.isMounted)) ? "success" : "neutral"
-          statusText: (storageBox.mounted || (sbRemote && sbRemote.isMounted)) ? "Mounted" : "Offline"
-          showDisconnect: false
-          showSettings: false
-          onOpenClicked: ocloud.openCloudFolder(storageBox.mount_point || "~/Cloud")
-          onUnmountClicked: ocloud.unmountStorageBox()
-          onMountClicked: ocloud.mountStorageBox()
-          onAutoMountToggled: ocloud.toggleAutoMount("storagebox")
-        }
-
-        // Google Drive
-        NativeDriveCard {
-          id: gdriveDriveCard
-          property var remote: { var l = root.cloudAccounts; return getRemoteByName("gdrive"); }
-          visible: !!remote
-          driveName: "Google Drive"
-          driveType: "Virtual Cloud Drive (FUSE)"
-          iconSource: (remote && remote.iconDataUri && remote.iconDataUri.length > 0) ? remote.iconDataUri : "icons/cloud.svg"
-          mountPath: remote ? remote.mountPath : "~/GoogleDrive"
-          capacityText: remote && remote.isMounted ? "Online & Synced" : "Ready to Mount"
-          isMounted: !!remote && remote.isMounted
-          autoMount: !!(remote && remote.autoMount)
-          showAutoMount: !!remote
-          statusVariant: remote && remote.isMounted ? "success" : "neutral"
-          statusText: remote && remote.isMounted ? "Mounted" : "Not Mounted"
-          showDisconnect: false
-          showSettings: false
-          onOpenClicked: if (remote) ocloud.openCloudFolder(remote.mountPath)
-          onUnmountClicked: if (remote) ocloud.unmountCloudAccount(remote.mountPath)
-          onMountClicked: if (remote) ocloud.mountCloudAccount(remote.name, remote.mountPath)
-          onAutoMountToggled: if (remote) ocloud.toggleAutoMount(remote.name)
-        }
-
-        // Microsoft OneDrive
-        NativeDriveCard {
-          id: onedriveDriveCard
-          property var remote: { var l = root.cloudAccounts; return getRemoteByName("onedrive"); }
-          visible: !!remote
-          driveName: "Microsoft OneDrive"
-          driveType: "Virtual Cloud Drive (FUSE)"
-          iconSource: (remote && remote.iconDataUri && remote.iconDataUri.length > 0) ? remote.iconDataUri : "icons/cloud.svg"
-          mountPath: remote ? remote.mountPath : "~/OneDrive"
-          capacityText: remote && remote.isMounted ? "Online & Synced" : "Ready to Mount"
-          isMounted: !!remote && remote.isMounted
-          autoMount: !!(remote && remote.autoMount)
-          showAutoMount: !!remote
-          statusVariant: remote && remote.isMounted ? "success" : "neutral"
-          statusText: remote && remote.isMounted ? "Mounted" : "Not Mounted"
-          showDisconnect: false
-          showSettings: false
-          onOpenClicked: if (remote) ocloud.openCloudFolder(remote.mountPath)
-          onUnmountClicked: if (remote) ocloud.unmountCloudAccount(remote.mountPath)
-          onMountClicked: if (remote) ocloud.mountCloudAccount(remote.name, remote.mountPath)
-          onAutoMountToggled: if (remote) ocloud.toggleAutoMount(remote.name)
-        }
-
-        // Dropbox
-        NativeDriveCard {
-          id: dropboxDriveCard
-          property var remote: { var l = root.cloudAccounts; return getRemoteByName("dropbox"); }
-          visible: !!remote
-          driveName: "Dropbox"
-          driveType: "Virtual Cloud Drive (FUSE)"
-          iconSource: (remote && remote.iconDataUri && remote.iconDataUri.length > 0) ? remote.iconDataUri : "icons/cloud.svg"
-          mountPath: remote ? remote.mountPath : "~/Dropbox"
-          capacityText: remote && remote.isMounted ? "Online & Synced" : "Ready to Mount"
-          isMounted: !!remote && remote.isMounted
-          autoMount: !!(remote && remote.autoMount)
-          showAutoMount: !!remote
-          statusVariant: remote && remote.isMounted ? "success" : "neutral"
-          statusText: remote && remote.isMounted ? "Mounted" : "Not Mounted"
-          showDisconnect: false
-          showSettings: false
-          onOpenClicked: if (remote) ocloud.openCloudFolder(remote.mountPath)
-          onUnmountClicked: if (remote) ocloud.unmountCloudAccount(remote.mountPath)
-          onMountClicked: if (remote) ocloud.mountCloudAccount(remote.name, remote.mountPath)
-          onAutoMountToggled: if (remote) ocloud.toggleAutoMount(remote.name)
-        }
-
-        // Cloudflare R2
-        NativeDriveCard {
-          id: r2DriveCard
-          property var remote: getRemoteByName("r2-ocloud") || getRemoteByName("r2")
-          visible: (r2Storage && !!r2Storage.configured) || !!remote
-          driveName: "Cloudflare R2"
-          driveType: "Object Storage Drive"
-          iconSource: (remote && remote.iconDataUri && remote.iconDataUri.length > 0) ? remote.iconDataUri : "icons/cloud.svg"
-          mountPath: "~/R2"
-          capacityText: "Active S3 Bucket"
-          isMounted: (r2Storage && r2Storage.mounted) || (remote && remote.isMounted)
-          autoMount: !!(remote && remote.autoMount)
-          showAutoMount: !!remote
-          statusVariant: ((r2Storage && r2Storage.mounted) || (remote && remote.isMounted)) ? "success" : "neutral"
-          statusText: ((r2Storage && r2Storage.mounted) || (remote && remote.isMounted)) ? "Mounted" : "Not Mounted"
-          showDisconnect: false
-          showSettings: false
-          onOpenClicked: ocloud.openCloudFolder("~/R2")
-          onUnmountClicked: ocloud.unmountCloudAccount("~/R2")
-          onMountClicked: ocloud.mountCloudAccount(remote ? remote.name : "r2-ocloud", "~/R2")
-          onAutoMountToggled: if (remote) ocloud.toggleAutoMount(remote.name)
-        }
-
-        // Custom S3 / SFTP Remotes
         Repeater {
-          model: cloudAccounts.filter(function(a) {
-            return a.type !== "drive" && a.type !== "onedrive" && a.type !== "dropbox" &&
-                   a.type !== "storagebox" && a.name !== "storagebox" &&
-                   a.name !== "r2-ocloud" && a.name !== "r2" && a.type !== "smb";
-          })
+          model: root.cloudAccounts
 
           delegate: NativeDriveCard {
             driveName: modelData.providerName || modelData.name
-            driveType: "Cloud Remote (" + (modelData.type || "S3").toUpperCase() + ")"
+            driveType: modelData.type || "Cloud Storage"
             iconSource: (modelData.iconDataUri && modelData.iconDataUri.length > 0) ? modelData.iconDataUri : (modelData.iconSvg || "icons/cloud.svg")
-            mountPath: modelData.mountPath
-            capacityText: modelData.isMounted ? "Mounted Volume" : "Offline"
-            isMounted: modelData.isMounted
-            autoMount: !!modelData.autoMount
-            showAutoMount: true
-            statusVariant: modelData.isMounted ? "success" : "neutral"
-            statusText: modelData.isMounted ? "Mounted" : "Not Mounted"
+            mountPath: modelData.mountPath || ""
+            capacityText: modelData.accountDetail || "Mounted Remote"
+            isMounted: true
             showDisconnect: true
             showSettings: false
-            onOpenClicked: ocloud.openCloudFolder(modelData.mountPath)
-            onUnmountClicked: ocloud.unmountCloudAccount(modelData.mountPath)
-            onMountClicked: ocloud.mountCloudAccount(modelData.name, modelData.mountPath)
-            onDisconnectClicked: ocloud.disconnectCloudAccount(modelData.name)
-            onAutoMountToggled: ocloud.toggleAutoMount(modelData.name)
+            onOpenClicked: {
+              if (modelData.mountPath) {
+                ocloud.openCloudFolder(modelData.mountPath);
+              } else {
+                ocloud.openCloudFolder(modelData.name);
+              }
+            }
+            onUnmountClicked: {
+              if (modelData.name) {
+                ocloud.disconnectCloudAccount(modelData.name);
+              }
+            }
+            onDisconnectClicked: {
+              if (modelData.name) {
+                ocloud.disconnectCloudAccount(modelData.name);
+              }
+            }
           }
         }
       }
 
       // =========================================================
-      // 3. CONNECTED NETWORK SHARES (SMB)
+      // 3. MOUNTED NETWORK SHARES
       // =========================================================
       ColumnLayout {
         Layout.fillWidth: true
-        spacing: 10
+        spacing: 8
+        visible: root.mountedShares.length > 0
 
         Text {
-          text: "CONNECTED NETWORK SHARES (SMB / CIFS)"
-          font.pixelSize: 11
+          text: "NETWORK SHARES (" + root.mountedShares.length + ")"
+          font.family: root.appFontFamily
+          font.pixelSize: 10
           font.bold: true
-          color: "#94a3b8"
+          color: root.mutedColor
         }
 
-        // Mounted SMB Shares Repeater
         Repeater {
-          model: mountedShares.filter(function(s) { return s.isMounted; })
+          model: root.mountedShares
 
           delegate: NativeDriveCard {
-            driveName: modelData.name
-            driveType: "Network Shared Folder"
+            driveName: modelData.name || "Network Share"
+            driveType: (modelData.protocol || "SMB") + " · " + (modelData.host || "")
             iconSource: "icons/network.svg"
-            mountPath: modelData.mountPath
-            capacityText: "Active Network Share"
+            mountPath: modelData.mountPath || ""
+            capacityText: "Active Share"
             isMounted: true
-            statusVariant: "success"
-            statusText: "Mounted"
-            showDisconnect: false
+            showDisconnect: true
             showSettings: false
-            onOpenClicked: ocloud.openCloudFolder(modelData.mountPath)
-            onUnmountClicked: ocloud.unmountCloudAccount(modelData.mountPath)
-          }
-        }
-
-        // Quick Link Card if no SMB shares are mounted
-        AppCard {
-          visible: mountedShares.filter(function(s) { return s.isMounted; }).length === 0
-          implicitHeight: smbEmptyRow.implicitHeight + 24
-
-          RowLayout {
-            id: smbEmptyRow
-            anchors.fill: parent
-            anchors.margins: 14
-            spacing: 14
-
-            Rectangle {
-              Layout.preferredWidth: 36
-              Layout.preferredHeight: 36
-              radius: 8
-              color: "#0b1329"
-              border.color: "#1e293b"
-              Image {
-                anchors.centerIn: parent
-                width: 20
-                height: 20
-                source: Qt.resolvedUrl("../icons/network.svg")
-                fillMode: Image.PreserveAspectFit
-                smooth: true
+            onOpenClicked: {
+              if (modelData.mountPath) {
+                ocloud.openCloudFolder(modelData.mountPath);
               }
             }
-
-            ColumnLayout {
-              Layout.fillWidth: true
-              spacing: 2
-              Text {
-                text: "No Network Shares Currently Mounted"
-                font.pixelSize: 13
-                font.bold: true
-                color: "#e2e8f0"
-              }
-              Text {
-                text: "Discover and mount shared folders from Macs, Windows PCs, or NAS servers on your local network"
-                font.pixelSize: 11
-                color: "#94a3b8"
+            onUnmountClicked: {
+              if (modelData.name) {
+                ocloud.unmountNetworkShare(modelData.name);
               }
             }
-
-            AppButton {
-              text: "Browse Network Shares"
-              iconSource: "icons/network.svg"
-              variant: "secondary"
-              onClicked: activeTab = "shares"
+            onDisconnectClicked: {
+              if (modelData.name) {
+                ocloud.unmountNetworkShare(modelData.name);
+              }
             }
           }
         }
-      }
-
-      // =========================================================
-      // 4. EPHEMERAL COMPUTE STORAGE
-      // =========================================================
-      ColumnLayout {
-        Layout.fillWidth: true
-        spacing: 10
-        visible: serverList && serverList.some(function(s) { return s.is_drive_mounted; })
-
-        Text {
-          text: "EPHEMERAL COMPUTE STORAGE"
-          font.pixelSize: 11
-          font.bold: true
-          color: "#ef4444"
-        }
-
-        Repeater {
-          model: serverList.filter(function(s) { return s.is_drive_mounted; })
-
-          delegate: NativeDriveCard {
-            driveName: modelData.name + " (Ephemeral VM Drive)"
-            driveType: "Temporary Compute NVMe Scratch"
-            iconSource: "icons/server.svg"
-            mountPath: "~/Cloud-" + modelData.name
-            capacityText: "Data destroyed on reboot"
-            isMounted: true
-            statusVariant: "danger"
-            statusText: "Ephemeral"
-            showDisconnect: false
-            showSettings: false
-            onOpenClicked: ocloud.openCloudFolder("~/Cloud-" + modelData.name)
-            onUnmountClicked: ocloud.unmountCloudAccount("~/Cloud-" + modelData.name)
-          }
-        }
-      }
-
-      // Bottom breathing room
-      Item {
-        Layout.preferredHeight: 40
-        Layout.fillWidth: true
       }
     }
   }

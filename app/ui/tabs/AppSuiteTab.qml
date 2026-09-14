@@ -9,7 +9,12 @@ Item {
   Layout.fillWidth: true
   Layout.fillHeight: true
 
-  readonly property bool isNarrow: width < 580
+  readonly property string appFontFamily: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+  readonly property color textColor: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
+  readonly property color mutedColor: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89"
+  readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
+  readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
+  readonly property color cardBg: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "#111111"
 
   property string selectedServerId: serverList.length > 0 ? String(serverList[0].id) : ""
   property string streamingEngine: "xpra"
@@ -47,8 +52,8 @@ Item {
   ]
 
   readonly property var engineOptions: [
-    { id: "xpra", name: "⚡ Xpra Seamless (Persistent & Smooth · Recommended)" },
-    { id: "waypipe", name: "🪟 Waypipe Direct (Original · Pure Wayland)" }
+    { id: "xpra", name: "Xpra Seamless" },
+    { id: "waypipe", name: "Waypipe Direct" }
   ]
 
   readonly property var filteredApps: {
@@ -65,39 +70,6 @@ Item {
     });
   }
 
-  function getMonogram(app) {
-    if (!app || !app.name) return "APP";
-    var map = {
-      "firefox": "FF",
-      "code": "VS",
-      "tradingview": "TV",
-      "slack": "SLK",
-      "teams": "TMS",
-      "thunderbird": "TB",
-      "zoom": "ZM",
-      "mattermost": "MM",
-      "obs": "OBS",
-      "handbrake": "HB",
-      "blender": "3D",
-      "gimp": "GMP",
-      "discord": "DIS",
-      "telegram": "TG",
-      "signal": "SIG",
-      "arcade": "ARC",
-      "foot": "TERM",
-      "mpv": "MPV"
-    };
-    return map[app.id] || app.name.substring(0, 3).toUpperCase();
-  }
-
-  function getCategoryColor(cat) {
-    if (cat === "Work & Office") return "#818cf8";
-    if (cat === "Communication") return "#34d399";
-    if (cat === "Creative & Media") return "#fbbf24";
-    if (cat === "Dev & Web") return "#38bdf8";
-    return accentSky;
-  }
-
   function checkActiveSessions() {
     if (!root.selectedServerId) return;
     ocloud.fetchAppSessions(root.selectedServerId, function(out, ok) {
@@ -108,8 +80,6 @@ Item {
           root.isSessionAttached = attached;
         });
       } else {
-        // If the client thought it was attached, but the cloud machine has no live session,
-        // cleanly reap any lingering local xpra/opus viewer processes to save CPU/battery.
         if (root.isSessionAttached) {
           root.isSessionAttached = false;
           ocloud.detachAppSession();
@@ -192,74 +162,68 @@ Item {
 
   ScrollView {
     anchors.fill: parent
-    anchors.margins: root.isNarrow ? 12 : 20
+    anchors.margins: 16
     contentWidth: availableWidth
     clip: true
 
     ColumnLayout {
       width: parent.width
-      spacing: 14
+      spacing: 12
 
-      // Header with Server & Engine Selectors
-      AppHeader {
-        title: "Cloud App Suite"
-        subtitle: "Stream sovereign desktop applications with 24/7 cloud persistence"
+      // =========================================================
+      // HEADER
+      // =========================================================
+      RowLayout {
+        Layout.fillWidth: true
+        spacing: 12
 
-        RowLayout {
-          spacing: 10
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: 2
 
-          RowLayout {
-            spacing: 6
-            Text {
-              text: "Run on:"
-              font.pixelSize: 11
-              font.bold: true
-              color: textSecondary
-            }
-            AppComboBox {
-              id: targetCombo
-              implicitHeight: 30
-              implicitWidth: 200
-              model: serverList.map(function(s) {
-                var prov = s.providerName || (s.isHomeWorkstation ? "Home Workstation" : (s.provider ? s.provider.toUpperCase() : "Cloud"));
-                return s.name + " [" + prov + "]";
-              })
-              onCurrentIndexChanged: {
-                if (currentIndex >= 0 && currentIndex < serverList.length) {
-                  root.selectedServerId = String(serverList[currentIndex].id);
-                  root.checkActiveSessions();
-                  root.probeAll();
-                }
-              }
-            }
+          Text {
+            text: "CLOUD APP SUITE"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: root.mutedColor
+            letterSpacing: 1.2
           }
 
-          RowLayout {
-            spacing: 6
-            Text {
-              text: "Engine:"
-              font.pixelSize: 11
-              font.bold: true
-              color: textSecondary
-            }
-            AppComboBox {
-              id: engineCombo
-              implicitHeight: 30
-              implicitWidth: 240
-              model: root.engineOptions.map(function(e) { return e.name; })
-              onCurrentIndexChanged: {
-                if (currentIndex >= 0 && currentIndex < root.engineOptions.length) {
-                  root.streamingEngine = root.engineOptions[currentIndex].id;
-                  ocloud.setStreamingEngine(root.streamingEngine);
-                }
-              }
-            }
+          Text {
+            text: root.filteredApps.length + " streaming apps · " + (root.activeSessionDisplay ? ("Session " + root.activeSessionDisplay + " live") : "Ready")
+            font.family: root.appFontFamily
+            font.pixelSize: 12
+            color: root.textColor
+          }
+        }
+
+        // Audio Toggle Button
+        Rectangle {
+          implicitWidth: audioText.implicitWidth + 14
+          implicitHeight: 24
+          radius: 2
+          color: audioMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: root.streamingAudio ? root.accentColor : root.borderCol
+          border.width: 1
+
+          Text {
+            id: audioText
+            anchors.centerIn: parent
+            text: root.streamingAudio ? "Audio: ON" : "Audio: OFF"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: root.streamingAudio ? root.accentColor : root.mutedColor
           }
 
-          AppButton {
-            implicitHeight: 30
-            variant: root.streamingAudio ? "primary" : "secondary"
-            text: root.streamingAudio ? "🔊 Audio: ON" : "🔇 Audio: OFF"
+          MouseArea {
+            id: audioMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
             onClicked: {
               root.streamingAudio = !root.streamingAudio;
               ocloud.setStreamingAudio(root.streamingAudio);
@@ -268,98 +232,185 @@ Item {
         }
       }
 
-      // Sleek Active Session Ribbon (Visible ONLY when a session exists)
+      // Thin separator
+      Rectangle {
+        Layout.fillWidth: true
+        height: 1
+        color: root.borderCol
+      }
+
+      // =========================================================
+      // ACTIVE SESSION BAR (IF RUNNING)
+      // =========================================================
       Rectangle {
         visible: root.activeSessionDisplay.length > 0
         Layout.fillWidth: true
-        implicitHeight: 48
-        radius: 8
-        color: root.isSessionAttached ? "#1e293b" : "#064e3b"
-        border.color: root.isSessionAttached ? "#3b82f6" : "#10b981"
+        implicitHeight: 36
+        radius: 2
+        color: root.cardBg
+        border.color: root.accentColor
         border.width: 1
 
         RowLayout {
           anchors.fill: parent
-          anchors.leftMargin: 16
-          anchors.rightMargin: 16
-          spacing: 12
+          anchors.leftMargin: 10
+          anchors.rightMargin: 10
+          spacing: 8
 
           Rectangle {
-            width: 8
-            height: 8
-            radius: 4
-            color: root.isSessionAttached ? "#38bdf8" : "#34d399"
+            width: 6
+            height: 6
+            radius: 3
+            color: root.isSessionAttached
+              ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+              : root.accentColor
           }
 
           Text {
-            text: root.isSessionAttached
-              ? "Session " + root.activeSessionDisplay + " is active on desktop"
-              : "Session " + root.activeSessionDisplay + " is running 24/7 in background"
-            font.pixelSize: 12
-            font.bold: true
-            color: textPrimary
             Layout.fillWidth: true
+            text: root.isSessionAttached
+              ? ("Session " + root.activeSessionDisplay + " is active on local display")
+              : ("Session " + root.activeSessionDisplay + " is running 24/7 in background")
+            font.family: root.appFontFamily
+            font.pixelSize: 11
+            font.bold: true
+            color: root.textColor
           }
 
-          AppButton {
+          Rectangle {
             visible: !root.isSessionAttached
-            text: "⚡ Re-attach Window"
-            variant: "primary"
-            implicitHeight: 28
-            onClicked: ocloud.attachAppSession(root.selectedServerId, root.activeSessionDisplay, root.streamingAudio)
+            implicitWidth: attText.implicitWidth + 12
+            implicitHeight: 22
+            radius: 2
+            color: attMouse.containsMouse ? root.accentColor : "transparent"
+            border.color: root.accentColor
+            border.width: 1
+
+            Text {
+              id: attText
+              anchors.centerIn: parent
+              text: "Re-attach"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              font.bold: true
+              color: attMouse.containsMouse
+                ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+                : root.accentColor
+            }
+
+            MouseArea {
+              id: attMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: ocloud.attachAppSession(root.selectedServerId, root.activeSessionDisplay, root.streamingAudio)
+            }
           }
 
-          AppButton {
+          Rectangle {
             visible: root.isSessionAttached
-            text: "Detach Window"
-            variant: "secondary"
-            implicitHeight: 28
-            onClicked: ocloud.detachAppSession(function() { root.checkActiveSessions(); })
+            implicitWidth: detText.implicitWidth + 12
+            implicitHeight: 22
+            radius: 2
+            color: "transparent"
+            border.color: root.borderCol
+            border.width: 1
+
+            Text {
+              id: detText
+              anchors.centerIn: parent
+              text: "Detach"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              color: root.textColor
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: ocloud.detachAppSession(function() { root.checkActiveSessions(); })
+            }
           }
 
-          AppButton {
-            text: "Terminate"
-            variant: "danger"
-            implicitHeight: 28
-            onClicked: ocloud.stopAppSession(root.selectedServerId, root.activeSessionDisplay, function() { root.checkActiveSessions(); })
+          Rectangle {
+            implicitWidth: termText.implicitWidth + 12
+            implicitHeight: 22
+            radius: 2
+            color: "transparent"
+            border.color: root.borderCol
+            border.width: 1
+
+            Text {
+              id: termText
+              anchors.centerIn: parent
+              text: "Terminate"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              color: root.mutedColor
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: ocloud.stopAppSession(root.selectedServerId, root.activeSessionDisplay, function() { root.checkActiveSessions(); })
+            }
           }
         }
       }
 
-      // Filter Toolbar: Category Pills + Live Search
+      // =========================================================
+      // CONTROLS & SEARCH BAR
+      // =========================================================
       RowLayout {
         Layout.fillWidth: true
-        spacing: 10
+        spacing: 8
 
-        // Category Pills
+        // Host selector
         RowLayout {
-          spacing: 6
-          Repeater {
-            model: root.categories
-            delegate: Rectangle {
-              id: catPill
-              implicitHeight: 28
-              implicitWidth: catLabel.implicitWidth + 20
-              radius: 14
-              color: root.activeCategory === modelData ? accentSky : (hoverArea.containsMouse ? "#1e293b" : "transparent")
-              border.color: root.activeCategory === modelData ? accentSky : borderSubtle
-              border.width: 1
-
-              Text {
-                id: catLabel
-                anchors.centerIn: parent
-                text: modelData
-                font.pixelSize: 11
-                font.bold: root.activeCategory === modelData
-                color: root.activeCategory === modelData ? "#0f172a" : textSecondary
+          spacing: 4
+          Text {
+            text: "HOST:"
+            font.family: root.appFontFamily
+            font.pixelSize: 9
+            font.bold: true
+            color: root.mutedColor
+          }
+          AppComboBox {
+            id: targetCombo
+            implicitHeight: 24
+            implicitWidth: 150
+            model: serverList.map(function(s) { return s.name; })
+            onCurrentIndexChanged: {
+              if (currentIndex >= 0 && currentIndex < serverList.length) {
+                root.selectedServerId = String(serverList[currentIndex].id);
+                root.checkActiveSessions();
+                root.probeAll();
               }
+            }
+          }
+        }
 
-              MouseArea {
-                id: hoverArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.activeCategory = modelData
+        // Engine selector
+        RowLayout {
+          spacing: 4
+          Text {
+            text: "ENGINE:"
+            font.family: root.appFontFamily
+            font.pixelSize: 9
+            font.bold: true
+            color: root.mutedColor
+          }
+          AppComboBox {
+            id: engineCombo
+            implicitHeight: 24
+            implicitWidth: 130
+            model: root.engineOptions.map(function(e) { return e.name; })
+            onCurrentIndexChanged: {
+              if (currentIndex >= 0 && currentIndex < root.engineOptions.length) {
+                root.streamingEngine = root.engineOptions[currentIndex].id;
+                ocloud.setStreamingEngine(root.streamingEngine);
               }
             }
           }
@@ -368,194 +419,227 @@ Item {
         Item { Layout.fillWidth: true }
 
         // Live Search Input
-        AppTextField {
+        TextField {
           id: searchBox
-          implicitWidth: 180
-          implicitHeight: 28
+          implicitWidth: 140
+          implicitHeight: 24
+          font.family: root.appFontFamily
+          font.pixelSize: 10
           placeholderText: "Search apps..."
+          color: root.textColor
+          background: Rectangle {
+            color: "transparent"
+            border.color: root.borderCol
+            border.width: 1
+            radius: 2
+          }
           onTextChanged: root.searchQuery = text
         }
       }
 
-      // Apps Grid
-      GridLayout {
+      // Category filters row
+      RowLayout {
         Layout.fillWidth: true
-        columns: root.isNarrow ? 1 : (width < 820 ? 2 : 3)
-        rowSpacing: 12
-        columnSpacing: 12
+        spacing: 6
 
         Repeater {
-          model: root.filteredApps
+          model: root.categories
+          delegate: Rectangle {
+            implicitHeight: 22
+            implicitWidth: catLabel.implicitWidth + 12
+            radius: 2
+            color: root.activeCategory === modelData
+              ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+              : "transparent"
+            border.color: root.activeCategory === modelData ? root.accentColor : root.borderCol
+            border.width: 1
 
-          delegate: AppCard {
-            Layout.fillWidth: true
-            implicitHeight: 120
+            Text {
+              id: catLabel
+              anchors.centerIn: parent
+              text: modelData
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              font.bold: root.activeCategory === modelData
+              color: root.activeCategory === modelData ? root.accentColor : root.mutedColor
+            }
 
-            RowLayout {
+            MouseArea {
               anchors.fill: parent
-              anchors.margins: 14
-              spacing: 12
-
-              // Left: App Monogram Badge
-              Rectangle {
-                id: iconBox
-                width: 44
-                height: 44
-                radius: 10
-                color: "#111827"
-                border.color: root.getCategoryColor(modelData.category)
-                border.width: 1.5
-
-                Text {
-                  anchors.centerIn: parent
-                  text: root.getMonogram(modelData)
-                  font.pixelSize: 13
-                  font.bold: true
-                  color: root.getCategoryColor(modelData.category)
-                }
-              }
-
-              // Center: App Info
-              ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 4
-
-                RowLayout {
-                  Layout.fillWidth: true
-                  spacing: 6
-
-                  Text {
-                    text: modelData.name || modelData.cmd
-                    font.pixelSize: 14
-                    font.bold: true
-                    color: textPrimary
-                    elide: Text.ElideRight
-                  }
-
-                  Rectangle {
-                    implicitHeight: 18
-                    implicitWidth: tagText.implicitWidth + 10
-                    radius: 4
-                    color: "#1e1b4b"
-                    border.color: "#312e81"
-                    Text {
-                      id: tagText
-                      anchors.centerIn: parent
-                      text: modelData.tag || "APP"
-                      font.pixelSize: 9
-                      font.bold: true
-                      color: root.getCategoryColor(modelData.category)
-                    }
-                  }
-
-                  // Pre-flight status badge: Ready vs Available
-                  Rectangle {
-                    property bool isReady: Boolean(root.installedAppMap[modelData.id] || root.installedAppMap[modelData.cmd])
-                    implicitHeight: 18
-                    implicitWidth: badgeInnerRow.implicitWidth + 10
-                    radius: 4
-                    color: isReady ? "#052e16" : "#1e293b"
-                    border.color: isReady ? "#16a34a" : "#334155"
-                    border.width: 1
-
-                    Row {
-                      id: badgeInnerRow
-                      anchors.centerIn: parent
-                      spacing: 4
-                      Rectangle {
-                        width: 6; height: 6; radius: 3
-                        color: parent.parent.isReady ? "#22c55e" : "#94a3b8"
-                        anchors.verticalCenter: parent.verticalCenter
-                      }
-                      Text {
-                        text: parent.parent.isReady ? "Ready" : "Available"
-                        font.pixelSize: 9
-                        font.bold: true
-                        color: parent.parent.isReady ? "#4ade80" : "#94a3b8"
-                      }
-                    }
-                  }
-
-                  Item { Layout.fillWidth: true }
-                }
-
-                Text {
-                  text: modelData.desc || ("Command: " + modelData.cmd)
-                  font.pixelSize: 11
-                  color: textMuted
-                  Layout.fillWidth: true
-                  wrapMode: Text.WordWrap
-                  maximumLineCount: 2
-                  elide: Text.ElideRight
-                }
-              }
-
-              // Right: Launch Button
-              AppButton {
-                text: "Launch"
-                variant: "primary"
-                implicitHeight: 32
-                implicitWidth: 80
-                iconSource: "icons/terminal.svg"
-                onClicked: root.requestLaunch(modelData.cmd, modelData.name, modelData.minRamMb || 0)
-              }
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.activeCategory = modelData
             }
           }
         }
       }
 
-      // Empty State if search matches nothing
-      Rectangle {
-        visible: root.filteredApps.length === 0
+      // =========================================================
+      // APPLICATIONS LIST (SINGLE-COLUMN DESKTOP ROWS)
+      // =========================================================
+      ColumnLayout {
         Layout.fillWidth: true
-        implicitHeight: 100
-        color: "transparent"
-        border.color: borderSubtle
-        border.width: 1
-        radius: 8
+        spacing: 6
 
-        ColumnLayout {
-          anchors.centerIn: parent
-          spacing: 6
-          Text {
-            text: "No applications found matching '" + root.searchQuery + "'"
-            color: textSecondary
-            font.pixelSize: 13
-            font.bold: true
-            Layout.alignment: Qt.AlignHCenter
-          }
-          Text {
-            text: "Use the command runner below to launch any custom binary."
-            color: textMuted
-            font.pixelSize: 11
-            Layout.alignment: Qt.AlignHCenter
+        Repeater {
+          model: root.filteredApps
+
+          delegate: Rectangle {
+            id: appRow
+            Layout.fillWidth: true
+            implicitHeight: 38
+            radius: 2
+            color: rowMouse.containsMouse
+              ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : root.cardBg)
+              : root.cardBg
+            border.color: rowMouse.containsMouse ? root.accentColor : root.borderCol
+            border.width: 1
+
+            readonly property bool isInstalled: Boolean(root.installedAppMap[modelData.cmd] || root.installedAppMap[modelData.cmd.toLowerCase()] || root.installedAppMap[modelData.id])
+
+            RowLayout {
+              anchors.fill: parent
+              anchors.leftMargin: 10
+              anchors.rightMargin: 10
+              spacing: 8
+
+              // Status dot (green = installed/ready, muted = install on demand)
+              Rectangle {
+                width: 6
+                height: 6
+                radius: 3
+                color: appRow.isInstalled
+                  ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+                  : root.mutedColor
+              }
+
+              // Terminal icon or generic icon
+              ThemeIcon {
+                width: 14
+                height: 14
+                source: "icons/terminal.svg"
+                color: root.textColor
+              }
+
+              // App Name
+              Text {
+                text: modelData.name || modelData.cmd
+                font.family: root.appFontFamily
+                font.pixelSize: 11
+                font.bold: true
+                color: root.textColor
+                Layout.preferredWidth: 110
+                elide: Text.ElideRight
+              }
+
+              // Category / Description
+              Text {
+                Layout.fillWidth: true
+                text: modelData.desc || ("Command: " + modelData.cmd)
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                color: root.mutedColor
+                elide: Text.ElideRight
+              }
+
+              // Launch Button
+              Rectangle {
+                implicitWidth: launchText.implicitWidth + 14
+                implicitHeight: 22
+                radius: 2
+                color: launchMouse.containsMouse ? root.accentColor : "transparent"
+                border.color: root.accentColor
+                border.width: 1
+
+                Text {
+                  id: launchText
+                  anchors.centerIn: parent
+                  text: appRow.isInstalled ? "Launch" : "Install & Run"
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  font.bold: true
+                  color: launchMouse.containsMouse
+                    ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+                    : root.accentColor
+                }
+
+                MouseArea {
+                  id: launchMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.requestLaunch(modelData.cmd, modelData.name, modelData.minRamMb || 0)
+                }
+              }
+            }
+
+            MouseArea {
+              id: rowMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              acceptedButtons: Qt.NoButton
+            }
           }
         }
       }
 
-      // Sleek Custom Command Runner
-      AppCard {
+      // Empty State
+      Rectangle {
+        visible: root.filteredApps.length === 0
         Layout.fillWidth: true
-        implicitHeight: 52
+        height: 44
+        radius: 2
+        color: "transparent"
+        border.color: root.borderCol
+        border.width: 1
 
         RowLayout {
           anchors.fill: parent
-          anchors.leftMargin: 16
-          anchors.rightMargin: 16
-          spacing: 12
+          anchors.margins: 10
+          spacing: 8
+          Text {
+            Layout.fillWidth: true
+            text: "No applications found matching search filter."
+            font.family: root.appFontFamily
+            font.pixelSize: 11
+            color: root.mutedColor
+          }
+        }
+      }
 
-          Image {
-            width: 16
-            height: 16
-            source: Qt.resolvedUrl("../icons/terminal.svg")
-            fillMode: Image.PreserveAspectFit
+      // =========================================================
+      // CUSTOM COMMAND RUNNER
+      // =========================================================
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 34
+        radius: 2
+        color: root.cardBg
+        border.color: root.borderCol
+        border.width: 1
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: 8
+          anchors.rightMargin: 8
+          spacing: 8
+
+          ThemeIcon {
+            width: 12
+            height: 12
+            source: "icons/terminal.svg"
+            color: root.mutedColor
           }
 
-          AppTextField {
+          TextField {
             id: customCmdField
             Layout.fillWidth: true
-            implicitHeight: 32
-            placeholderText: "Run any custom Linux application (e.g. foot, mpv, htop, krita)..."
+            implicitHeight: 24
+            font.family: root.appFontFamily
+            font.pixelSize: 11
+            placeholderText: "Run custom command (e.g. mpv, foot, htop)..."
+            color: root.textColor
+            background: Rectangle { color: "transparent" }
             onAccepted: {
               var cmd = text.trim();
               if (cmd) {
@@ -565,16 +649,39 @@ Item {
             }
           }
 
-          AppButton {
-            text: "Launch Custom"
-            variant: "primary"
-            implicitHeight: 32
+          Rectangle {
+            implicitWidth: runText.implicitWidth + 14
+            implicitHeight: 22
+            radius: 2
+            color: runMouse.containsMouse ? root.accentColor : "transparent"
+            border.color: root.accentColor
+            border.width: 1
             enabled: customCmdField.text.trim().length > 0
-            onClicked: {
-              var cmd = customCmdField.text.trim();
-              if (cmd) {
-                root.requestLaunch(cmd, cmd);
-                customCmdField.text = "";
+            opacity: enabled ? 1.0 : 0.4
+
+            Text {
+              id: runText
+              anchors.centerIn: parent
+              text: "Run"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              font.bold: true
+              color: runMouse.containsMouse
+                ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+                : root.accentColor
+            }
+
+            MouseArea {
+              id: runMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                var cmd = customCmdField.text.trim();
+                if (cmd) {
+                  root.requestLaunch(cmd, cmd);
+                  customCmdField.text = "";
+                }
               }
             }
           }

@@ -8,7 +8,12 @@ Item {
   Layout.fillWidth: true
   Layout.fillHeight: true
 
-  readonly property bool isNarrow: width < 520
+  readonly property string appFontFamily: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+  readonly property color textColor: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
+  readonly property color mutedColor: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89"
+  readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
+  readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
+  readonly property color cardBg: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "#111111"
 
   property var recentBackups: (backupInfo && backupInfo.recent) || []
   property var scheduleConfig: (backupInfo && backupInfo.schedule) || ({})
@@ -56,74 +61,132 @@ Item {
 
   ScrollView {
     anchors.fill: parent
-    anchors.margins: root.isNarrow ? 12 : 20
+    anchors.margins: 16
     contentWidth: availableWidth
     clip: true
 
     ColumnLayout {
       width: parent.width
-      spacing: 16
+      spacing: 12
 
-      // Unified Header
-      AppHeader {
-        title: "Automated Backups"
-        subtitle: "Incremental snapshots to Storage Box, Home NAS, or S3 with automated scheduling"
+      // =========================================================
+      // HEADER
+      // =========================================================
+      RowLayout {
+        Layout.fillWidth: true
+        spacing: 12
 
-        AppButton {
-          text: "Take Snapshot Now"
-          iconSource: "icons/archive.svg"
-          variant: "primary"
-          onClicked: {
-            var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
-            ocloud.runBackup(srcField.text.trim(), targetDest);
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: 2
+
+          Text {
+            text: "AUTOMATED BACKUPS & SNAPSHOTS"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: root.mutedColor
+            letterSpacing: 1.2
+          }
+
+          Text {
+            text: (scheduleConfig.enabled ? ("Active · " + (scheduleConfig.interval || "daily")) : "Schedule paused")
+              + " · " + root.recentBackups.length + " recorded snapshots"
+            font.family: root.appFontFamily
+            font.pixelSize: 12
+            color: root.textColor
+          }
+        }
+
+        // Take Snapshot Button
+        Rectangle {
+          implicitWidth: snapText.implicitWidth + 16
+          implicitHeight: 24
+          radius: 2
+          color: snapMouse.containsMouse ? root.accentColor : "transparent"
+          border.color: root.accentColor
+          border.width: 1
+
+          Text {
+            id: snapText
+            anchors.centerIn: parent
+            text: "+ Take Snapshot Now"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: snapMouse.containsMouse
+              ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+              : root.accentColor
+          }
+
+          MouseArea {
+            id: snapMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+              var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
+              ocloud.runBackup(srcField.text.trim(), targetDest);
+            }
           }
         }
       }
 
-      // Schedule Configuration Card
-      AppCard {
+      // Thin separator
+      Rectangle {
         Layout.fillWidth: true
-        implicitHeight: schedCol.implicitHeight + 32
+        height: 1
+        color: root.borderCol
+      }
+
+      // =========================================================
+      // SCHEDULE CONFIGURATION
+      // =========================================================
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: schedCol.implicitHeight + 20
+        radius: 2
+        color: root.cardBg
+        border.color: root.borderCol
+        border.width: 1
 
         ColumnLayout {
           id: schedCol
-          anchors.top: parent.top
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.margins: 16
-          spacing: 16
+          anchors.fill: parent
+          anchors.margins: 10
+          spacing: 10
 
           RowLayout {
             Layout.fillWidth: true
+            spacing: 8
+
             Rectangle {
-              width: 32
-              height: 32
-              radius: 8
-              color: "#064e3b"
-              Image {
-                anchors.centerIn: parent
-                width: 18
-                height: 18
-                source: Qt.resolvedUrl("../icons/archive.svg")
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-              }
+              width: 6
+              height: 6
+              radius: 3
+              color: enableSwitch.checked
+                ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+                : root.mutedColor
             }
-            ColumnLayout {
-              spacing: 2
-              Text {
-                text: "Automated Snapshot Schedule"
-                font.pixelSize: 15
-                font.bold: true
-                color: textPrimary
-              }
-              Text {
-                text: "Snapshots exclude temporary files, cache dirs, and node_modules"
-                font.pixelSize: 11
-                color: textMuted
-              }
+
+            Text {
+              text: "SCHEDULE CONFIGURATION"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              font.bold: true
+              color: root.mutedColor
+              letterSpacing: 1.2
             }
+
             Item { Layout.fillWidth: true }
+
+            Text {
+              text: "AUTOMATION:"
+              font.family: root.appFontFamily
+              font.pixelSize: 9
+              font.bold: true
+              color: root.mutedColor
+            }
 
             AppSwitch {
               id: enableSwitch
@@ -135,70 +198,94 @@ Item {
             }
           }
 
-          // Source Folder Selection
+          // Source folder row
           ColumnLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: 3
 
             Text {
-              text: "Source Directory to Backup:"
-              font.pixelSize: 12
+              text: "SOURCE DIRECTORY"
+              font.family: root.appFontFamily
+              font.pixelSize: 9
               font.bold: true
-              color: textSecondary
+              color: root.mutedColor
             }
 
             RowLayout {
               Layout.fillWidth: true
-              spacing: 10
+              spacing: 6
 
-              AppTextField {
+              TextField {
                 id: srcField
                 Layout.fillWidth: true
-                implicitHeight: 34
+                implicitHeight: 24
+                font.family: root.appFontFamily
+                font.pixelSize: 11
                 text: (scheduleConfig && scheduleConfig.source) || "~"
-                placeholderText: "Enter directory path (e.g. ~/Projects)"
+                placeholderText: "Enter directory (e.g. ~/Projects)"
+                color: root.textColor
+                background: Rectangle {
+                  color: "transparent"
+                  border.color: root.borderCol
+                  border.width: 1
+                  radius: 2
+                }
               }
 
-              AppButton {
-                text: "~/Projects"
-                variant: "secondary"
-                onClicked: srcField.text = "~/Projects"
-              }
+              Repeater {
+                model: ["~", "~/Projects", "~/Documents"]
+                delegate: Rectangle {
+                  implicitWidth: pText.implicitWidth + 10
+                  implicitHeight: 24
+                  radius: 2
+                  color: pMouse.containsMouse
+                    ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                    : "transparent"
+                  border.color: root.borderCol
+                  border.width: 1
 
-              AppButton {
-                text: "~/Documents"
-                variant: "secondary"
-                onClicked: srcField.text = "~/Documents"
-              }
+                  Text {
+                    id: pText
+                    anchors.centerIn: parent
+                    text: modelData
+                    font.family: root.appFontFamily
+                    font.pixelSize: 10
+                    color: root.textColor
+                  }
 
-              AppButton {
-                text: "Home (~)"
-                variant: "secondary"
-                onClicked: srcField.text = "~"
+                  MouseArea {
+                    id: pMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: srcField.text = modelData
+                  }
+                }
               }
             }
           }
 
-          // Target Destination Selection
-          ColumnLayout {
+          // Target Destination & Frequency row
+          RowLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: 8
 
-            Text {
-              text: "Target Destination Cloud Drive / Remote:"
-              font.pixelSize: 12
-              font.bold: true
-              color: textSecondary
-            }
-
-            RowLayout {
+            ColumnLayout {
               Layout.fillWidth: true
-              spacing: 10
+              spacing: 3
+
+              Text {
+                text: "DESTINATION DRIVE"
+                font.family: root.appFontFamily
+                font.pixelSize: 9
+                font.bold: true
+                color: root.mutedColor
+              }
 
               AppComboBox {
                 id: destCombo
                 Layout.fillWidth: true
-                implicitHeight: 34
+                implicitHeight: 24
                 model: destinationList.map(function(d) { return d.name; })
                 currentIndex: {
                   var savedDest = (scheduleConfig && scheduleConfig.destination) || "storagebox";
@@ -211,200 +298,252 @@ Item {
                 }
               }
             }
-          }
 
-          RowLayout {
-            Layout.fillWidth: true
-            spacing: 16
+            ColumnLayout {
+              implicitWidth: 120
+              spacing: 3
 
-            Text {
-              text: "Snapshot Frequency:"
-              font.pixelSize: 12
-              color: textSecondary
-            }
-
-            AppComboBox {
-              id: intervalCombo
-              implicitHeight: 32
-              implicitWidth: 160
-              model: ["daily", "hourly", "weekly"]
-              currentIndex: {
-                if (scheduleConfig.interval === "hourly") return 1;
-                if (scheduleConfig.interval === "weekly") return 2;
-                return 0;
+              Text {
+                text: "FREQUENCY"
+                font.family: root.appFontFamily
+                font.pixelSize: 9
+                font.bold: true
+                color: root.mutedColor
               }
-              onCurrentValueChanged: {
-                var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
-                ocloud.setBackupSchedule(enableSwitch.checked, currentValue, srcField.text.trim(), targetDest);
+
+              AppComboBox {
+                id: intervalCombo
+                implicitHeight: 24
+                implicitWidth: 120
+                model: ["daily", "hourly", "weekly"]
+                currentIndex: {
+                  if (scheduleConfig.interval === "hourly") return 1;
+                  if (scheduleConfig.interval === "weekly") return 2;
+                  return 0;
+                }
+                onCurrentValueChanged: {
+                  var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
+                  ocloud.setBackupSchedule(enableSwitch.checked, currentValue, srcField.text.trim(), targetDest);
+                }
               }
             }
 
-            Text {
-              text: "Default: Daily at 03:00 AM"
-              font.pixelSize: 11
-              color: textMuted
-            }
+            Rectangle {
+              Layout.alignment: Qt.AlignBottom
+              implicitWidth: saveText.implicitWidth + 14
+              implicitHeight: 24
+              radius: 2
+              color: saveMouse.containsMouse ? root.accentColor : "transparent"
+              border.color: root.accentColor
+              border.width: 1
 
-            Item { Layout.fillWidth: true }
+              Text {
+                id: saveText
+                anchors.centerIn: parent
+                text: "Save"
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                font.bold: true
+                color: saveMouse.containsMouse
+                  ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+                  : root.accentColor
+              }
 
-            AppButton {
-              text: "Save Schedule Configuration"
-              variant: "primary"
-              onClicked: {
-                var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
-                ocloud.setBackupSchedule(enableSwitch.checked, intervalCombo.currentValue, srcField.text.trim(), targetDest);
+              MouseArea {
+                id: saveMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
+                  ocloud.setBackupSchedule(enableSwitch.checked, intervalCombo.currentValue, srcField.text.trim(), targetDest);
+                }
               }
             }
           }
         }
       }
 
-      // History Timeline Table Card
-      AppCard {
+      // =========================================================
+      // RECENT SNAPSHOT HISTORY
+      // =========================================================
+      ColumnLayout {
         Layout.fillWidth: true
-        implicitHeight: histCol.implicitHeight + 32
+        spacing: 8
 
-        ColumnLayout {
-          id: histCol
-          anchors.top: parent.top
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.margins: 16
-          spacing: 14
-
+        RowLayout {
+          Layout.fillWidth: true
           Text {
-            text: "Recent Snapshot History"
-            font.pixelSize: 15
+            text: "SNAPSHOT HISTORY"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
             font.bold: true
-            color: textPrimary
+            color: root.mutedColor
+            letterSpacing: 1.2
           }
+          Item { Layout.fillWidth: true }
+          Text {
+            text: root.recentBackups.length + " entries in ledger"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            color: root.mutedColor
+          }
+        }
 
-          ColumnLayout {
-            visible: recentBackups.length === 0
-            spacing: 12
+        // Empty state
+        Rectangle {
+          visible: root.recentBackups.length === 0
+          Layout.fillWidth: true
+          height: 44
+          radius: 2
+          color: "transparent"
+          border.color: root.borderCol
+          border.width: 1
 
+          RowLayout {
+            anchors.fill: parent
+            anchors.margins: 10
+            spacing: 8
             Text {
+              Layout.fillWidth: true
               text: "No manual or automated snapshots recorded in the ledger yet."
-              font.pixelSize: 12
-              color: textSecondary
-            }
-
-            RowLayout {
-              spacing: 28
-              ColumnLayout {
-                spacing: 2
-                Text { text: "SOURCE DIRECTORY"; font.pixelSize: 10; font.bold: true; color: textMuted }
-                Text { text: (scheduleConfig && scheduleConfig.source) || "~"; font.pixelSize: 12; color: accentSky }
-              }
-              ColumnLayout {
-                spacing: 2
-                Text { text: "TARGET DESTINATION"; font.pixelSize: 10; font.bold: true; color: textMuted }
-                Text { text: (scheduleConfig && scheduleConfig.destination) ? scheduleConfig.destination : ((storageBox && storageBox.mount_point) ? storageBox.mount_point : "~/Cloud"); font.pixelSize: 12; color: accentSky }
-              }
-              ColumnLayout {
-                spacing: 2
-                Text { text: "ENCRYPTION"; font.pixelSize: 10; font.bold: true; color: textMuted }
-                Text { text: "AES-256 via Vault"; font.pixelSize: 12; color: textPrimary }
-              }
-              ColumnLayout {
-                spacing: 2
-                Text { text: "RETENTION POLICY"; font.pixelSize: 10; font.bold: true; color: textMuted }
-                Text { text: "Last 7 daily, 4 weekly snapshots"; font.pixelSize: 12; color: textPrimary }
-              }
+              font.family: root.appFontFamily
+              font.pixelSize: 11
+              color: root.mutedColor
             }
           }
+        }
+
+        // Single-column snapshot rows
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: 6
+          visible: root.recentBackups.length > 0
 
           Repeater {
-            model: recentBackups
+            model: root.recentBackups
 
             delegate: Rectangle {
               Layout.fillWidth: true
-              height: 48
-              radius: 6
-              color: "#080e18"
-              border.color: borderSubtle
+              implicitHeight: 36
+              radius: 2
+              color: snapRowMouse.containsMouse
+                ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : root.cardBg)
+                : root.cardBg
+              border.color: snapRowMouse.containsMouse ? root.accentColor : root.borderCol
+              border.width: 1
 
               RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: 14
-                spacing: 16
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                spacing: 8
+
+                // Status dot
+                Rectangle {
+                  width: 6
+                  height: 6
+                  radius: 3
+                  color: modelData.status === "success"
+                    ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+                    : ((typeof theme !== "undefined" && theme.danger) ? theme.danger : "#f7768e")
+                }
 
                 Text {
                   text: modelData.id
-                  font.pixelSize: 12
+                  font.family: root.appFontFamily
+                  font.pixelSize: 11
                   font.bold: true
-                  color: textPrimary
+                  color: root.textColor
                 }
 
                 Text {
                   text: modelData.timestamp
-                  font.pixelSize: 11
-                  color: textMuted
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  color: root.mutedColor
                 }
 
                 Item { Layout.fillWidth: true }
 
                 Text {
                   text: (modelData.bytes_transferred || "0 B") + " (" + (modelData.duration_seconds || 0) + "s)"
-                  font.pixelSize: 11
-                  color: accentSky
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  color: root.accentColor
                 }
 
-                AppBadge {
+                Text {
                   text: (modelData.status || "success").toUpperCase()
-                  variant: modelData.status === "success" ? "success" : "danger"
+                  font.family: root.appFontFamily
+                  font.pixelSize: 9
+                  font.bold: true
+                  color: modelData.status === "success"
+                    ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+                    : root.mutedColor
                 }
+              }
+
+              MouseArea {
+                id: snapRowMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.NoButton
               }
             }
           }
         }
       }
 
-      // Disaster Recovery Policy Card
-      AppCard {
+      // =========================================================
+      // DISASTER RECOVERY SPECS (COMPACT ROW)
+      // =========================================================
+      Rectangle {
         Layout.fillWidth: true
-        implicitHeight: drCol.implicitHeight + 32
+        implicitHeight: drCol.implicitHeight + 16
+        radius: 2
+        color: root.cardBg
+        border.color: root.borderCol
+        border.width: 1
 
         ColumnLayout {
           id: drCol
-          anchors.top: parent.top
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.margins: 16
-          spacing: 12
+          anchors.fill: parent
+          anchors.margins: 10
+          spacing: 6
 
           Text {
-            text: "Disaster Recovery & Redundancy"
-            font.pixelSize: 15
+            text: "DISASTER RECOVERY & INTEGRITY"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
             font.bold: true
-            color: textPrimary
+            color: root.mutedColor
+            letterSpacing: 1.2
           }
 
-          GridLayout {
+          RowLayout {
             Layout.fillWidth: true
-            columns: 3
-            columnSpacing: 16
+            spacing: 16
 
             ColumnLayout {
               Layout.fillWidth: true
-              spacing: 4
-              Text { text: "Point-in-Time Rollback"; font.pixelSize: 12; font.bold: true; color: textPrimary }
-              Text { text: "Mount any snapshot directly as a read-only filesystem to inspect or restore specific folders."; font.pixelSize: 11; color: textMuted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+              spacing: 2
+              Text { text: "ENCRYPTION"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
+              Text { text: "AES-256 via Vault"; font.family: root.appFontFamily; font.pixelSize: 11; color: root.textColor }
             }
 
             ColumnLayout {
               Layout.fillWidth: true
-              spacing: 4
-              Text { text: "Zero-Knowledge Encryption"; font.pixelSize: 12; font.bold: true; color: textPrimary }
-              Text { text: "Files are encrypted at rest with hardware-derived keys before being transmitted to the Storage Box."; font.pixelSize: 11; color: textMuted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+              spacing: 2
+              Text { text: "RETENTION"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
+              Text { text: "7 daily, 4 weekly"; font.family: root.appFontFamily; font.pixelSize: 11; color: root.textColor }
             }
 
             ColumnLayout {
               Layout.fillWidth: true
-              spacing: 4
-              Text { text: "Integrity Verification"; font.pixelSize: 12; font.bold: true; color: textPrimary }
-              Text { text: "SHA-256 block hashes are recorded in the local ledger to guarantee tamper-proof restores."; font.pixelSize: 11; color: textMuted; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+              spacing: 2
+              Text { text: "INTEGRITY"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
+              Text { text: "SHA-256 ledger verified"; font.family: root.appFontFamily; font.pixelSize: 11; color: root.textColor }
             }
           }
         }

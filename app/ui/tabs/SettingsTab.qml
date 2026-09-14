@@ -8,7 +8,12 @@ Item {
   Layout.fillWidth: true
   Layout.fillHeight: true
 
-  readonly property bool isNarrow: width < 520
+  readonly property string appFontFamily: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+  readonly property color textColor: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
+  readonly property color mutedColor: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89"
+  readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
+  readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
+  readonly property color cardBg: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "#111111"
 
   property var fileManagers: []
   property string selectedFileManager: "default"
@@ -90,413 +95,544 @@ Item {
 
   ScrollView {
     anchors.fill: parent
-    anchors.margins: root.isNarrow ? 12 : 20
+    anchors.margins: 16
     contentWidth: availableWidth
     clip: true
 
     ColumnLayout {
       width: parent.width
-      spacing: 20
+      spacing: 12
 
-      // Unified Header
-      AppHeader {
-        title: "Settings & System Preferences"
-        subtitle: "Default file manager integration, credentials vault, and live datacenter latency prober"
-      }
-
-      // Status Feedback Banner
-      AppBanner {
-        visible: statusMessage !== ""
+      // =========================================================
+      // HEADER
+      // =========================================================
+      RowLayout {
         Layout.fillWidth: true
-        title: statusIsError ? "Notice" : "Success"
-        message: statusMessage
-        variant: statusIsError ? "warning" : "success"
-        iconSource: "icons/activity.svg"
-      }
-
-      // 1. File Manager & Desktop Integration Card
-      AppCard {
-        Layout.fillWidth: true
-        implicitHeight: fmCol.implicitHeight + 32
+        spacing: 12
 
         ColumnLayout {
-          id: fmCol
-          anchors.top: parent.top
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.margins: 16
-          spacing: 16
+          Layout.fillWidth: true
+          spacing: 2
 
-          // Header
-          RowLayout {
-            Layout.fillWidth: true
-            Rectangle {
-              width: 32
-              height: 32
-              radius: 8
-              color: "#0f766e"
-              Image {
-                anchors.centerIn: parent
-                width: 18
-                height: 18
-                source: Qt.resolvedUrl("../icons/hard-drive.svg")
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-              }
-            }
-            ColumnLayout {
-              spacing: 2
-              Text {
-                text: "Default File Manager"
-                font.pixelSize: 15
-                font.bold: true
-                color: textPrimary
-              }
-              Text {
-                text: "Select which application handles mounted cloud drives, storage boxes, and folders"
-                font.pixelSize: 11
-                color: textMuted
-              }
-            }
-            Item { Layout.fillWidth: true }
-            AppBadge {
-              text: selectedFileManager === "default" ? "OS Default" : selectedFileManager.toUpperCase()
-              variant: selectedFileManager === "flea" ? "success" : "info"
-            }
+          Text {
+            text: "SETTINGS & PREFERENCES"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: root.mutedColor
+            letterSpacing: 1.2
           }
 
-          // File Manager Option Cards
-          GridLayout {
-            Layout.fillWidth: true
-            columns: 2
-            rowSpacing: 10
-            columnSpacing: 10
+          Text {
+            text: "File manager integration · Credentials vault · Client diagnostics"
+            font.family: root.appFontFamily
+            font.pixelSize: 12
+            color: root.textColor
+          }
+        }
 
-            Repeater {
-              model: fileManagers
+        // Test Launch Button
+        Rectangle {
+          implicitWidth: testText.implicitWidth + 14
+          implicitHeight: 24
+          radius: 2
+          color: testMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: root.borderCol
+          border.width: 1
 
-              delegate: Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 64
-                radius: 8
-                color: selectedFileManager === modelData.id ? "#13233f" : (fmOptMouse.containsMouse ? "#0f172a" : "#0a101d")
-                border.color: selectedFileManager === modelData.id ? "#0284c7" : (fmOptMouse.containsMouse ? "#334155" : borderSubtle)
-                border.width: selectedFileManager === modelData.id ? 2 : 1
-
-                RowLayout {
-                  anchors.fill: parent
-                  anchors.leftMargin: 14
-                  anchors.rightMargin: 14
-                  spacing: 12
-
-                  // Radio selection indicator
-                  Rectangle {
-                    width: 18
-                    height: 18
-                    radius: 9
-                    color: "transparent"
-                    border.color: selectedFileManager === modelData.id ? "#38bdf8" : "#475569"
-                    border.width: 2
-
-                    Rectangle {
-                      anchors.centerIn: parent
-                      width: 8
-                      height: 8
-                      radius: 4
-                      color: "#38bdf8"
-                      visible: selectedFileManager === modelData.id
-                    }
-                  }
-
-                  ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-
-                    RowLayout {
-                      spacing: 8
-                      Text {
-                        text: modelData.name
-                        font.pixelSize: 13
-                        font.bold: true
-                        color: textPrimary
-                      }
-
-                      AppBadge {
-                        visible: !!modelData.badge
-                        text: modelData.badge || ""
-                        variant: modelData.id === "flea" ? "success" : (modelData.id === "default" ? "info" : "neutral")
-                      }
-
-                      AppBadge {
-                        visible: !modelData.available && modelData.id !== "custom"
-                        text: "Not Installed"
-                        variant: "danger"
-                      }
-                    }
-
-                    Text {
-                      text: modelData.desc || ""
-                      font.pixelSize: 10
-                      color: textMuted
-                      elide: Text.ElideRight
-                      Layout.fillWidth: true
-                    }
-                  }
-                }
-
-                MouseArea {
-                  id: fmOptMouse
-                  anchors.fill: parent
-                  hoverEnabled: true
-                  cursorShape: Qt.PointingHandCursor
-                  onClicked: {
-                    selectedFileManager = modelData.id;
-                    saveAllSettings();
-                  }
-                }
-              }
-            }
+          Text {
+            id: testText
+            anchors.centerIn: parent
+            text: "Test File Manager"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            color: root.textColor
           }
 
-          // Custom Command Field (visible if custom selected)
-          ColumnLayout {
-            Layout.fillWidth: true
-            visible: selectedFileManager === "custom"
-            spacing: 4
-
-            Text {
-              text: "Custom Executable / Command"
-              font.pixelSize: 11
-              font.bold: true
-              color: textSecondary
-            }
-
-            AppTextField {
-              id: customCmdField
-              Layout.fillWidth: true
-              implicitHeight: 34
-              text: customCommand
-              placeholderText: "e.g. ghostty -e yazi, thunar, or pcmanfm"
-              onTextChanged: customCommand = text
-            }
-          }
-
-          // Drive Safety Pre-flight Probe Row
-          Rectangle {
-            Layout.fillWidth: true
-            height: 52
-            radius: 8
-            color: "#081424"
-            border.color: borderSubtle
-
-            RowLayout {
-              anchors.fill: parent
-              anchors.leftMargin: 14
-              anchors.rightMargin: 14
-              spacing: 12
-
-              ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 2
-                Text {
-                  text: "Drive Safety Pre-flight Probe (Recommended)"
-                  font.pixelSize: 12
-                  font.bold: true
-                  color: textPrimary
-                }
-                Text {
-                  text: "Performs a 2-second timeout probe before opening drives to protect against file manager freezes on stalled networks"
-                  font.pixelSize: 10
-                  color: textMuted
-                }
-              }
-
-              AppSwitch {
-                checked: probeEnabled
-                onToggled: probeEnabled = checked
-              }
-            }
-          }
-
-          // Action Buttons Row
-          RowLayout {
-            Layout.fillWidth: true
-            spacing: 12
-
-            AppButton {
-              text: "Save File Manager Preference"
-              variant: "primary"
-              onClicked: saveAllSettings()
-            }
-
-            AppButton {
-              text: "Test Launch File Manager"
-              variant: "secondary"
-              onClicked: {
-                ocloud.testLaunchFileManager(selectedFileManager, customCommand);
-              }
-            }
-
-            Item { Layout.fillWidth: true }
+          MouseArea {
+            id: testMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: ocloud.testLaunchFileManager(selectedFileManager, customCommand)
           }
         }
       }
 
-      // 2. Vault Credentials Card
-      AppCard {
+      // Thin separator
+      Rectangle {
         Layout.fillWidth: true
-        implicitHeight: vaultCol.implicitHeight + 32
+        height: 1
+        color: root.borderCol
+      }
+
+      // Status Notification Ribbon
+      Rectangle {
+        visible: root.statusMessage !== ""
+        Layout.fillWidth: true
+        implicitHeight: 28
+        radius: 2
+        color: root.cardBg
+        border.color: root.statusIsError
+          ? ((typeof theme !== "undefined" && theme.danger) ? theme.danger : "#f7768e")
+          : ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+        border.width: 1
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: 10
+          anchors.rightMargin: 10
+          spacing: 8
+
+          Rectangle {
+            width: 6
+            height: 6
+            radius: 3
+            color: root.statusIsError
+              ? ((typeof theme !== "undefined" && theme.danger) ? theme.danger : "#f7768e")
+              : ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: root.statusMessage
+            font.family: root.appFontFamily
+            font.pixelSize: 11
+            color: root.textColor
+          }
+
+          Text {
+            text: "✕"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            color: root.mutedColor
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.statusMessage = ""
+            }
+          }
+        }
+      }
+
+      // =========================================================
+      // FILE MANAGER INTEGRATION
+      // =========================================================
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: fmCol.implicitHeight + 20
+        radius: 2
+        color: root.cardBg
+        border.color: root.borderCol
+        border.width: 1
 
         ColumnLayout {
-          id: vaultCol
-          anchors.top: parent.top
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.margins: 16
-          spacing: 16
+          id: fmCol
+          anchors.fill: parent
+          anchors.margins: 10
+          spacing: 10
 
           RowLayout {
             Layout.fillWidth: true
+            spacing: 8
+
             Rectangle {
-              width: 32
-              height: 32
-              radius: 8
-              color: "#0c4a6e"
-              Image {
-                anchors.centerIn: parent
-                width: 18
-                height: 18
-                source: Qt.resolvedUrl("../icons/shield.svg")
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-              }
+              width: 6
+              height: 6
+              radius: 3
+              color: root.accentColor
             }
-            ColumnLayout {
-              spacing: 2
-              Text {
-                text: "Ocloud Credentials Vault"
-                font.pixelSize: 15
-                font.bold: true
-                color: textPrimary
-              }
-              Text {
-                text: "Encrypted at rest at ~/.config/omarchy/vault.enc (AES-256-GCM, chmod 600)"
-                font.pixelSize: 11
-                color: textMuted
-              }
+
+            Text {
+              text: "DEFAULT FILE MANAGER"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              font.bold: true
+              color: root.mutedColor
+              letterSpacing: 1.2
             }
+
             Item { Layout.fillWidth: true }
-            AppBadge {
-              text: "Locked 600"
-              variant: "success"
+
+            Text {
+              text: "ACTIVE: " + root.selectedFileManager.toUpperCase()
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              font.bold: true
+              color: root.accentColor
             }
           }
 
-
-          // Tailscale Key Field
+          // Single column File Manager Radio Rows
           ColumnLayout {
             Layout.fillWidth: true
             spacing: 6
 
+            Repeater {
+              model: root.fileManagers
+
+              delegate: Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 34
+                radius: 2
+                color: fmMouse.containsMouse
+                  ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                  : (root.selectedFileManager === modelData.id
+                      ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                      : "transparent")
+                border.color: root.selectedFileManager === modelData.id ? root.accentColor : root.borderCol
+                border.width: 1
+
+                RowLayout {
+                  anchors.fill: parent
+                  anchors.leftMargin: 10
+                  anchors.rightMargin: 10
+                  spacing: 8
+
+                  // Radio dot
+                  Rectangle {
+                    width: 12
+                    height: 12
+                    radius: 6
+                    color: "transparent"
+                    border.color: root.selectedFileManager === modelData.id ? root.accentColor : root.mutedColor
+                    border.width: 1
+
+                    Rectangle {
+                      anchors.centerIn: parent
+                      width: 6
+                      height: 6
+                      radius: 3
+                      color: root.accentColor
+                      visible: root.selectedFileManager === modelData.id
+                    }
+                  }
+
+                  Text {
+                    text: modelData.name + (modelData.badge ? (" (" + modelData.badge + ")") : "")
+                    font.family: root.appFontFamily
+                    font.pixelSize: 11
+                    font.bold: root.selectedFileManager === modelData.id
+                    color: root.selectedFileManager === modelData.id ? root.accentColor : root.textColor
+                  }
+
+                  Text {
+                    Layout.fillWidth: true
+                    text: modelData.desc || ""
+                    font.family: root.appFontFamily
+                    font.pixelSize: 10
+                    color: root.mutedColor
+                    elide: Text.ElideRight
+                  }
+
+                  Text {
+                    visible: !modelData.available && modelData.id !== "custom"
+                    text: "Not Installed"
+                    font.family: root.appFontFamily
+                    font.pixelSize: 9
+                    color: (typeof theme !== "undefined" && theme.danger) ? theme.danger : "#f7768e"
+                  }
+                }
+
+                MouseArea {
+                  id: fmMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    root.selectedFileManager = modelData.id;
+                    root.saveAllSettings();
+                  }
+                }
+              }
+            }
+          }
+
+          // Custom Command Field
+          ColumnLayout {
+            Layout.fillWidth: true
+            visible: root.selectedFileManager === "custom"
+            spacing: 3
+
+            Text {
+              text: "CUSTOM EXECUTABLE / COMMAND"
+              font.family: root.appFontFamily
+              font.pixelSize: 9
+              font.bold: true
+              color: root.mutedColor
+            }
+
+            TextField {
+              id: customCmdField
+              Layout.fillWidth: true
+              implicitHeight: 24
+              font.family: root.appFontFamily
+              font.pixelSize: 11
+              text: root.customCommand
+              placeholderText: "e.g. ghostty -e yazi, thunar, or pcmanfm"
+              color: root.textColor
+              background: Rectangle {
+                color: "transparent"
+                border.color: root.borderCol
+                border.width: 1
+                radius: 2
+              }
+              onTextChanged: root.customCommand = text
+              onEditingFinished: root.saveAllSettings()
+            }
+          }
+
+          // Pre-flight probe row
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 1
+
+              Text {
+                text: "Drive Safety Pre-flight Probe"
+                font.family: root.appFontFamily
+                font.pixelSize: 11
+                font.bold: true
+                color: root.textColor
+              }
+
+              Text {
+                text: "2-second timeout probe before launching file manager to protect against stalled networks"
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                color: root.mutedColor
+              }
+            }
+
+            AppSwitch {
+              checked: root.probeEnabled
+              onToggled: {
+                root.probeEnabled = checked;
+                root.saveAllSettings();
+              }
+            }
+          }
+        }
+      }
+
+      // =========================================================
+      // CREDENTIALS VAULT
+      // =========================================================
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: vaultCol.implicitHeight + 20
+        radius: 2
+        color: root.cardBg
+        border.color: root.borderCol
+        border.width: 1
+
+        ColumnLayout {
+          id: vaultCol
+          anchors.fill: parent
+          anchors.margins: 10
+          spacing: 10
+
+          RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            Rectangle {
+              width: 6
+              height: 6
+              radius: 3
+              color: (typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a"
+            }
+
+            Text {
+              text: "CREDENTIALS VAULT"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              font.bold: true
+              color: root.mutedColor
+              letterSpacing: 1.2
+            }
+
+            Item { Layout.fillWidth: true }
+
+            Text {
+              text: "~/.config/omarchy/vault.enc (AES-256-GCM · 600)"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              color: root.mutedColor
+            }
+          }
+
+          ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 3
+
             RowLayout {
               Layout.fillWidth: true
               Text {
-                text: "Tailscale Reusable Auth Key (Optional for auto-join)"
-                font.pixelSize: 11
+                text: "TAILSCALE REUSABLE AUTH KEY"
+                font.family: root.appFontFamily
+                font.pixelSize: 9
                 font.bold: true
-                color: textSecondary
+                color: root.mutedColor
               }
               Item { Layout.fillWidth: true }
-              AppBadge {
-                visible: hasTailscaleKey
-                text: tailscaleDaysSince >= 0 ? (tailscaleDaysSince === 0 ? "Added today (90d max)" : ("Added " + tailscaleDaysSince + "d ago (90d max)")) : "Stored in Vault"
-                variant: tailscaleExpiringSoon ? "warning" : "success"
+              Text {
+                visible: root.hasTailscaleKey
+                text: root.tailscaleDaysSince >= 0
+                  ? (root.tailscaleDaysSince === 0 ? "Key stored today" : ("Stored " + root.tailscaleDaysSince + "d ago"))
+                  : "Stored in Vault"
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                color: root.tailscaleExpiringSoon
+                  ? ((typeof theme !== "undefined" && theme.warning) ? theme.warning : "#e0af68")
+                  : ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
               }
             }
 
             RowLayout {
               Layout.fillWidth: true
-              spacing: 10
-              AppTextField {
+              spacing: 6
+
+              TextField {
                 id: tsField
                 Layout.fillWidth: true
-                implicitHeight: 34
+                implicitHeight: 24
                 echoMode: TextInput.Password
-                placeholderText: hasTailscaleKey ? "••••••••••••••••••••••••" : "tskey-auth-..."
+                font.family: root.appFontFamily
+                font.pixelSize: 11
+                placeholderText: root.hasTailscaleKey ? "••••••••••••••••••••••••" : "tskey-auth-..."
+                color: root.textColor
+                background: Rectangle {
+                  color: "transparent"
+                  border.color: root.borderCol
+                  border.width: 1
+                  radius: 2
+                }
               }
-              AppButton {
-                text: "Save to Vault"
-                variant: "primary"
-                onClicked: {
-                  if (tsField.text.trim()) {
-                    ocloud.setVaultSecret("tailscale_auth_key", tsField.text.trim());
+
+              Rectangle {
+                implicitWidth: saveKeyText.implicitWidth + 14
+                implicitHeight: 24
+                radius: 2
+                color: saveKeyMouse.containsMouse ? root.accentColor : "transparent"
+                border.color: root.accentColor
+                border.width: 1
+
+                Text {
+                  id: saveKeyText
+                  anchors.centerIn: parent
+                  text: "Save"
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  font.bold: true
+                  color: saveKeyMouse.containsMouse
+                    ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+                    : root.accentColor
+                }
+
+                MouseArea {
+                  id: saveKeyMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    if (tsField.text.trim()) {
+                      ocloud.setVaultSecret("tailscale_auth_key", tsField.text.trim());
+                      tsField.text = "";
+                      root.reloadTailscaleInfo();
+                    }
+                  }
+                }
+              }
+
+              Rectangle {
+                visible: root.hasTailscaleKey
+                implicitWidth: clearKeyText.implicitWidth + 14
+                implicitHeight: 24
+                radius: 2
+                color: "transparent"
+                border.color: root.borderCol
+                border.width: 1
+
+                Text {
+                  id: clearKeyText
+                  anchors.centerIn: parent
+                  text: "Clear"
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  color: root.mutedColor
+                }
+
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    ocloud.setVaultSecret("tailscale_auth_key", "");
                     tsField.text = "";
                     root.reloadTailscaleInfo();
                   }
                 }
               }
-              AppButton {
-                visible: hasTailscaleKey
-                text: "Clear"
-                variant: "danger"
-                onClicked: {
-                  ocloud.setVaultSecret("tailscale_auth_key", "");
-                  tsField.text = "";
-                  root.reloadTailscaleInfo();
-                }
-              }
             }
           }
         }
       }
 
-      // 4. System & Architecture Diagnostics
-      AppCard {
+      // =========================================================
+      // SYSTEM DIAGNOSTICS
+      // =========================================================
+      Rectangle {
         Layout.fillWidth: true
-        implicitHeight: diagCol.implicitHeight + 32
+        implicitHeight: diagCol.implicitHeight + 16
+        radius: 2
+        color: root.cardBg
+        border.color: root.borderCol
+        border.width: 1
 
         ColumnLayout {
           id: diagCol
-          anchors.top: parent.top
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.margins: 16
-          spacing: 14
+          anchors.fill: parent
+          anchors.margins: 10
+          spacing: 6
 
           Text {
-            text: "System & Architecture Diagnostics"
-            font.pixelSize: 15
+            text: "SYSTEM DIAGNOSTICS"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
             font.bold: true
-            color: textPrimary
+            color: root.mutedColor
+            letterSpacing: 1.2
           }
 
-          GridLayout {
+          RowLayout {
             Layout.fillWidth: true
-            columns: 4
-            columnSpacing: 20
+            spacing: 16
 
             ColumnLayout {
+              Layout.fillWidth: true
               spacing: 2
-              Text { text: "CLIENT ARCHITECTURE"; font.pixelSize: 10; font.bold: true; color: textMuted }
-              Text { text: "Apple Silicon (aarch64)"; font.pixelSize: 12; font.bold: true; color: textPrimary }
+              Text { text: "ARCHITECTURE"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
+              Text { text: "Apple Silicon (aarch64)"; font.family: root.appFontFamily; font.pixelSize: 11; color: root.textColor }
             }
 
             ColumnLayout {
+              Layout.fillWidth: true
               spacing: 2
-              Text { text: "DESKTOP COMPOSITOR"; font.pixelSize: 10; font.bold: true; color: textMuted }
-              Text { text: "Hyprland Wayland"; font.pixelSize: 12; color: textPrimary }
+              Text { text: "COMPOSITOR"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
+              Text { text: "Hyprland Wayland"; font.family: root.appFontFamily; font.pixelSize: 11; color: root.textColor }
             }
 
             ColumnLayout {
+              Layout.fillWidth: true
               spacing: 2
-              Text { text: "ENCRYPTION ENGINE"; font.pixelSize: 10; font.bold: true; color: textMuted }
-              Text { text: "AES-256-GCM / PBKDF2"; font.pixelSize: 12; color: textPrimary }
-            }
-
-            ColumnLayout {
-              spacing: 2
-              Text { text: "DEFAULT FILE MANAGER"; font.pixelSize: 10; font.bold: true; color: textMuted }
-              Text { text: selectedFileManager.toUpperCase(); font.pixelSize: 12; font.bold: true; color: accentSky }
+              Text { text: "SECURITY ENGINE"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
+              Text { text: "AES-256-GCM / PBKDF2"; font.family: root.appFontFamily; font.pixelSize: 11; color: root.textColor }
             }
           }
         }

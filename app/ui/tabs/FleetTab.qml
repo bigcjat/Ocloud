@@ -8,257 +8,419 @@ Item {
   Layout.fillWidth: true
   Layout.fillHeight: true
 
-  readonly property bool isNarrow: width < 520
+  readonly property string appFontFamily: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+  readonly property color textColor: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
+  readonly property color mutedColor: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89"
+  readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
+  readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
 
   ScrollView {
     anchors.fill: parent
-    anchors.margins: root.isNarrow ? 12 : 20
+    anchors.margins: 16
     contentWidth: availableWidth
     clip: true
 
     ColumnLayout {
       width: parent.width
-      spacing: root.isNarrow ? 14 : 20
+      spacing: 12
 
-      // Section Header
-      AppHeader {
-        title: "Compute Fleet"
-        subtitle: "Manage Google Cloud & Hetzner VMs, Home Workstations, and Bare Metal Nodes"
+      // =========================================================
+      // FLEET HEADER
+      // =========================================================
+      RowLayout {
+        Layout.fillWidth: true
+        spacing: 12
 
-        AppButton {
-          text: root.isNarrow ? "Procure" : "Procure Cloud VM"
-          iconSource: "icons/server.svg"
-          variant: "primary"
-          onClicked: procureModal.openModal()
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: 2
+
+          Text {
+            text: "COMPUTE FLEET"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: root.mutedColor
+            letterSpacing: 1.2
+          }
+
+          Text {
+            text: serverList.length + " active nodes"
+            font.family: root.appFontFamily
+            font.pixelSize: 12
+            color: root.textColor
+          }
         }
 
-        AppButton {
-          text: root.isNarrow ? "Add Node" : "Add Home Node"
-          iconSource: "icons/plus.svg"
-          variant: "secondary"
-          onClicked: addNodeModal.openModal()
+        // Procure VM Button
+        Rectangle {
+          implicitWidth: procText.implicitWidth + 16
+          implicitHeight: 24
+          radius: 2
+          color: procMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: procMouse.containsMouse ? root.accentColor : root.borderCol
+          border.width: 1
+
+          Text {
+            id: procText
+            anchors.centerIn: parent
+            text: "+ Procure VM"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: procMouse.containsMouse ? root.accentColor : root.textColor
+          }
+
+          MouseArea {
+            id: procMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: procureModal.openModal()
+          }
+        }
+
+        // Add Node Button
+        Rectangle {
+          implicitWidth: addText.implicitWidth + 16
+          implicitHeight: 24
+          radius: 2
+          color: addMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: addMouse.containsMouse ? root.accentColor : root.borderCol
+          border.width: 1
+
+          Text {
+            id: addText
+            anchors.centerIn: parent
+            text: "+ Add Node"
+            font.family: root.appFontFamily
+            font.pixelSize: 10
+            font.bold: true
+            color: addMouse.containsMouse ? root.accentColor : root.textColor
+          }
+
+          MouseArea {
+            id: addMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: addNodeModal.openModal()
+          }
         }
       }
 
-      // Empty State
-      AppCard {
+      // Thin separator
+      Rectangle {
+        Layout.fillWidth: true
+        height: 1
+        color: root.borderCol
+      }
+
+      // =========================================================
+      // EMPTY STATE
+      // =========================================================
+      Rectangle {
         visible: serverList.length === 0
-        implicitHeight: 200
+        Layout.fillWidth: true
+        implicitHeight: 120
+        radius: 4
+        color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
+        border.color: root.borderCol
+        border.width: 1
 
         ColumnLayout {
           anchors.centerIn: parent
-          spacing: 10
-          Image {
-            width: 36
-            height: 36
-            source: Qt.resolvedUrl("../icons/server.svg")
-            fillMode: Image.PreserveAspectFit
-            Layout.alignment: Qt.AlignHCenter
-            smooth: true
-          }
+          spacing: 6
+
           Text {
+            Layout.alignment: Qt.AlignHCenter
             text: "No Compute Nodes in Fleet"
-            font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-            font.pixelSize: 14
+            font.family: root.appFontFamily
+            font.pixelSize: 13
             font.bold: true
-            color: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : textPrimary
-            Layout.alignment: Qt.AlignHCenter
+            color: root.textColor
           }
+
           Text {
-            text: "Deploy a high-speed Google Cloud or Hetzner VM, or register your Home Workstation"
-            font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+            Layout.alignment: Qt.AlignHCenter
+            text: "Click \"+ Procure VM\" or \"+ Add Node\" above to connect machines."
+            font.family: root.appFontFamily
             font.pixelSize: 11
-            color: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : textMuted
-            Layout.alignment: Qt.AlignHCenter
-          }
-
-          RowLayout {
-            spacing: 12
-            Layout.alignment: Qt.AlignHCenter
-            Layout.topMargin: 6
-
-            AppButton {
-              text: "Procure Cloud VM"
-              iconSource: "icons/server.svg"
-              variant: "primary"
-              onClicked: procureModal.openModal()
-            }
-
-            AppButton {
-              text: "Add Home Node"
-              iconSource: "icons/plus.svg"
-              variant: "secondary"
-              onClicked: addNodeModal.openModal()
-            }
+            color: root.mutedColor
           }
         }
       }
 
-      // Server Cards List
-      Repeater {
-        model: serverList
+      // =========================================================
+      // SERVER CARDS LIST (Flea-style, 100% Theme Colors)
+      // =========================================================
+      ColumnLayout {
+        Layout.fillWidth: true
+        spacing: 8
+        visible: serverList.length > 0
 
-        delegate: AppCard {
-          implicitHeight: cardCol.implicitHeight + (root.isNarrow ? 24 : 32)
+        Repeater {
+          model: serverList
 
-          ColumnLayout {
-            id: cardCol
-            anchors.fill: parent
-            anchors.margins: root.isNarrow ? 12 : 16
-            spacing: root.isNarrow ? 10 : 14
+          delegate: Rectangle {
+            id: serverItem
+            Layout.fillWidth: true
+            implicitHeight: itemCol.implicitHeight + 20
+            radius: 4
+            color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
+            border.color: itemMouse.containsMouse ? root.accentColor : root.borderCol
+            border.width: 1
 
-            // Top Row: Badges, Title, Status
-            RowLayout {
-              Layout.fillWidth: true
-              spacing: 10
-
-              // Provider Brand Logo
-              Image {
-                width: 20
-                height: 20
-                source: modelData.isHomeWorkstation ? Qt.resolvedUrl("../icons/device-workstation.svg") : ((modelData.providerIcon && modelData.providerIcon.length > 0) ? modelData.providerIcon : Qt.resolvedUrl("../icons/server.svg"))
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-              }
-
-              Text {
-                text: modelData.name
-                font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-                font.pixelSize: root.isNarrow ? 13 : 15
-                font.bold: true
-                color: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : textPrimary
-                elide: Text.ElideRight
-                Layout.maximumWidth: root.isNarrow ? 140 : 260
-              }
-
-              Text {
-                visible: !root.isNarrow
-                text: "(" + (modelData.type || "server") + " · " + (modelData.location || "cloud") + ")"
-                font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-                font.pixelSize: 11
-                color: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : textMuted
-              }
-
-              Item { Layout.fillWidth: true }
-
-              // Standardized Live Status Pill
-              AppBadge {
-                variant: modelData.status === "running" ? "success" : (modelData.status === "starting" ? "warning" : "danger")
-                text: modelData.status === "running" ? "ONLINE" : (modelData.status === "starting" ? "STARTING..." : "STOPPED")
-              }
+            MouseArea {
+              id: itemMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              acceptedButtons: Qt.NoButton
             }
 
-            // Middle: Specs, IP, Network (Flow for responsive wrap)
-            Flow {
-              Layout.fillWidth: true
-              spacing: root.isNarrow ? 12 : 24
+            ColumnLayout {
+              id: itemCol
+              anchors.fill: parent
+              anchors.margins: 12
+              spacing: 8
 
-              ColumnLayout {
-                spacing: 2
-                Text { text: "PUBLIC IP"; font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"; font.pixelSize: 9; font.bold: true; color: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : textMuted }
-                Text {
-                  text: (modelData.ipv4 && modelData.ipv4 !== "no IP" && modelData.ipv4 !== "No IP assigned")
-                    ? modelData.ipv4
-                    : (modelData.status === "starting" ? "Assigning IP..." : "No IP assigned")
-                  font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-                  font.pixelSize: 11
-                  font.bold: true
-                  color: (modelData.status === "starting" && (!modelData.ipv4 || modelData.ipv4 === "no IP")) ? "#fbbf24" : ((typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : textPrimary)
+              // Top Row: Status Dot, Icon, Title, Specs
+              RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+
+                // 6px Flea Status Dot
+                Rectangle {
+                  Layout.preferredWidth: 6
+                  Layout.preferredHeight: 6
+                  Layout.alignment: Qt.AlignVCenter
+                  color: modelData.status === "running"
+                    ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
+                    : (modelData.status === "starting" ? ((typeof theme !== "undefined" && theme.yellow) ? theme.yellow : "#e0af68") : root.mutedColor)
                 }
-              }
 
-              ColumnLayout {
-                spacing: 2
-                Text { text: "TAILSCALE IP"; font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"; font.pixelSize: 9; font.bold: true; color: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : textMuted }
-                Text {
-                  text: (modelData.tailscale_ip || modelData.tailscaleIp) ? (modelData.tailscale_ip || modelData.tailscaleIp) : "Not connected"
-                  font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-                  font.pixelSize: 11
-                  font.bold: !!(modelData.tailscale_ip || modelData.tailscaleIp)
-                  color: (modelData.tailscale_ip || modelData.tailscaleIp) ? "#38bdf8" : ((typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : textMuted)
+                // Brand / Node Vector Icon
+                ThemeIcon {
+                  Layout.preferredWidth: 20
+                  Layout.preferredHeight: 20
+                  Layout.alignment: Qt.AlignVCenter
+                  source: modelData.isHomeWorkstation ? "icons/device-workstation.svg" : ((modelData.providerIcon && modelData.providerIcon.length > 0) ? modelData.providerIcon : "icons/server.svg")
+                  color: itemMouse.containsMouse ? root.accentColor : root.textColor
                 }
-              }
 
-              ColumnLayout {
-                spacing: 2
-                Text { text: "PROVIDER"; font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"; font.pixelSize: 9; font.bold: true; color: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : textMuted }
-                Text { text: (modelData.provider || "hetzner").toUpperCase(); font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"; font.pixelSize: 11; color: (typeof theme !== "undefined" && theme.textSecondary) ? theme.textSecondary : textSecondary }
-              }
+                // Node Name & Type
+                ColumnLayout {
+                  Layout.fillWidth: true
+                  spacing: 2
 
-              ColumnLayout {
-                spacing: 2
-                Text { text: "NODE ID"; font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"; font.pixelSize: 9; font.bold: true; color: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : textMuted }
-                Text { text: String(modelData.id); font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"; font.pixelSize: 11; color: (typeof theme !== "undefined" && theme.textSecondary) ? theme.textSecondary : textSecondary }
-              }
-            }
+                  RowLayout {
+                    spacing: 6
+                    Text {
+                      text: modelData.name
+                      font.family: root.appFontFamily
+                      font.pixelSize: 13
+                      font.bold: true
+                      color: root.textColor
+                      elide: Text.ElideRight
+                    }
 
-            // Divider
-            Rectangle {
-              Layout.fillWidth: true
-              height: 1
-              color: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : borderSubtle
-            }
+                    Text {
+                      text: "· " + (modelData.status === "running" ? "online" : modelData.status)
+                      font.family: root.appFontFamily
+                      font.pixelSize: 10
+                      color: modelData.status === "running"
+                        ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
+                        : root.mutedColor
+                    }
+                  }
 
-            // Bottom Row: Action Toolbar with Flow wrapping
-            Flow {
-              Layout.fillWidth: true
-              spacing: 6
-
-              AppButton {
-                text: "Task Manager"
-                iconSource: "icons/activity.svg"
-                variant: "secondary"
-                onClicked: taskManagerModal.openForServer(modelData)
-              }
-
-              AppButton {
-                text: "SSH Terminal"
-                iconSource: "icons/terminal.svg"
-                variant: "secondary"
-                onClicked: ocloud.openTerminal(modelData.name, modelData.tailscale_ip || modelData.ipv4, modelData.user || "root")
-              }
-
-              AppButton {
-                enabled: modelData.status === "running"
-                text: modelData.is_drive_mounted ? "Unmount Drive" : "Mount Drive"
-                iconSource: modelData.is_drive_mounted ? "icons/eject.svg" : "icons/hard-drive.svg"
-                variant: modelData.is_drive_mounted ? "danger" : "secondary"
-                onClicked: {
-                  if (modelData.is_drive_mounted) {
-                    ocloud.unmountEphemeralVm();
-                  } else {
-                    consentModal.openForServer(modelData.name, String(modelData.id));
+                  Text {
+                    text: (modelData.ipv4 || "No IP") + " · Tailscale: " + (modelData.tailscale_ip || modelData.tailscaleIp || "none") + " · " + (modelData.provider || "cloud").toUpperCase()
+                    font.family: root.appFontFamily
+                    font.pixelSize: 10
+                    color: root.mutedColor
+                    elide: Text.ElideRight
                   }
                 }
-              }
 
-              AppButton {
-                enabled: modelData.status !== "starting" && modelData.status !== "stopping"
-                text: modelData.status === "running" ? "Power Off" : (modelData.status === "starting" ? "Starting..." : "Power On")
-                variant: modelData.status === "running" ? "secondary" : "success"
-                onClicked: {
-                  var act = modelData.status === "running" ? "stop" : "start";
-                  ocloud.serverAction(act, String(modelData.id));
-                }
-              }
+                // Compact Desktop Action Toolbar
+                RowLayout {
+                  Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                  spacing: 6
 
-              AppButton {
-                enabled: modelData.status === "running"
-                text: "Reboot"
-                iconSource: "icons/refresh.svg"
-                variant: "secondary"
-                onClicked: ocloud.serverAction("reboot", String(modelData.id))
-              }
+                  // SSH Button
+                  Rectangle {
+                    implicitWidth: sshText.implicitWidth + 12
+                    implicitHeight: 22
+                    radius: 2
+                    color: sshMouse.containsMouse
+                      ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                      : "transparent"
+                    border.color: sshMouse.containsMouse ? root.accentColor : root.borderCol
+                    border.width: 1
 
-              AppButton {
-                text: "Delete"
-                iconSource: "icons/trash.svg"
-                variant: "danger"
-                onClicked: {
-                  if (modelData.provider === "custom") {
-                    ocloud.removeNode(String(modelData.id));
-                  } else {
-                    ocloud.serverAction("delete", String(modelData.id));
+                    Text {
+                      id: sshText
+                      anchors.centerIn: parent
+                      text: "SSH"
+                      font.family: root.appFontFamily
+                      font.pixelSize: 10
+                      font.bold: true
+                      color: sshMouse.containsMouse ? root.accentColor : root.textColor
+                    }
+
+                    MouseArea {
+                      id: sshMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: ocloud.openTerminal(modelData.name, modelData.tailscale_ip || modelData.ipv4, modelData.user || "root")
+                    }
+                  }
+
+                  // Mount/Unmount Button
+                  Rectangle {
+                    visible: modelData.status === "running"
+                    implicitWidth: mntText.implicitWidth + 12
+                    implicitHeight: 22
+                    radius: 2
+                    color: mntMouse.containsMouse
+                      ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                      : "transparent"
+                    border.color: mntMouse.containsMouse ? root.accentColor : root.borderCol
+                    border.width: 1
+
+                    Text {
+                      id: mntText
+                      anchors.centerIn: parent
+                      text: modelData.is_drive_mounted ? "Unmount" : "Mount"
+                      font.family: root.appFontFamily
+                      font.pixelSize: 10
+                      font.bold: true
+                      color: mntMouse.containsMouse ? root.accentColor : root.textColor
+                    }
+
+                    MouseArea {
+                      id: mntMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: {
+                        if (modelData.is_drive_mounted) {
+                          ocloud.unmountEphemeralVm();
+                        } else {
+                          consentModal.openForServer(modelData.name, String(modelData.id));
+                        }
+                      }
+                    }
+                  }
+
+                  // Top / Activity Button
+                  Rectangle {
+                    implicitWidth: topText.implicitWidth + 12
+                    implicitHeight: 22
+                    radius: 2
+                    color: topMouse.containsMouse
+                      ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                      : "transparent"
+                    border.color: topMouse.containsMouse ? root.accentColor : root.borderCol
+                    border.width: 1
+
+                    Text {
+                      id: topText
+                      anchors.centerIn: parent
+                      text: "Top"
+                      font.family: root.appFontFamily
+                      font.pixelSize: 10
+                      font.bold: true
+                      color: topMouse.containsMouse ? root.accentColor : root.textColor
+                    }
+
+                    MouseArea {
+                      id: topMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: taskManagerModal.openForServer(modelData)
+                    }
+                  }
+
+                  // Power Button
+                  Rectangle {
+                    enabled: modelData.status !== "starting" && modelData.status !== "stopping"
+                    implicitWidth: pwrText.implicitWidth + 12
+                    implicitHeight: 22
+                    radius: 2
+                    color: pwrMouse.containsMouse
+                      ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                      : "transparent"
+                    border.color: pwrMouse.containsMouse ? root.accentColor : root.borderCol
+                    border.width: 1
+
+                    Text {
+                      id: pwrText
+                      anchors.centerIn: parent
+                      text: modelData.status === "running" ? "Off" : "On"
+                      font.family: root.appFontFamily
+                      font.pixelSize: 10
+                      font.bold: true
+                      color: pwrMouse.containsMouse ? root.accentColor : root.mutedColor
+                    }
+
+                    MouseArea {
+                      id: pwrMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: {
+                        var act = modelData.status === "running" ? "stop" : "start";
+                        ocloud.serverAction(act, String(modelData.id));
+                      }
+                    }
+                  }
+
+                  // Delete Button
+                  Rectangle {
+                    implicitWidth: delText.implicitWidth + 12
+                    implicitHeight: 22
+                    radius: 2
+                    color: delMouse.containsMouse
+                      ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                      : "transparent"
+                    border.color: delMouse.containsMouse
+                      ? ((typeof theme !== "undefined" && theme.red) ? theme.red : root.accentColor)
+                      : root.borderCol
+                    border.width: 1
+
+                    Text {
+                      id: delText
+                      anchors.centerIn: parent
+                      text: "Delete"
+                      font.family: root.appFontFamily
+                      font.pixelSize: 10
+                      font.bold: true
+                      color: delMouse.containsMouse
+                        ? ((typeof theme !== "undefined" && theme.red) ? theme.red : root.accentColor)
+                        : root.mutedColor
+                    }
+
+                    MouseArea {
+                      id: delMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: {
+                        if (modelData.provider === "custom") {
+                          ocloud.removeNode(String(modelData.id));
+                        } else {
+                          ocloud.serverAction("delete", String(modelData.id));
+                        }
+                      }
+                    }
                   }
                 }
               }
