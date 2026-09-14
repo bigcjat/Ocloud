@@ -565,13 +565,12 @@ FloatingWindow {
               anchors.rightMargin: 8
               spacing: 8
 
-              Image {
+              ThemeIcon {
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
                 Layout.alignment: Qt.AlignVCenter
-                source: Qt.resolvedUrl("icons/device-desktop.svg")
-                fillMode: Image.PreserveAspectFit
-                smooth: true
+                source: "icons/device-desktop.svg"
+                color: theme.textSecondary
               }
 
               ColumnLayout {

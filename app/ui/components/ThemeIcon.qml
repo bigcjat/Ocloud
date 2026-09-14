@@ -5,13 +5,19 @@ Item {
   id: root
   property string source: ""
   property color color: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
-  readonly property bool isBrandLogo: source.indexOf("data:image") >= 0
 
   implicitWidth: 20
   implicitHeight: 20
 
+  Rectangle {
+    id: fillRect
+    anchors.fill: parent
+    color: root.color
+    visible: false
+  }
+
   Image {
-    id: rawIcon
+    id: maskImage
     anchors.fill: parent
     source: {
       if (!root.source) return "";
@@ -19,18 +25,19 @@ Item {
       if (root.source.indexOf("icons/") === 0) return Qt.resolvedUrl("../" + root.source);
       return Qt.resolvedUrl(root.source);
     }
-    sourceSize.width: Math.max(48, root.width * 2)
-    sourceSize.height: Math.max(48, root.height * 2)
+    sourceSize.width: Math.max(64, root.width * 2)
+    sourceSize.height: Math.max(64, root.height * 2)
     fillMode: Image.PreserveAspectFit
     smooth: true
-    visible: root.isBrandLogo
+    visible: false
   }
 
   MultiEffect {
-    visible: !root.isBrandLogo
     anchors.fill: parent
-    source: rawIcon
-    colorization: 1.0
-    colorizationColor: root.color
+    source: fillRect
+    maskEnabled: true
+    maskSource: maskImage
+    visible: root.source.length > 0 && maskImage.status === Image.Ready
   }
 }
+
