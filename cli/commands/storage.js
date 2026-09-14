@@ -513,6 +513,48 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     return;
   }
 
+  if (subcmd === 'add-koofr') {
+    const [name, username, password, mountPoint] = args;
+    if (!username || !password) {
+      throw new Error('Usage: ocloud storage add-koofr <name> <username> <password> [mount_point]');
+    }
+    const remoteName = (name || 'koofr').toLowerCase().replace(/ /g, '-');
+    const expMount = resolveMountPath(mountPoint || '~/Koofr');
+
+    // 1. Save in Vault
+    if (vault) {
+      vault.setScopedCredentials(remoteName, { username, password });
+      vault.ensureRcloneEncrypted(rcloneBin);
+    }
+
+    // 2. Create in Rclone
+    const cmdArgs = [
+      rcloneBin, 'config', 'create', remoteName, 'koofr',
+      'user', username,
+      'password', password,
+      'provider', 'koofr',
+      '--non-interactive'
+    ];
+
+    fs.mkdirSync(expMount, { recursive: true });
+    try {
+      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
+      console.log(`✔ Configured Koofr remote '${remoteName}' in Rclone.`);
+    } catch(e) {
+      throw new Error(`Error configuring Koofr: ${e.message}`);
+    }
+
+    try {
+      await mountAndVerifyRemote(`${remoteName}:`, expMount, rcloneBin, env, remoteName);
+      console.log(`✔ Mounted Koofr '${remoteName}' to ${expMount}`);
+    } catch(e) {
+      try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
+      try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
+      throw new Error(`Failed to mount Koofr '${remoteName}': ${e.message}`);
+    }
+    return;
+  }
+
   if (subcmd === 'add-s3') {
     const [name, endpoint, bucket, key, secret, mountPoint] = args;
     const remoteName = (name || 's3').toLowerCase().replace(/ /g, '-');

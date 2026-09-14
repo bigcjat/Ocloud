@@ -637,6 +637,20 @@ Item {
     }, 45000);
   }
 
+  function addKoofrStorage(name, username, password, mountPath, callback) {
+    root.busyChanged(true, "Configuring Koofr in Vault & mounting...");
+    var args = ["storage", "add-koofr", name, username, password];
+    args.push(mountPath ? mountPath : "");
+    runCli(args, function(out, ok) {
+      root.busyChanged(false, "");
+      var msg = ok ? ("Mounted " + name + " to " + (mountPath || "~/Koofr")) : (out || "Failed to add Koofr storage");
+      root.actionCompleted("addKoofrStorage", ok, msg);
+      root.refreshStatusAsync();
+      root.fetchCloudAccountsAsync();
+      if (callback) callback(ok, msg);
+    }, 45000);
+  }
+
   function addS3Storage(name, endpoint, bucket, key, secret, mountPath, callback) {
     root.busyChanged(true, "Configuring S3 in Vault & mounting...");
     runCli(["storage", "add-s3", name, endpoint, bucket || "", key, secret, mountPath || ""], function(out, ok) {

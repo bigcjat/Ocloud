@@ -2101,6 +2101,8 @@ Rectangle {
                   ocloud.addProtonDriveStorage(sName, keyField.text.trim(), secretField.text.trim(), twofaField.text.trim(), mailboxPassField.text.trim(), mPath, handleResult);
                 } else if (rType === "mega" || (method && method.rcloneType === "mega") || (platform && platform.id === "mega" && rType === "mega")) {
                   ocloud.addMegaStorage(sName, keyField.text.trim(), secretField.text.trim(), mPath, handleResult);
+                } else if (rType === "koofr" || (method && method.rcloneType === "koofr") || (platform && platform.id === "koofr")) {
+                  ocloud.addKoofrStorage(sName, keyField.text.trim(), secretField.text.trim(), mPath, handleResult);
                 } else if (aType === "webdav" || rType === "webdav") {
                   var vendor = (method && method.vendor) ? method.vendor : (platform ? platform.vendor || "" : "");
                   ocloud.addWebdavStorage(sName, endpointField.text.trim(), keyField.text.trim(), secretField.text.trim(), vendor, mPath, handleResult);

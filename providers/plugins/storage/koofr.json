@@ -1,0 +1,49 @@
+{
+  "id": "koofr",
+  "name": "Koofr",
+  "type": "storage",
+  "category": "personal",
+  "authType": "credentials",
+  "rcloneType": "koofr",
+  "defaultRemoteName": "koofr",
+  "defaultMount": "~/Koofr",
+  "badge": "10 GB Free (EU)",
+  "badgeColor": "#1b6199",
+  "brandColor": "#1b6199",
+  "tagline": "Private, European GDPR-compliant cloud storage with WebDAV and Rclone support.",
+  "dashboardUrl": "https://app.koofr.net",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path fill=\"#1b6199\" d=\"M19 6h-3V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H5a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3V9a3 3 0 0 0-3-3m-9-2h4v2h-4zm10 13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1z\"/><path fill=\"#1b6199\" d=\"M12 9.5 13.5 12 12 14.5 10.5 12z\"/></svg>",
+  "instructions": {
+    "navBreadcrumb": "Koofr › Setup Assistant",
+    "step1": "Enter your Koofr account email address.",
+    "step2": "Generate and enter an App-Specific Password from https://app.koofr.net/app/admin/preferences/password.",
+    "step3": "Your virtual drive will mount immediately to ~/Koofr."
+  },
+  "disclosure": "Note: Koofr requires an App-Specific Password for Rclone connection. Your primary account login password will not work.",
+  "fields": [
+    {
+      "key": "username",
+      "label": "Koofr Account Email",
+      "placeholder": "user@example.com",
+      "type": "text",
+      "required": true,
+      "helper": "The email address associated with your Koofr account"
+    },
+    {
+      "key": "password",
+      "label": "App-Specific Password",
+      "placeholder": "••••••••••••",
+      "type": "password",
+      "required": true,
+      "helper": "Generate at: app.koofr.net/app/admin/preferences/password"
+    }
+  ],
+  "allowedDomains": [
+    "*.koofr.net",
+    "*.koofr.eu"
+  ],
+  "permissions": {
+    "network": true,
+    "rclone": true
+  }
+}
