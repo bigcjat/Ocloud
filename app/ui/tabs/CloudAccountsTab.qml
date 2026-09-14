@@ -15,12 +15,23 @@ Item {
 
   function reloadPlugins() {
     try {
-      var raw = ocloud.fetchStoragePlugins();
+      var raw = ocloud.fetchStoragePlugins(true);
       if (raw && raw.length > 2) {
         storagePlugins = JSON.parse(raw);
       }
     } catch (e) {
       storagePlugins = [];
+    }
+  }
+
+  Connections {
+    target: ocloud
+    function onStoragePluginsUpdated(json) {
+      if (json && json.length > 2) {
+        try {
+          storagePlugins = JSON.parse(json);
+        } catch(e) {}
+      }
     }
   }
 

@@ -19,6 +19,7 @@ Item {
   signal catalogUpdated(string providerId, string catalogJson)
   signal hetznerCatalogUpdated(string catalogJson)
   signal computePluginsUpdated(string pluginsJson)
+  signal storagePluginsUpdated(string pluginsJson)
   signal storageMounted(string name, string path)
   signal settingsUpdated(string settingsJson)
 
@@ -447,6 +448,7 @@ Item {
       onStreamFinished: {
         if (text && text.trim().length > 0) {
           root.cachedStoragePlugins = text;
+          root.storagePluginsUpdated(root.cachedStoragePlugins);
         }
       }
     }
@@ -473,8 +475,8 @@ Item {
     }
   }
 
-  function fetchStoragePlugins() {
-    if (!pluginsProc.running && root.cachedStoragePlugins === "[]") {
+  function fetchStoragePlugins(force) {
+    if (force || (!pluginsProc.running && root.cachedStoragePlugins === "[]")) {
       pluginsProc.running = true;
     }
     return root.cachedStoragePlugins;

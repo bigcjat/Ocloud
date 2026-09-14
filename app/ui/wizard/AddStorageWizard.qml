@@ -65,9 +65,9 @@ Rectangle {
     return null;
   }
 
-  function loadPlatforms() {
+  function loadPlatforms(force) {
     try {
-      var raw = ocloud.fetchStoragePlugins();
+      var raw = ocloud.fetchStoragePlugins(force);
       if (raw && raw.length > 2) {
         var list = JSON.parse(raw);
         if (list && list.length > 0) {
@@ -79,12 +79,24 @@ Rectangle {
     platforms = [];
   }
 
+  Connections {
+    target: ocloud
+    function onStoragePluginsUpdated(json) {
+      if (json && json.length > 2) {
+        try {
+          var list = JSON.parse(json);
+          if (list && list.length > 0) modal.platforms = list;
+        } catch(e) {}
+      }
+    }
+  }
+
   Component.onCompleted: {
-    loadPlatforms();
+    loadPlatforms(false);
   }
 
   function openModal(initialPlatform) {
-    loadPlatforms();
+    loadPlatforms(true);
     stepName = "providers";
     selectedPlatform = null;
     selectedMethod = null;
