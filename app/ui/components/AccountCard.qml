@@ -1,13 +1,16 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 
 Rectangle {
   id: root
   Layout.fillWidth: true
-  radius: (typeof theme !== "undefined" && theme.cornerRadius) ? theme.cornerRadius : 8
-  color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "#24283b"
-  border.color: isConnected ? ((typeof theme !== "undefined" && theme.accent) ? Qt.rgba(theme.accent.r, theme.accent.g, theme.accent.b, 0.4) : "#3b82f6") : ((typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#414868")
+  radius: (typeof theme !== "undefined" && theme.cornerRadius) ? Math.min(theme.cornerRadius, 4) : 4
+  color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
+  border.color: cardMouse.containsMouse
+    ? ((typeof theme !== "undefined" && theme.borderActive) ? theme.borderActive : theme.borderSubtle)
+    : ((typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "transparent")
   border.width: 1
 
   property string accountName: "Cloud Account"
@@ -16,136 +19,204 @@ Rectangle {
   property string userDetail: "Signed In"
   property string authMethod: "OAuth 2.0"
   property bool isConnected: true
-  property string statusText: isConnected ? "Connected" : "Not Linked"
-  property string statusVariant: isConnected ? "success" : "neutral"
+  property string mountPath: ""
 
   signal connectClicked()
   signal disconnectClicked()
+  signal openClicked()
 
-  readonly property bool isNarrow: width < 480
+  readonly property bool isNarrow: width < 420
+  readonly property string appFontFamily: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+  readonly property color textColor: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#ffffff"
+  readonly property color mutedColor: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#888888"
+  readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
+  readonly property color dotColor: root.isConnected
+    ? ((typeof theme !== "undefined" && theme.green) ? theme.green : accentColor)
+    : ((typeof theme !== "undefined" && theme.muted) ? theme.muted : "#555555")
 
-  implicitHeight: cardContent.implicitHeight + (root.isNarrow ? 20 : 24)
+  implicitHeight: cardContent.implicitHeight + 16
 
-  ColumnLayout {
+  MouseArea {
+    id: cardMouse
+    anchors.fill: parent
+    hoverEnabled: true
+    acceptedButtons: Qt.NoButton
+  }
+
+  RowLayout {
     id: cardContent
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
-    anchors.margins: root.isNarrow ? 10 : 14
-    spacing: 10
+    anchors.margins: 12
+    spacing: 12
 
-    RowLayout {
-      Layout.fillWidth: true
-      spacing: root.isNarrow ? 10 : 12
+    // Status Dot (Flea-style 6px indicator)
+    Rectangle {
+      Layout.preferredWidth: 6
+      Layout.preferredHeight: 6
+      Layout.alignment: Qt.AlignVCenter
+      color: root.dotColor
+    }
 
-      // Service Brand Icon Container
-      Rectangle {
-        Layout.preferredWidth: root.isNarrow ? 36 : 42
-        Layout.preferredHeight: root.isNarrow ? 36 : 42
-        radius: (typeof theme !== "undefined" && theme.cornerRadius) ? Math.max(4, theme.cornerRadius - 2) : 6
-        color: (typeof theme !== "undefined" && theme.cardBgAlt) ? theme.cardBgAlt : "#13141c"
-        border.color: root.isConnected ? ((typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7") : ((typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#414868")
-        border.width: 1
+    // Theme-Reactive Monochrome Brand Icon
+    Item {
+      Layout.preferredWidth: 22
+      Layout.preferredHeight: 22
+      Layout.alignment: Qt.AlignVCenter
 
-        Image {
-          anchors.centerIn: parent
-          width: root.isNarrow ? 22 : 26
-          height: root.isNarrow ? 22 : 26
-          source: {
-            if (root.iconSource.indexOf(":") >= 0) return root.iconSource;
-            if (root.iconSource.indexOf("icons/") === 0) return Qt.resolvedUrl("../" + root.iconSource);
-            return Qt.resolvedUrl(root.iconSource);
-          }
-          fillMode: Image.PreserveAspectFit
-          smooth: true
+      Image {
+        id: rawIcon
+        anchors.fill: parent
+        source: {
+          if (root.iconSource.indexOf(":") >= 0) return root.iconSource;
+          if (root.iconSource.indexOf("icons/") === 0) return Qt.resolvedUrl("../" + root.iconSource);
+          return Qt.resolvedUrl(root.iconSource);
         }
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        visible: false
       }
 
-      // Account Info
-      ColumnLayout {
-        Layout.fillWidth: true
-        spacing: 2
-
-        RowLayout {
-          spacing: 6
-          Layout.fillWidth: true
-
-          Text {
-            text: root.accountName
-            font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-            font.pixelSize: root.isNarrow ? 13 : 14
-            font.bold: true
-            color: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
-            elide: Text.ElideRight
-            Layout.maximumWidth: root.isNarrow ? 140 : 260
-          }
-
-          AppBadge {
-            variant: root.statusVariant
-            text: root.statusText
-          }
-
-          AppBadge {
-            visible: !root.isNarrow
-            variant: "neutral"
-            text: root.authMethod
-          }
-        }
-
-        Text {
-          text: root.userDetail || root.accountType
-          font.family: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
-          font.pixelSize: 10
-          color: root.isConnected ? ((typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7") : ((typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89")
-          elide: Text.ElideRight
-          Layout.fillWidth: true
-        }
-      }
-
-      // Wide layout: Action button pinned to the right
-      RowLayout {
-        visible: !root.isNarrow
-        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-        spacing: 8
-
-        AppButton {
-          visible: !root.isConnected
-          text: "+ Connect Account"
-          variant: "primary"
-          iconSource: "icons/plus.svg"
-          onClicked: root.connectClicked()
-        }
-
-        AppButton {
-          visible: root.isConnected
-          text: "Disconnect"
-          variant: "secondary"
-          onClicked: root.disconnectClicked()
-        }
+      MultiEffect {
+        anchors.fill: parent
+        source: rawIcon
+        colorization: 1.0
+        colorizationColor: cardMouse.containsMouse ? root.accentColor : root.textColor
       }
     }
 
-    // Narrow/Quarter layout: Action button displayed below
-    RowLayout {
-      visible: root.isNarrow
+    // Account Name and Path (Zero badges, pure typography)
+    ColumnLayout {
       Layout.fillWidth: true
-      spacing: 6
+      spacing: 2
 
-      Item { Layout.fillWidth: true }
-
-      AppButton {
-        visible: !root.isConnected
-        text: "+ Connect"
-        variant: "primary"
-        iconSource: "icons/plus.svg"
-        onClicked: root.connectClicked()
+      Text {
+        text: root.accountName
+        font.family: root.appFontFamily
+        font.pixelSize: 13
+        font.bold: true
+        color: root.textColor
+        elide: Text.ElideRight
+        Layout.fillWidth: true
       }
 
-      AppButton {
+      Text {
+        text: root.userDetail || root.accountType
+        font.family: root.appFontFamily
+        font.pixelSize: 10
+        color: root.mutedColor
+        elide: Text.ElideRight
+        Layout.fillWidth: true
+      }
+    }
+
+    // Restrained Desktop Action Buttons (Theme Colors)
+    RowLayout {
+      Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+      spacing: 6
+
+      // Open in File Manager button (if connected)
+      Rectangle {
         visible: root.isConnected
-        text: "Disconnect"
-        variant: "secondary"
-        onClicked: root.disconnectClicked()
+        implicitWidth: openText.implicitWidth + 14
+        implicitHeight: 24
+        radius: 2
+        color: openMouse.containsMouse
+          ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+          : "transparent"
+        border.color: openMouse.containsMouse ? root.accentColor : ((typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333")
+        border.width: 1
+
+        Text {
+          id: openText
+          anchors.centerIn: parent
+          text: "Open"
+          font.family: root.appFontFamily
+          font.pixelSize: 10
+          font.bold: true
+          color: openMouse.containsMouse ? root.accentColor : root.textColor
+        }
+
+        MouseArea {
+          id: openMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: {
+            if (root.mountPath && root.mountPath.length > 0) {
+              ocloud.openCloudFolder(root.mountPath);
+            } else {
+              ocloud.openCloudFolder(root.accountName);
+            }
+          }
+        }
+      }
+
+      // Disconnect button
+      Rectangle {
+        visible: root.isConnected
+        implicitWidth: discText.implicitWidth + 14
+        implicitHeight: 24
+        radius: 2
+        color: discMouse.containsMouse
+          ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+          : "transparent"
+        border.color: discMouse.containsMouse
+          ? ((typeof theme !== "undefined" && theme.red) ? theme.red : root.accentColor)
+          : ((typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333")
+        border.width: 1
+
+        Text {
+          id: discText
+          anchors.centerIn: parent
+          text: "Disconnect"
+          font.family: root.appFontFamily
+          font.pixelSize: 10
+          font.bold: true
+          color: discMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.red) ? theme.red : root.accentColor)
+            : root.mutedColor
+        }
+
+        MouseArea {
+          id: discMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.disconnectClicked()
+        }
+      }
+
+      // Connect button (when not connected)
+      Rectangle {
+        visible: !root.isConnected
+        implicitWidth: connText.implicitWidth + 14
+        implicitHeight: 24
+        radius: 2
+        color: connMouse.containsMouse
+          ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+          : "transparent"
+        border.color: connMouse.containsMouse ? root.accentColor : ((typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333")
+        border.width: 1
+
+        Text {
+          id: connText
+          anchors.centerIn: parent
+          text: "+ Connect"
+          font.family: root.appFontFamily
+          font.pixelSize: 10
+          font.bold: true
+          color: connMouse.containsMouse ? root.accentColor : root.textColor
+        }
+
+        MouseArea {
+          id: connMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.connectClicked()
+        }
       }
     }
   }

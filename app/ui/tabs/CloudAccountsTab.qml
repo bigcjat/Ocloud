@@ -8,10 +8,14 @@ Item {
   Layout.fillWidth: true
   Layout.fillHeight: true
 
-  readonly property bool isNarrow: width < 520
-
   property var cloudAccounts: []
   property var storagePlugins: []
+
+  readonly property string appFontFamily: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
+  readonly property color textColor: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#ffffff"
+  readonly property color mutedColor: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#888888"
+  readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
+  readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
 
   function reloadPlugins() {
     try {
@@ -45,29 +49,13 @@ Item {
     reloadPlugins();
   }
 
-  function isPluginConnected(plugin) {
-    if (!cloudAccounts || cloudAccounts.length === 0) return false;
-    return cloudAccounts.some(function(acc) {
-      return acc.name === plugin.id ||
-             acc.name === plugin.defaultRemoteName ||
-             (acc.providerId && acc.providerId === plugin.id) ||
-             (plugin.id === "google_drive" && (acc.type === "drive" || acc.name === "gdrive")) ||
-             (plugin.id === "onedrive" && (acc.type === "onedrive" || acc.name === "onedrive")) ||
-             (plugin.id === "dropbox" && (acc.type === "dropbox" || acc.name === "dropbox")) ||
-             (plugin.id === "hetzner_storage_box" && (acc.type === "storagebox" || acc.name === "storagebox")) ||
-             (plugin.id === "cloudflare_r2" && (acc.name === "r2" || acc.name === "r2-ocloud"));
-    });
-  }
-
   Component.onCompleted: {
     reloadAccounts();
-    reloadPlugins();
   }
 
   onVisibleChanged: {
     if (visible) {
       reloadAccounts();
-      reloadPlugins();
     }
   }
 
@@ -82,88 +70,131 @@ Item {
     }
   }
 
-  function getRemoteByName(rName) {
-    for (var i = 0; i < cloudAccounts.length; i++) {
-      if (cloudAccounts[i].name === rName || cloudAccounts[i].type === rName) {
-        return cloudAccounts[i];
-      }
-    }
-    return null;
-  }
+  readonly property var activeAccounts: cloudAccounts.filter(function(a) { return a.type !== "smb"; })
 
   ScrollView {
     anchors.fill: parent
-    anchors.margins: root.isNarrow ? 12 : 20
+    anchors.margins: 16
     contentWidth: availableWidth
     clip: true
 
     ColumnLayout {
       width: parent.width
-      spacing: 24
+      spacing: 16
 
-      // Section Header
-      AppHeader {
-        title: "Cloud Accounts"
-        subtitle: "Manage your linked cloud storage services, credentials, and accounts"
+      // =========================================================
+      // HEADER BAR
+      // =========================================================
+      RowLayout {
+        Layout.fillWidth: true
+        spacing: 12
 
-        RowLayout {
-          spacing: 10
+        ColumnLayout {
+          Layout.fillWidth: true
+          spacing: 2
 
-          AppButton {
-            text: "Refresh"
-            iconSource: "icons/refresh.svg"
-            variant: "secondary"
-            onClicked: reloadAccounts()
+          Text {
+            text: "CONNECTED STORAGE"
+            font.family: root.appFontFamily
+            font.pixelSize: 11
+            font.bold: true
+            font.letterSpacing: 1
+            color: root.mutedColor
           }
 
-          AppButton {
-            text: "Add Cloud Storage"
-            iconSource: "icons/plus.svg"
-            variant: "primary"
+          Text {
+            text: root.activeAccounts.length === 1 ? "1 cloud drive mounted" : (root.activeAccounts.length + " cloud drives mounted")
+            font.family: root.appFontFamily
+            font.pixelSize: 12
+            color: root.textColor
+          }
+        }
+
+        // Refresh Action
+        Rectangle {
+          implicitWidth: refreshText.implicitWidth + 16
+          implicitHeight: 28
+          radius: 2
+          color: refMouse.containsMouse
+            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+            : "transparent"
+          border.color: refMouse.containsMouse ? root.accentColor : root.borderCol
+          border.width: 1
+
+          Text {
+            id: refreshText
+            anchors.centerIn: parent
+            text: "Refresh"
+            font.family: root.appFontFamily
+            font.pixelSize: 11
+            font.bold: true
+            color: refMouse.containsMouse ? root.accentColor : root.textColor
+          }
+
+          MouseArea {
+            id: refMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.reloadAccounts()
+          }
+        }
+
+        // Add Storage Action (Theme-accented button)
+        Rectangle {
+          implicitWidth: addText.implicitWidth + 20
+          implicitHeight: 28
+          radius: 2
+          color: addMouse.containsMouse
+            ? Qt.darker(root.accentColor, 1.2)
+            : root.accentColor
+
+          Text {
+            id: addText
+            anchors.centerIn: parent
+            text: "+ Add Storage"
+            font.family: root.appFontFamily
+            font.pixelSize: 11
+            font.bold: true
+            color: (typeof theme !== "undefined" && theme.background) ? theme.background : "#000000"
+          }
+
+          MouseArea {
+            id: addMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
             onClicked: addStorageModal.openModal()
           }
         }
       }
 
-      // Security Explainer Banner
-      AppBanner {
-        variant: "info"
-        iconSource: "icons/user-circle.svg"
-        title: "Authenticated Cloud Services"
-        message: "OAuth tokens, API credentials, and cloud sessions are stored securely on this machine. Click '+ Add Cloud Storage' to connect a new personal cloud or object storage bucket."
-
-        AppBadge {
-          variant: "success"
-          text: cloudAccounts.filter(function(a) { return a.type !== "smb"; }).length + " Connected"
-        }
+      // Thin separator hairline
+      Rectangle {
+        Layout.fillWidth: true
+        height: 1
+        color: root.borderCol
       }
 
       // =========================================================
-      // SECTION 1: CONNECTED ACCOUNTS
+      // CONNECTED ACCOUNTS LIST (ONLY CONNECTED SERVICES)
       // =========================================================
       ColumnLayout {
         Layout.fillWidth: true
-        spacing: 12
-
-        Text {
-          text: "CONNECTED CLOUD ACCOUNTS (" + cloudAccounts.filter(function(a) { return a.type !== "smb"; }).length + ")"
-          font.pixelSize: 11
-          font.bold: true
-          color: "#94a3b8"
-        }
+        spacing: 8
+        visible: root.activeAccounts.length > 0
 
         Repeater {
-          model: cloudAccounts.filter(function(a) { return a.type !== "smb"; })
+          model: root.activeAccounts
 
           delegate: AccountCard {
             accountName: modelData.providerName || modelData.name
             accountType: (modelData.type === "drive" || modelData.type === "onedrive" || modelData.type === "dropbox") ? "Personal Cloud" : "Object Storage"
             iconSource: (modelData.iconDataUri && modelData.iconDataUri.length > 0) ? modelData.iconDataUri : (modelData.iconSvg || "icons/cloud.svg")
-            userDetail: modelData.accountDetail || "Authenticated Session"
-            authMethod: (modelData.type === "drive" || modelData.type === "onedrive" || modelData.type === "dropbox") ? "OAuth 2.0" : (modelData.type === "storagebox" ? "SSH / SFTP" : "API Key")
+            userDetail: (modelData.mountPath ? modelData.mountPath : "") + (modelData.accountDetail ? (" · " + modelData.accountDetail) : "")
+            authMethod: ""
             isConnected: true
-            statusText: "Connected"
-            statusVariant: "success"
+            mountPath: modelData.mountPath || ""
             onDisconnectClicked: {
               if (modelData.name) {
                 ocloud.disconnectCloudAccount(modelData.name);
@@ -174,85 +205,108 @@ Item {
       }
 
       // =========================================================
-      // SECTION 2: AVAILABLE CLOUD PLATFORMS (TO CONNECT)
+      // EMPTY STATE (WHEN ZERO CONNECTED SERVICES)
       // =========================================================
-      ColumnLayout {
+      Rectangle {
+        visible: root.activeAccounts.length === 0
         Layout.fillWidth: true
-        spacing: 12
+        implicitHeight: 120
+        radius: 4
+        color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
+        border.color: root.borderCol
+        border.width: 1
 
-        Text {
-          text: "AVAILABLE CLOUD PLATFORMS"
-          font.pixelSize: 11
-          font.bold: true
-          color: "#64748b"
-        }
+        ColumnLayout {
+          anchors.centerIn: parent
+          spacing: 8
 
-        Repeater {
-          model: storagePlugins.filter(function(plugin) {
-            return !isPluginConnected(plugin);
-          })
+          Text {
+            Layout.alignment: Qt.AlignHCenter
+            text: "No Cloud Storage Connected"
+            font.family: root.appFontFamily
+            font.pixelSize: 13
+            font.bold: true
+            color: root.textColor
+          }
 
-          delegate: AccountCard {
-            accountName: modelData.name
-            accountType: modelData.category === "personal" ? "Personal Cloud" : "Object Storage"
-            iconSource: (modelData.iconDataUri && modelData.iconDataUri.length > 0) ? modelData.iconDataUri : (modelData.iconSvg || "icons/cloud.svg")
-            userDetail: modelData.tagline || ("Connect " + modelData.name)
-            authMethod: modelData.authType === "oauth" ? "OAuth 2.0" : (modelData.authType === "webdav" ? "App Password / WebDAV" : "API Key / S3")
-            isConnected: false
-            statusText: "Not Linked"
-            statusVariant: "neutral"
-            onConnectClicked: addStorageModal.openModal(modelData.id)
+          Text {
+            Layout.alignment: Qt.AlignHCenter
+            text: "Click \"+ Add Storage\" above to connect your personal cloud drives or S3 buckets."
+            font.family: root.appFontFamily
+            font.pixelSize: 11
+            color: root.mutedColor
           }
         }
       }
 
-      // Advanced CLI / Rclone Card
-      AppCard {
-        implicitHeight: rcloneRow.implicitHeight + 28
+      Item {
+        Layout.preferredHeight: 12
+      }
+
+      // =========================================================
+      // ADVANCED CLI CARD (100% Theme Colors)
+      // =========================================================
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: rcloneRow.implicitHeight + 20
+        radius: 4
+        color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
+        border.color: root.borderCol
+        border.width: 1
 
         RowLayout {
           id: rcloneRow
           anchors.fill: parent
-          anchors.margins: 16
-          spacing: 16
-
-          Rectangle {
-            Layout.preferredWidth: 40
-            Layout.preferredHeight: 40
-            radius: 8
-            color: "#141e30"
-            border.color: "#1e293b"
-            Image {
-              anchors.centerIn: parent
-              width: 22
-              height: 22
-              source: Qt.resolvedUrl("../icons/terminal.svg")
-              fillMode: Image.PreserveAspectFit
-              smooth: true
-            }
-          }
+          anchors.margins: 12
+          spacing: 12
 
           ColumnLayout {
             Layout.fillWidth: true
             spacing: 2
+
             Text {
-              text: "Advanced Cloud Storage CLI"
-              font.pixelSize: 14
+              text: "Rclone Advanced Storage CLI"
+              font.family: root.appFontFamily
+              font.pixelSize: 12
               font.bold: true
-              color: textPrimary
+              color: root.textColor
             }
+
             Text {
-              text: "Manage advanced rclone storage remotes, encryption filters, and chunking"
-              font.pixelSize: 11
-              color: textMuted
+              text: "Manage raw remotes, encryption filters, and chunking directly"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              color: root.mutedColor
             }
           }
 
-          AppButton {
-            text: "Rclone Configurator"
-            iconSource: "icons/terminal.svg"
-            variant: "secondary"
-            onClicked: ocloud.launchRcloneConfig()
+          Rectangle {
+            implicitWidth: rcText.implicitWidth + 14
+            implicitHeight: 24
+            radius: 2
+            color: rcMouse.containsMouse
+              ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+              : "transparent"
+            border.color: rcMouse.containsMouse ? root.accentColor : root.borderCol
+            border.width: 1
+
+            Text {
+              id: rcText
+              anchors.centerIn: parent
+              text: "Launch CLI"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              font.bold: true
+              color: rcMouse.containsMouse ? root.accentColor : root.textColor
+            }
+
+            MouseArea {
+              id: rcMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: ocloud.launchRcloneConfig()
+            }
           }
         }
       }
