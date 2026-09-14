@@ -101,6 +101,7 @@ class BridgeServer {
     const origLog = console.log;
     const origWarn = console.warn;
     const origError = console.error;
+    const origExit = process.exit;
 
     console.log = (...a) => {
       captured += a.map(x => (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(' ') + '\n';
@@ -111,17 +112,25 @@ class BridgeServer {
     console.error = (...a) => {
       captured += a.map(x => (typeof x === 'object' ? JSON.stringify(x) : String(x))).join(' ') + '\n';
     };
+    process.exit = (code) => {
+      if (code && code !== 0) {
+        throw new Error(captured.trim() || `Command failed with exit code ${code}`);
+      }
+    };
 
     let ok = true;
     try {
       await runCommandWithContext(args, this.context);
     } catch (err) {
       ok = false;
-      captured += (err.message || String(err)) + '\n';
+      if (!captured.includes(err.message)) {
+        captured += (err.message || String(err)) + '\n';
+      }
     } finally {
       console.log = origLog;
       console.warn = origWarn;
       console.error = origError;
+      process.exit = origExit;
     }
 
     const response = {

@@ -296,8 +296,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     try {
       await mountAndVerifyRemote(remoteTarget, mountPoint, rcloneBin, env, remoteName, noOpen);
     } catch (e) {
-      console.error(`Failed to mount ${remoteName}: ${e.message}`);
-      process.exit(1);
+      throw new Error(`Failed to mount ${remoteName}: ${e.message}`);
     }
     return;
   }
@@ -331,8 +330,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     if (ok) {
       console.log(`✔ Unmounted ${mountPoint}`);
     } else {
-      console.error(`Failed to unmount ${mountPoint}`);
-      process.exit(1);
+      throw new Error(`Failed to unmount ${mountPoint}`);
     }
     return;
   }
@@ -366,8 +364,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
   if (subcmd === 'toggle-auto-mount') {
     const rem = args[0];
     if (!rem) {
-      console.error('Usage: ocloud storage toggle-auto-mount <remoteName>');
-      process.exit(1);
+      throw new Error('Usage: ocloud storage toggle-auto-mount <remoteName>');
     }
     const settings = loadSettings();
     let list = settings.autoMountRemotes || [];
@@ -413,8 +410,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
   if (subcmd === 'add-proton') {
     const [name, username, password, twofa, mailboxPass, mountPoint] = args;
     if (!username || !password) {
-      console.error('Usage: ocloud storage add-proton <name> <username> <password> [2fa] [mailbox_pass] [mount_point]');
-      process.exit(1);
+      throw new Error('Usage: ocloud storage add-proton <name> <username> <password> [2fa] [mailbox_pass] [mount_point]');
     }
     const remoteName = (name || 'protondrive').toLowerCase().replace(/ /g, '-');
     const expMount = resolveMountPath(mountPoint || '~/ProtonDrive');
@@ -441,8 +437,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
       execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
       console.log(`✔ Configured Proton Drive remote '${remoteName}' in Rclone.`);
     } catch(e) {
-      console.error(`Error configuring Proton Drive: ${e.message}`);
-      process.exit(1);
+      throw new Error(`Error configuring Proton Drive: ${e.message}`);
     }
 
     try {
@@ -451,8 +446,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     } catch(e) {
       try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
       try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
-      console.error(`Failed to mount Proton Drive '${remoteName}': ${e.message}`);
-      process.exit(1);
+      throw new Error(`Failed to mount Proton Drive '${remoteName}': ${e.message}`);
     }
     return;
   }
@@ -488,8 +482,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     try {
       execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
     } catch(e) {
-      console.error(`Error configuring S3 remote '${remoteName}': ${e.message}`);
-      process.exit(1);
+      throw new Error(`Error configuring S3 remote '${remoteName}': ${e.message}`);
     }
 
     const remoteTarget = bucket ? `${remoteName}:${bucket}` : `${remoteName}:`;
@@ -499,8 +492,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     } catch(e) {
       try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
       try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
-      console.error(`Failed to mount S3 remote '${remoteName}': ${e.message}`);
-      process.exit(1);
+      throw new Error(`Failed to mount S3 remote '${remoteName}': ${e.message}`);
     }
     return;
   }
@@ -527,8 +519,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     try {
       execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
     } catch(e) {
-      console.error(`Error configuring WebDAV remote '${remoteName}': ${e.message}`);
-      process.exit(1);
+      throw new Error(`Error configuring WebDAV remote '${remoteName}': ${e.message}`);
     }
 
     try {
@@ -537,8 +528,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     } catch(e) {
       try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
       try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
-      console.error(`Failed to mount WebDAV remote '${remoteName}': ${e.message}`);
-      process.exit(1);
+      throw new Error(`Failed to mount WebDAV remote '${remoteName}': ${e.message}`);
     }
     return;
   }
@@ -564,8 +554,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     try {
       execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
     } catch(e) {
-      console.error(`Error configuring SFTP remote '${remoteName}': ${e.message}`);
-      process.exit(1);
+      throw new Error(`Error configuring SFTP remote '${remoteName}': ${e.message}`);
     }
 
     try {
@@ -574,8 +563,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     } catch(e) {
       try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
       try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
-      console.error(`Failed to mount SFTP remote '${remoteName}': ${e.message}`);
-      process.exit(1);
+      throw new Error(`Failed to mount SFTP remote '${remoteName}': ${e.message}`);
     }
     return;
   }
@@ -602,8 +590,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     try {
       execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
     } catch(e) {
-      console.error(`Error configuring SMB remote '${remoteName}': ${e.message}`);
-      process.exit(1);
+      throw new Error(`Error configuring SMB remote '${remoteName}': ${e.message}`);
     }
 
     try {
@@ -612,8 +599,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     } catch(e) {
       try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
       try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
-      console.error(`Failed to mount SMB share //${host}/${share}: ${e.message}`);
-      process.exit(1);
+      throw new Error(`Failed to mount SMB share //${host}/${share}: ${e.message}`);
     }
     return;
   }

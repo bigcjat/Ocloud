@@ -69,6 +69,13 @@ Item {
     }
     onExited: (code, status) => {
       root.bridgeReady = false;
+      var cbs = root.pendingCallbacks;
+      root.pendingCallbacks = ({});
+      for (var k in cbs) {
+        if (typeof cbs[k] === "function") {
+          try { cbs[k]("Bridge process exited unexpectedly (code " + code + ")", false); } catch(e) {}
+        }
+      }
       bridgeRestartTimer.start();
     }
   }
@@ -82,18 +89,43 @@ Item {
     }
   }
 
+  Component {
+    id: bridgeTimeoutTimerComp
+    Timer {
+      property string reqId: ""
+      property int timeoutMs: 15000
+      interval: timeoutMs
+      running: true
+      repeat: false
+      onTriggered: {
+        if (root.pendingCallbacks && root.pendingCallbacks[reqId]) {
+          var cb = root.pendingCallbacks[reqId];
+          delete root.pendingCallbacks[reqId];
+          console.warn("[OcloudBackend] Bridge request timed out after " + timeoutMs + "ms: " + reqId);
+          cb("Operation timed out after " + Math.round(timeoutMs/1000) + "s", false);
+        }
+        destroy();
+      }
+    }
+  }
+
   // Helper to run a command and collect output (uses warm Bridge first, fallback to CLI fork)
   function runCli(args, onDone, timeoutMs) {
+    var tMs = timeoutMs || 15000;
     if (root.bridgeReady && bridgeProc.running) {
       var reqId = "req_" + (root.nextReqId++);
-      root.pendingCallbacks[reqId] = onDone;
+      var timer = bridgeTimeoutTimerComp.createObject(root, { "reqId": reqId, "timeoutMs": tMs });
+      root.pendingCallbacks[reqId] = function(out, ok) {
+        if (timer) timer.destroy();
+        onDone(out, ok);
+      };
       bridgeProc.write(JSON.stringify({ id: reqId, args: args }) + "\n");
       return;
     }
 
     var proc = dynamicProcComp.createObject(root, {
       "command": [root.ocloudBin].concat(args),
-      "timeoutMs": timeoutMs || 15000
+      "timeoutMs": tMs
     });
     proc.finishedCallback = onDone;
     proc.running = true;
