@@ -1189,7 +1189,7 @@ Rectangle {
                         ocloud.connectCloudAccount(pType, rName, eArgs);
                       } else if (modal.isApp) {
                         Qt.openUrlExternally((modal.selectedMethod && modal.selectedMethod.dashboardUrl) ? modal.selectedMethod.dashboardUrl : modal.selectedPlatform.dashboardUrl);
-                      } else if (modal.selectedMethod && modal.selectedMethod.authType === "webdav") {
+                      } else if (modal.selectedMethod && (modal.selectedMethod.authType === "webdav" || modal.selectedMethod.authType === "credentials")) {
                         modal.stepName = "credentials";
                       } else if (modal.selectedPlatform && modal.selectedPlatform.dashboardUrl) {
                         Qt.openUrlExternally(modal.selectedPlatform.dashboardUrl);
@@ -2096,6 +2096,8 @@ Rectangle {
                   ocloud.mountCloudAccount(remoteName, mPath, handleResult);
                 } else if (rType === "protondrive" || (platform && platform.id === "protondrive")) {
                   ocloud.addProtonDriveStorage(sName, keyField.text.trim(), secretField.text.trim(), twofaField.text.trim(), mailboxPassField.text.trim(), mPath, handleResult);
+                } else if (rType === "mega" || (method && method.rcloneType === "mega") || (platform && platform.id === "mega" && rType === "mega")) {
+                  ocloud.addMegaStorage(sName, keyField.text.trim(), secretField.text.trim(), mPath, handleResult);
                 } else if (aType === "webdav" || rType === "webdav") {
                   var vendor = (method && method.vendor) ? method.vendor : (platform ? platform.vendor || "" : "");
                   ocloud.addWebdavStorage(sName, endpointField.text.trim(), keyField.text.trim(), secretField.text.trim(), vendor, mPath, handleResult);

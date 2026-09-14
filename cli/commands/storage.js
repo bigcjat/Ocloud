@@ -80,6 +80,10 @@ function getCloudAccounts(registry, vault = null) {
         matchedPlugin = p;
         break;
       }
+      if (p.id === 'mega' && (name.startsWith('mega') || t === 'mega')) {
+        matchedPlugin = p;
+        break;
+      }
       if (p.rcloneType === t) {
         matchedPlugin = p;
       }
@@ -91,6 +95,8 @@ function getCloudAccounts(registry, vault = null) {
     if (name === 'storagebox') defaultMount = '~/Cloud';
     if (name === 'r2') defaultMount = '~/R2';
     if (t === 'protondrive' || name === 'protondrive') defaultMount = '~/ProtonDrive';
+    if (t === 'mega' || name === 'mega') defaultMount = '~/Mega';
+    if (name === 'mega-s4') defaultMount = '~/Mega-S4';
     const mountPath = resolveMountPath(defaultMount);
 
     let detail = cfg.user ? `${cfg.user}@${cfg.host || ''}` : (cfg.endpoint || (matchedPlugin ? matchedPlugin.tagline : 'Cloud Account'));
@@ -100,6 +106,9 @@ function getCloudAccounts(registry, vault = null) {
     }
     if (t === 'protondrive') {
       detail = `Proton Drive (${cfg.username || cfg.user || 'Encrypted'})`;
+    }
+    if (t === 'mega') {
+      detail = `MEGA Drive (${cfg.user || cfg.username || 'Personal'})`;
     }
 
     remotes.push({
@@ -461,6 +470,47 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     return;
   }
 
+  if (subcmd === 'add-mega') {
+    const [name, username, password, mountPoint] = args;
+    if (!username || !password) {
+      throw new Error('Usage: ocloud storage add-mega <name> <username> <password> [mount_point]');
+    }
+    const remoteName = (name || 'mega').toLowerCase().replace(/ /g, '-');
+    const expMount = resolveMountPath(mountPoint || '~/Mega');
+
+    // 1. Save in Vault
+    if (vault) {
+      vault.setScopedCredentials(remoteName, { username, password });
+      vault.ensureRcloneEncrypted(rcloneBin);
+    }
+
+    // 2. Create in Rclone
+    const cmdArgs = [
+      rcloneBin, 'config', 'create', remoteName, 'mega',
+      'user', username,
+      'pass', password,
+      '--non-interactive'
+    ];
+
+    fs.mkdirSync(expMount, { recursive: true });
+    try {
+      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
+      console.log(`✔ Configured MEGA remote '${remoteName}' in Rclone.`);
+    } catch(e) {
+      throw new Error(`Error configuring MEGA: ${e.message}`);
+    }
+
+    try {
+      await mountAndVerifyRemote(`${remoteName}:`, expMount, rcloneBin, env, remoteName);
+      console.log(`✔ Mounted MEGA '${remoteName}' to ${expMount}`);
+    } catch(e) {
+      try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
+      try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
+      throw new Error(`Failed to mount MEGA '${remoteName}': ${e.message}`);
+    }
+    return;
+  }
+
   if (subcmd === 'add-s3') {
     const [name, endpoint, bucket, key, secret, mountPoint] = args;
     const remoteName = (name || 's3').toLowerCase().replace(/ /g, '-');
@@ -478,6 +528,8 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
       s3Provider = 'Backblaze';
     } else if (endpoint && (endpoint.includes('cloudflare') || endpoint.includes('r2.cloudflarestorage.com'))) {
       s3Provider = 'Cloudflare';
+    } else if ((endpoint && (endpoint.includes('mega') || endpoint.includes('s4.mega.io'))) || remoteName.includes('mega')) {
+      s3Provider = 'Mega';
     }
 
     const cmdArgs = [
