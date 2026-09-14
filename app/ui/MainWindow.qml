@@ -354,37 +354,58 @@ FloatingWindow {
 
         Item { Layout.fillWidth: true }
 
-        // Status Badges (Visible in Full and Half mode)
+        // Status Indicators (Quiet, theme-reactive, no chunky badges)
         RowLayout {
           visible: !window.isQuarter
-          spacing: 6
+          spacing: 12
 
-          AppBadge {
-            text: serverList.length + (serverList.length === 1 ? (window.isHalf ? " Node" : " Node Online") : (window.isHalf ? " Nodes" : " Nodes Online"))
-            variant: serverList.length > 0 ? "success" : "neutral"
+          RowLayout {
+            spacing: 6
+            Rectangle {
+              width: 6; height: 6; radius: 3
+              color: serverList.length > 0
+                ? ((typeof theme !== "undefined" && theme.homeGreen) ? theme.homeGreen : "#9ece6a")
+                : theme.textMuted
+            }
+            Text {
+              text: serverList.length + (serverList.length === 1 ? (window.isHalf ? " Node" : " Node Online") : (window.isHalf ? " Nodes" : " Nodes Online"))
+              font.family: theme.fontFamily
+              font.pixelSize: 11
+              color: theme.textSecondary
+            }
           }
 
-          AppBadge {
+          RowLayout {
             visible: serverList.length > 0 && !!calculateTotalFleetCost()
-            text: calculateTotalFleetCost()
-            variant: "info"
+            spacing: 6
+            Rectangle {
+              width: 6; height: 6; radius: 3
+              color: theme.accent
+            }
+            Text {
+              text: calculateTotalFleetCost()
+              font.family: theme.fontFamily
+              font.pixelSize: 11
+              color: theme.textSecondary
+            }
           }
 
-          AppBadge {
+          RowLayout {
             visible: !!(storageBox && storageBox.configured) && window.isFull
-            text: (storageBox && storageBox.mounted) ? "Storage Box Mounted" : "Storage Box Offline"
-            variant: (storageBox && storageBox.mounted) ? "info" : "neutral"
+            spacing: 6
+            Rectangle {
+              width: 6; height: 6; radius: 3
+              color: (storageBox && storageBox.mounted)
+                ? ((typeof theme !== "undefined" && theme.homeGreen) ? theme.homeGreen : "#9ece6a")
+                : theme.textMuted
+            }
+            Text {
+              text: (storageBox && storageBox.mounted) ? "Storage Box Mounted" : "Storage Box Offline"
+              font.family: theme.fontFamily
+              font.pixelSize: 11
+              color: theme.textSecondary
+            }
           }
-        }
-
-        // Refresh Button: Responsive text / icon
-        AppButton {
-          id: refreshBtn
-          enabled: !window.isBusy
-          text: window.isQuarter ? "" : (window.isHalf ? "Refresh" : "Refresh Fleet")
-          iconSource: "icons/refresh.svg"
-          variant: "secondary"
-          onClicked: reloadAll()
         }
       }
     }
@@ -451,27 +472,18 @@ FloatingWindow {
                 }
               }
 
-              // Pinned Count Badge (Full view)
-              Rectangle {
-                id: badgeRect
+              // Pinned Count (Full view) - Clean quiet muted text, no chunky light-on-light pill
+              Text {
+                id: badgeText
                 visible: !window.isHalf && modelData.count > 0 && (modelData.id === "fleet" || modelData.id === "storage" || modelData.id === "accounts" || modelData.id === "shares")
                 anchors.right: parent.right
-                anchors.rightMargin: 10
+                anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
-                height: 16
-                width: Math.max(16, badgeText.implicitWidth + 8)
-                radius: 8
-                color: modelData.id === "fleet" ? theme.accentSky : (modelData.id === "accounts" ? theme.accentSky : theme.homeGreen)
-
-                Text {
-                  id: badgeText
-                  anchors.centerIn: parent
-                  text: String(modelData.count)
-                  font.family: theme.fontFamily
-                  font.pixelSize: 9
-                  font.bold: true
-                  color: "#ffffff"
-                }
+                text: String(modelData.count)
+                font.family: theme.fontFamily
+                font.pixelSize: 10
+                font.bold: true
+                color: activeTab === modelData.id ? theme.accent : theme.textMuted
               }
 
               // Half View: Centered Icon + Dot Badge

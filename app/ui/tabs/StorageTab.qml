@@ -8,26 +8,26 @@ Item {
   Layout.fillWidth: true
   Layout.fillHeight: true
 
-  property var rootCapacities: ({})
-  property var cloudAccounts: []
-  property var mountedShares: []
-
   readonly property string appFontFamily: (typeof theme !== "undefined" && theme.fontFamily) ? theme.fontFamily : "monospace"
   readonly property color textColor: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
   readonly property color mutedColor: (typeof theme !== "undefined" && theme.textMuted) ? theme.textMuted : "#565f89"
   readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
   readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
 
+  property var cloudAccounts: []
+  property var mountedShares: []
+  property var rootCapacities: ({})
+
   function refreshCapacities() {
-    try {
-      var raw = ocloud.getDriveCapacities();
-      rootCapacities = JSON.parse(raw || "{}");
-    } catch (e) {}
+    ocloud.getDriveCapacities(function(caps) {
+      if (caps) rootCapacities = caps;
+    });
   }
 
   function reloadCloudAccounts() {
     try {
-      cloudAccounts = JSON.parse(ocloud.fetchCloudAccounts() || "[]");
+      var raw = ocloud.fetchCloudAccounts();
+      cloudAccounts = JSON.parse(raw || "[]");
     } catch (e) {
       cloudAccounts = [];
     }
@@ -35,23 +35,10 @@ Item {
 
   function reloadMountedShares() {
     try {
-      mountedShares = JSON.parse(ocloud.getNetworkShares() || "[]");
+      var raw = ocloud.getNetworkShares();
+      mountedShares = JSON.parse(raw || "[]");
     } catch (e) {
       mountedShares = [];
-    }
-  }
-
-  Component.onCompleted: {
-    refreshCapacities();
-    reloadCloudAccounts();
-    reloadMountedShares();
-  }
-
-  onVisibleChanged: {
-    if (visible) {
-      root.refreshCapacities();
-      root.reloadCloudAccounts();
-      root.reloadMountedShares();
     }
   }
 
@@ -59,22 +46,33 @@ Item {
     target: ocloud
     function onCloudAccountsUpdated(jsonStr) {
       try {
-        root.cloudAccounts = JSON.parse(jsonStr);
-      } catch(e) {
-        root.cloudAccounts = [];
+        cloudAccounts = JSON.parse(jsonStr);
+      } catch (e) {
+        cloudAccounts = [];
       }
     }
     function onNetworkSharesUpdated(jsonStr) {
       try {
-        root.mountedShares = JSON.parse(jsonStr);
-      } catch(e) {
-        root.mountedShares = [];
+        mountedShares = JSON.parse(jsonStr);
+      } catch (e) {
+        mountedShares = [];
+      }
+    }
+    function onActionCompleted(action, success, msg) {
+      if (action === "mountCloudAccount" || action === "unmountCloudAccount" || action === "disconnectCloudAccount" || action === "mountStorageBox" || action === "unmountStorageBox") {
+        root.reloadCloudAccounts();
+        root.refreshCapacities();
       }
     }
   }
 
+  Component.onCompleted: {
+    reloadCloudAccounts();
+    reloadMountedShares();
+    refreshCapacities();
+  }
+
   ScrollView {
-    id: storageScroll
     anchors.fill: parent
     anchors.margins: 16
     contentWidth: availableWidth
@@ -92,7 +90,6 @@ Item {
         spacing: 12
 
         ColumnLayout {
-          Layout.fillWidth: true
           spacing: 2
 
           Text {
@@ -111,6 +108,9 @@ Item {
             color: root.textColor
           }
         }
+
+        // Spacer pushing action buttons to the absolute right edge
+        Item { Layout.fillWidth: true }
 
         // Refresh Disks Button
         Rectangle {
@@ -201,6 +201,7 @@ Item {
         }
 
         NativeDriveCard {
+          Layout.fillWidth: true
           driveName: "System Volume"
           driveType: "Internal NVMe Storage (/)"
           iconSource: "icons/hard-drive.svg"
@@ -229,7 +230,7 @@ Item {
       }
 
       // =========================================================
-      // 2. CONNECTED CLOUD DRIVES
+      // 2. CONNECTED CLOUD DRIVES (RESPONSIVE 1 OR 2 COLUMNS)
       // =========================================================
       ColumnLayout {
         Layout.fillWidth: true
@@ -244,33 +245,41 @@ Item {
           color: root.mutedColor
         }
 
-        Repeater {
-          model: root.cloudAccounts
+        GridLayout {
+          Layout.fillWidth: true
+          columns: root.width > 800 ? 2 : 1
+          columnSpacing: 10
+          rowSpacing: 8
 
-          delegate: NativeDriveCard {
-            driveName: modelData.providerName || modelData.name
-            driveType: modelData.type || "Cloud Storage"
-            iconSource: (modelData.iconDataUri && modelData.iconDataUri.length > 0) ? modelData.iconDataUri : (modelData.iconSvg || "icons/cloud.svg")
-            mountPath: modelData.mountPath || ""
-            capacityText: modelData.accountDetail || "Mounted Remote"
-            isMounted: true
-            showDisconnect: true
-            showSettings: false
-            onOpenClicked: {
-              if (modelData.mountPath) {
-                ocloud.openCloudFolder(modelData.mountPath);
-              } else {
-                ocloud.openCloudFolder(modelData.name);
+          Repeater {
+            model: root.cloudAccounts
+
+            delegate: NativeDriveCard {
+              Layout.fillWidth: true
+              driveName: modelData.providerName || modelData.name
+              driveType: modelData.type || "Cloud Storage"
+              iconSource: (modelData.iconDataUri && modelData.iconDataUri.length > 0) ? modelData.iconDataUri : (modelData.iconSvg || "icons/cloud.svg")
+              mountPath: modelData.mountPath || ""
+              capacityText: modelData.accountDetail || "Mounted Remote"
+              isMounted: true
+              showDisconnect: true
+              showSettings: false
+              onOpenClicked: {
+                if (modelData.mountPath) {
+                  ocloud.openCloudFolder(modelData.mountPath);
+                } else {
+                  ocloud.openCloudFolder(modelData.name);
+                }
               }
-            }
-            onUnmountClicked: {
-              if (modelData.name) {
-                ocloud.disconnectCloudAccount(modelData.name);
+              onUnmountClicked: {
+                if (modelData.name) {
+                  ocloud.disconnectCloudAccount(modelData.name);
+                }
               }
-            }
-            onDisconnectClicked: {
-              if (modelData.name) {
-                ocloud.disconnectCloudAccount(modelData.name);
+              onDisconnectClicked: {
+                if (modelData.name) {
+                  ocloud.disconnectCloudAccount(modelData.name);
+                }
               }
             }
           }
@@ -278,7 +287,7 @@ Item {
       }
 
       // =========================================================
-      // 3. MOUNTED NETWORK SHARES
+      // 3. MOUNTED NETWORK SHARES (RESPONSIVE 1 OR 2 COLUMNS)
       // =========================================================
       ColumnLayout {
         Layout.fillWidth: true
@@ -293,31 +302,39 @@ Item {
           color: root.mutedColor
         }
 
-        Repeater {
-          model: root.mountedShares
+        GridLayout {
+          Layout.fillWidth: true
+          columns: root.width > 800 ? 2 : 1
+          columnSpacing: 10
+          rowSpacing: 8
 
-          delegate: NativeDriveCard {
-            driveName: modelData.name || "Network Share"
-            driveType: (modelData.protocol || "SMB") + " · " + (modelData.host || "")
-            iconSource: "icons/network.svg"
-            mountPath: modelData.mountPath || ""
-            capacityText: "Active Share"
-            isMounted: true
-            showDisconnect: true
-            showSettings: false
-            onOpenClicked: {
-              if (modelData.mountPath) {
-                ocloud.openCloudFolder(modelData.mountPath);
+          Repeater {
+            model: root.mountedShares
+
+            delegate: NativeDriveCard {
+              Layout.fillWidth: true
+              driveName: modelData.name || "Network Share"
+              driveType: (modelData.protocol || "SMB") + " · " + (modelData.host || "")
+              iconSource: "icons/network.svg"
+              mountPath: modelData.mountPath || ""
+              capacityText: "Active Share"
+              isMounted: true
+              showDisconnect: true
+              showSettings: false
+              onOpenClicked: {
+                if (modelData.mountPath) {
+                  ocloud.openCloudFolder(modelData.mountPath);
+                }
               }
-            }
-            onUnmountClicked: {
-              if (modelData.name) {
-                ocloud.unmountNetworkShare(modelData.name);
+              onUnmountClicked: {
+                if (modelData.name) {
+                  ocloud.unmountNetworkShare(modelData.name);
+                }
               }
-            }
-            onDisconnectClicked: {
-              if (modelData.name) {
-                ocloud.unmountNetworkShare(modelData.name);
+              onDisconnectClicked: {
+                if (modelData.name) {
+                  ocloud.unmountNetworkShare(modelData.name);
+                }
               }
             }
           }

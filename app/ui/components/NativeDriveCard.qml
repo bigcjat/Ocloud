@@ -5,7 +5,8 @@ import QtQuick.Layouts
 Rectangle {
   id: root
   Layout.fillWidth: true
-  radius: 4
+  implicitHeight: (root.isMounted && root.usedPercent >= 0) ? 50 : 46
+  radius: 2
   color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
   border.color: driveMouse.containsMouse
     ? ((typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7")
@@ -52,15 +53,12 @@ Rectangle {
     }
   }
 
-  signal openClicked()
-  signal unmountClicked()
-  signal settingsClicked()
-  signal connectClicked()
   signal mountClicked()
+  signal unmountClicked()
+  signal openClicked()
+  signal settingsClicked()
   signal disconnectClicked()
   signal autoMountToggled(bool enabled)
-
-  implicitHeight: cardContent.implicitHeight + 20
 
   MouseArea {
     id: driveMouse
@@ -69,15 +67,173 @@ Rectangle {
     acceptedButtons: Qt.NoButton
   }
 
-  ColumnLayout {
-    id: cardContent
+  Item {
+    id: cardInner
     anchors.fill: parent
-    anchors.margins: 12
-    spacing: 8
+    anchors.margins: 10
 
-    // Row: Status Dot, Icon, Details, Actions
+    // =========================================================
+    // RIGHT ACTION TOOLBAR (PINNED TO ABSOLUTE RIGHT EDGE)
+    // =========================================================
     RowLayout {
-      Layout.fillWidth: true
+      id: actionRow
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: 6
+
+      // Open in File Manager
+      Rectangle {
+        visible: root.isMounted
+        implicitWidth: openText.implicitWidth + 14
+        implicitHeight: 24
+        radius: 2
+        color: openMouse.containsMouse
+          ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+          : "transparent"
+        border.color: openMouse.containsMouse ? root.accentColor : root.borderCol
+        border.width: 1
+
+        Text {
+          id: openText
+          anchors.centerIn: parent
+          text: "Open"
+          font.family: root.appFontFamily
+          font.pixelSize: 10
+          font.bold: true
+          color: openMouse.containsMouse ? root.accentColor : root.textColor
+        }
+
+        MouseArea {
+          id: openMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.openClicked()
+        }
+      }
+
+      // Mount Drive Button
+      Rectangle {
+        visible: !root.isMounted && root.isConnected
+        implicitWidth: mntText.implicitWidth + 14
+        implicitHeight: 24
+        radius: 2
+        color: mntMouse.containsMouse
+          ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+          : "transparent"
+        border.color: mntMouse.containsMouse ? root.accentColor : root.borderCol
+        border.width: 1
+
+        Text {
+          id: mntText
+          anchors.centerIn: parent
+          text: (root.isBusy && root.busyAction === "mounting") ? "Mounting..." : "Mount"
+          font.family: root.appFontFamily
+          font.pixelSize: 10
+          font.bold: true
+          color: mntMouse.containsMouse ? root.accentColor : root.textColor
+        }
+
+        MouseArea {
+          id: mntMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          enabled: !root.isBusy
+          cursorShape: Qt.PointingHandCursor
+          onClicked: {
+            root.isBusy = true;
+            root.busyAction = "mounting";
+            root.lastError = "";
+            root.mountClicked();
+          }
+        }
+      }
+
+      // Unmount / Disconnect Button
+      Rectangle {
+        visible: root.isMounted && root.mountPath !== "/" && root.driveType.indexOf("Internal") < 0
+        implicitWidth: unmText.implicitWidth + 14
+        implicitHeight: 24
+        radius: 2
+        color: unmMouse.containsMouse
+          ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+          : "transparent"
+        border.color: unmMouse.containsMouse ? root.accentColor : root.borderCol
+        border.width: 1
+
+        Text {
+          id: unmText
+          anchors.centerIn: parent
+          text: (root.isBusy && root.busyAction === "unmounting")
+            ? "Unmounting..."
+            : (root.showDisconnect ? "Disconnect" : "Unmount")
+          font.family: root.appFontFamily
+          font.pixelSize: 10
+          font.bold: true
+          color: unmMouse.containsMouse ? root.accentColor : root.mutedColor
+        }
+
+        MouseArea {
+          id: unmMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          enabled: !root.isBusy
+          cursorShape: Qt.PointingHandCursor
+          onClicked: {
+            root.isBusy = true;
+            root.busyAction = "unmounting";
+            root.lastError = "";
+            if (root.showDisconnect) {
+              root.disconnectClicked();
+            } else {
+              root.unmountClicked();
+            }
+          }
+        }
+      }
+
+      // Auto-Mount Toggle Button
+      Rectangle {
+        visible: root.showAutoMount && root.isConnected
+        implicitWidth: autoText.implicitWidth + 14
+        implicitHeight: 24
+        radius: 2
+        color: autoMouse.containsMouse
+          ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+          : "transparent"
+        border.color: autoMouse.containsMouse ? root.accentColor : root.borderCol
+        border.width: 1
+
+        Text {
+          id: autoText
+          anchors.centerIn: parent
+          text: root.autoMount ? "Auto: ON" : "Auto: OFF"
+          font.family: root.appFontFamily
+          font.pixelSize: 10
+          font.bold: true
+          color: root.autoMount
+            ? ((typeof theme !== "undefined" && theme.homeGreen) ? theme.homeGreen : root.accentColor)
+            : root.mutedColor
+        }
+
+        MouseArea {
+          id: autoMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: root.autoMountToggled(!root.autoMount)
+        }
+      }
+    }
+
+    // =========================================================
+    // LEFT INFO GROUP (ANCHORED FROM LEFT TO ACTION ROW)
+    // =========================================================
+    RowLayout {
+      anchors.left: parent.left
+      anchors.right: actionRow.left
+      anchors.rightMargin: 12
+      anchors.verticalCenter: parent.verticalCenter
       spacing: 10
 
       // 6px Flea Status Dot
@@ -85,31 +241,34 @@ Rectangle {
         Layout.preferredWidth: 6
         Layout.preferredHeight: 6
         Layout.alignment: Qt.AlignVCenter
+        radius: 3
         color: root.isMounted
-          ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
+          ? ((typeof theme !== "undefined" && theme.homeGreen) ? theme.homeGreen : root.accentColor)
           : root.mutedColor
       }
 
-      // Drive ThemeIcon
+      // Drive ThemeIcon (Razor sharp)
       ThemeIcon {
-        Layout.preferredWidth: 20
-        Layout.preferredHeight: 20
+        Layout.preferredWidth: 18
+        Layout.preferredHeight: 18
         Layout.alignment: Qt.AlignVCenter
         source: root.iconSource
         color: driveMouse.containsMouse ? root.accentColor : root.textColor
       }
 
-      // Drive Details (Zero badges, pure typography)
+      // Details: Title + Mount/Capacity
       ColumnLayout {
         Layout.fillWidth: true
         spacing: 2
 
         RowLayout {
+          Layout.fillWidth: true
           spacing: 6
+
           Text {
             text: root.driveName
             font.family: root.appFontFamily
-            font.pixelSize: 13
+            font.pixelSize: 12
             font.bold: true
             color: root.textColor
             elide: Text.ElideRight
@@ -120,12 +279,15 @@ Rectangle {
             font.family: root.appFontFamily
             font.pixelSize: 10
             color: root.isMounted
-              ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
+              ? ((typeof theme !== "undefined" && theme.homeGreen) ? theme.homeGreen : root.accentColor)
               : root.mutedColor
           }
+
+          Item { Layout.fillWidth: true }
         }
 
         Text {
+          Layout.fillWidth: true
           text: (root.mountPath ? root.mountPath : root.driveType) + (root.capacityText ? (" · " + root.capacityText) : "")
           font.family: root.appFontFamily
           font.pixelSize: 10
@@ -133,155 +295,16 @@ Rectangle {
           elide: Text.ElideRight
         }
       }
-
-      // Compact Desktop Action Toolbar
-      RowLayout {
-        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-        spacing: 6
-
-        // Open in File Manager Button
-        Rectangle {
-          visible: root.isMounted && !!root.mountPath
-          implicitWidth: opnText.implicitWidth + 14
-          implicitHeight: 22
-          radius: 2
-          color: opnMouse.containsMouse
-            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
-            : "transparent"
-          border.color: opnMouse.containsMouse ? root.accentColor : root.borderCol
-          border.width: 1
-
-          Text {
-            id: opnText
-            anchors.centerIn: parent
-            text: "Open"
-            font.family: root.appFontFamily
-            font.pixelSize: 10
-            font.bold: true
-            color: opnMouse.containsMouse ? root.accentColor : root.textColor
-          }
-
-          MouseArea {
-            id: opnMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.openClicked()
-          }
-        }
-
-        // Mount Drive Button
-        Rectangle {
-          visible: root.isConnected && !root.isMounted
-          implicitWidth: mntText.implicitWidth + 14
-          implicitHeight: 22
-          radius: 2
-          color: mntMouse.containsMouse
-            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
-            : "transparent"
-          border.color: mntMouse.containsMouse ? root.accentColor : root.borderCol
-          border.width: 1
-
-          Text {
-            id: mntText
-            anchors.centerIn: parent
-            text: (root.isBusy && root.busyAction === "mounting") ? "Mounting..." : "Mount"
-            font.family: root.appFontFamily
-            font.pixelSize: 10
-            font.bold: true
-            color: mntMouse.containsMouse ? root.accentColor : root.textColor
-          }
-
-          MouseArea {
-            id: mntMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            enabled: !root.isBusy
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              root.isBusy = true;
-              root.busyAction = "mounting";
-              root.lastError = "";
-              root.mountClicked();
-            }
-          }
-        }
-
-        // Unmount Drive Button
-        Rectangle {
-          visible: root.isMounted && root.mountPath !== "/" && root.driveType.indexOf("Internal") < 0
-          implicitWidth: unmText.implicitWidth + 14
-          implicitHeight: 22
-          radius: 2
-          color: unmMouse.containsMouse
-            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
-            : "transparent"
-          border.color: unmMouse.containsMouse ? root.accentColor : root.borderCol
-          border.width: 1
-
-          Text {
-            id: unmText
-            anchors.centerIn: parent
-            text: (root.isBusy && root.busyAction === "unmounting") ? "Unmounting..." : "Unmount"
-            font.family: root.appFontFamily
-            font.pixelSize: 10
-            font.bold: true
-            color: unmMouse.containsMouse ? root.accentColor : root.mutedColor
-          }
-
-          MouseArea {
-            id: unmMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            enabled: !root.isBusy
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              root.isBusy = true;
-              root.busyAction = "unmounting";
-              root.lastError = "";
-              root.unmountClicked();
-            }
-          }
-        }
-
-        // Auto-Mount Toggle Button
-        Rectangle {
-          visible: root.showAutoMount && root.isConnected
-          implicitWidth: autoText.implicitWidth + 14
-          implicitHeight: 22
-          radius: 2
-          color: autoMouse.containsMouse
-            ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
-            : "transparent"
-          border.color: autoMouse.containsMouse ? root.accentColor : root.borderCol
-          border.width: 1
-
-          Text {
-            id: autoText
-            anchors.centerIn: parent
-            text: root.autoMount ? "Auto: ON" : "Auto: OFF"
-            font.family: root.appFontFamily
-            font.pixelSize: 10
-            font.bold: true
-            color: root.autoMount
-              ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
-              : root.mutedColor
-          }
-
-          MouseArea {
-            id: autoMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.autoMountToggled(!root.autoMount)
-          }
-        }
-      }
     }
 
-    // Capacity Gauge Hairline (Subtle 2px line)
+    // =========================================================
+    // 2PX GAUGE HAIRLINE (PINNED TO BOTTOM OF CARD)
+    // =========================================================
     Rectangle {
-      Layout.fillWidth: true
+      anchors.bottom: parent.bottom
+      anchors.bottomMargin: -4
+      anchors.left: parent.left
+      anchors.right: parent.right
       height: 2
       radius: 1
       color: root.borderCol
@@ -292,20 +315,9 @@ Rectangle {
         radius: 1
         width: Math.max(2, parent.width * Math.min(1.0, Math.max(0.0, root.usedPercent)))
         color: root.usedPercent > 0.9
-          ? ((typeof theme !== "undefined" && theme.red) ? theme.red : root.accentColor)
+          ? ((typeof theme !== "undefined" && theme.dangerRed) ? theme.dangerRed : root.accentColor)
           : root.accentColor
       }
-    }
-
-    // Error Message Banner (if any)
-    Text {
-      visible: root.lastError.length > 0
-      text: "⚠ " + root.lastError
-      color: (typeof theme !== "undefined" && theme.red) ? theme.red : "#f7768e"
-      font.family: root.appFontFamily
-      font.pixelSize: 10
-      wrapMode: Text.WordWrap
-      Layout.fillWidth: true
     }
   }
 }

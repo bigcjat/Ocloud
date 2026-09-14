@@ -32,7 +32,6 @@ Item {
         spacing: 12
 
         ColumnLayout {
-          Layout.fillWidth: true
           spacing: 2
 
           Text {
@@ -51,6 +50,8 @@ Item {
             color: root.textColor
           }
         }
+
+        Item { Layout.fillWidth: true }
 
         // Procure VM Button
         Rectangle {
