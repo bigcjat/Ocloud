@@ -17,6 +17,13 @@ Item {
   property var activeContainers: []
   property bool deploying: false
 
+  readonly property var workloadTemplates: [
+    { id: "postgres", name: "PostgreSQL 16", desc: "Relational database with persistent NVMe storage", icon: "icons/database.svg" },
+    { id: "redis", name: "Redis Cache", desc: "In-memory cache & pub/sub message broker", icon: "icons/bolt.svg" },
+    { id: "nginx", name: "Nginx Ingress", desc: "Reverse proxy & automated TLS termination", icon: "icons/world.svg" },
+    { id: "ollama", name: "Ollama AI Engine", desc: "Local LLM inference & embeddings server", icon: "icons/cpu.svg" }
+  ]
+
   Connections {
     target: ocloud
     function onDockerContainersUpdated(jsonStr) {
@@ -148,19 +155,21 @@ Item {
       }
 
       // =========================================================
-      // ACTIVE CONTAINERS LIST
+      // ACTIVE CONTAINERS LIST (RESPONSIVE 2-COLUMN GRID)
       // =========================================================
-      ColumnLayout {
+      GridLayout {
         visible: root.activeContainers.length > 0
         Layout.fillWidth: true
-        spacing: 8
+        columns: root.width > 800 ? 2 : 1
+        columnSpacing: 10
+        rowSpacing: 8
 
         Repeater {
           model: root.activeContainers
 
           delegate: Rectangle {
             Layout.fillWidth: true
-            implicitHeight: cCol.implicitHeight + 20
+            implicitHeight: 56
             radius: 4
             color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
             border.color: cMouse.containsMouse ? root.accentColor : root.borderCol
@@ -173,139 +182,141 @@ Item {
               acceptedButtons: Qt.NoButton
             }
 
-            ColumnLayout {
-              id: cCol
-              anchors.fill: parent
-              anchors.margins: 12
-              spacing: 8
+            // Left details row
+            RowLayout {
+              anchors.left: parent.left
+              anchors.leftMargin: 12
+              anchors.right: actionRow.left
+              anchors.rightMargin: 10
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: 10
 
-              RowLayout {
+              Rectangle {
+                Layout.preferredWidth: 6
+                Layout.preferredHeight: 6
+                Layout.alignment: Qt.AlignVCenter
+                color: (modelData.status || "").toLowerCase().indexOf("up") >= 0 || (modelData.status || "").toLowerCase().indexOf("run") >= 0
+                  ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
+                  : root.mutedColor
+              }
+
+              ThemeIcon {
+                Layout.preferredWidth: 20
+                Layout.preferredHeight: 20
+                Layout.alignment: Qt.AlignVCenter
+                source: "icons/docker.svg"
+                color: cMouse.containsMouse ? root.accentColor : root.textColor
+              }
+
+              ColumnLayout {
                 Layout.fillWidth: true
-                spacing: 10
+                spacing: 2
 
-                // 6px Flea Status Dot
-                Rectangle {
-                  Layout.preferredWidth: 6
-                  Layout.preferredHeight: 6
-                  Layout.alignment: Qt.AlignVCenter
-                  color: (modelData.status || "").toLowerCase().indexOf("up") >= 0 || (modelData.status || "").toLowerCase().indexOf("run") >= 0
-                    ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
-                    : root.mutedColor
-                }
-
-                ThemeIcon {
-                  Layout.preferredWidth: 20
-                  Layout.preferredHeight: 20
-                  Layout.alignment: Qt.AlignVCenter
-                  source: "icons/box.svg"
-                  color: cMouse.containsMouse ? root.accentColor : root.textColor
-                }
-
-                ColumnLayout {
-                  Layout.fillWidth: true
-                  spacing: 2
-
-                  RowLayout {
-                    spacing: 6
-                    Text {
-                      text: modelData.name || modelData.id || "container"
-                      font.family: root.appFontFamily
-                      font.pixelSize: 13
-                      font.bold: true
-                      color: root.textColor
-                      elide: Text.ElideRight
-                    }
-
-                    Text {
-                      text: "· " + (modelData.status || "running")
-                      font.family: root.appFontFamily
-                      font.pixelSize: 10
-                      color: root.mutedColor
-                    }
+                RowLayout {
+                  spacing: 6
+                  Text {
+                    text: modelData.name || modelData.id || "container"
+                    font.family: root.appFontFamily
+                    font.pixelSize: 12
+                    font.bold: true
+                    color: root.textColor
+                    elide: Text.ElideRight
                   }
 
                   Text {
-                    text: (modelData.image || "image") + (modelData.ports ? (" · Ports: " + modelData.ports) : "")
+                    text: "· " + (modelData.status || "running")
                     font.family: root.appFontFamily
                     font.pixelSize: 10
                     color: root.mutedColor
-                    elide: Text.ElideRight
                   }
                 }
 
-                RowLayout {
-                  Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                  spacing: 6
+                Text {
+                  Layout.fillWidth: true
+                  text: (modelData.image || "image") + (modelData.ports ? (" · " + modelData.ports) : "")
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  color: root.mutedColor
+                  elide: Text.ElideRight
+                }
+              }
+            }
 
-                  // Exec Shell
-                  Rectangle {
-                    implicitWidth: shText.implicitWidth + 12
-                    implicitHeight: 22
-                    radius: 2
-                    color: shMouse.containsMouse
-                      ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
-                      : "transparent"
-                    border.color: shMouse.containsMouse ? root.accentColor : root.borderCol
-                    border.width: 1
+            // Action Buttons: Pinned flush right!
+            RowLayout {
+              id: actionRow
+              anchors.right: parent.right
+              anchors.rightMargin: 12
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: 6
 
-                    Text {
-                      id: shText
-                      anchors.centerIn: parent
-                      text: "Shell"
-                      font.family: root.appFontFamily
-                      font.pixelSize: 10
-                      font.bold: true
-                      color: shMouse.containsMouse ? root.accentColor : root.textColor
-                    }
+              // Exec Shell
+              Rectangle {
+                implicitWidth: shText.implicitWidth + 12
+                implicitHeight: 24
+                radius: 2
+                color: shMouse.containsMouse
+                  ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                  : "transparent"
+                border.color: shMouse.containsMouse ? root.accentColor : root.borderCol
+                border.width: 1
 
-                    MouseArea {
-                      id: shMouse
-                      anchors.fill: parent
-                      hoverEnabled: true
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: {
-                        var ip = (serverList && serverList.length > 0) ? (serverList[0].tailscale_ip || serverList[0].ipv4) : "";
-                        ocloud.openTerminal(modelData.name, ip);
-                      }
-                    }
+                Text {
+                  id: shText
+                  anchors.centerIn: parent
+                  text: "Shell"
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  font.bold: true
+                  color: shMouse.containsMouse ? root.accentColor : root.textColor
+                }
+
+                MouseArea {
+                  id: shMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    var ip = (serverList && serverList.length > 0) ? (serverList[0].tailscale_ip || serverList[0].ipv4) : "";
+                    ocloud.openTerminal(modelData.name, ip);
                   }
+                }
+              }
 
-                  // Stop Container
-                  Rectangle {
-                    implicitWidth: stpText.implicitWidth + 12
-                    implicitHeight: 22
-                    radius: 2
-                    color: stpMouse.containsMouse
-                      ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
-                      : "transparent"
-                    border.color: stpMouse.containsMouse
-                      ? ((typeof theme !== "undefined" && theme.red) ? theme.red : root.accentColor)
-                      : root.borderCol
-                    border.width: 1
+              // Stop Container
+              Rectangle {
+                implicitWidth: stpText.implicitWidth + 12
+                implicitHeight: 24
+                radius: 2
+                color: stpMouse.containsMouse
+                  ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                  : "transparent"
+                border.color: stpMouse.containsMouse
+                  ? ((typeof theme !== "undefined" && theme.red) ? theme.red : root.accentColor)
+                  : root.borderCol
+                border.width: 1
 
-                    Text {
-                      id: stpText
-                      anchors.centerIn: parent
-                      text: "Stop"
-                      font.family: root.appFontFamily
-                      font.pixelSize: 10
-                      font.bold: true
-                      color: stpMouse.containsMouse
-                        ? ((typeof theme !== "undefined" && theme.red) ? theme.red : root.accentColor)
-                        : root.mutedColor
-                    }
+                Text {
+                  id: stpText
+                  anchors.centerIn: parent
+                  text: "Stop"
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  font.bold: true
+                  color: stpMouse.containsMouse
+                    ? ((typeof theme !== "undefined" && theme.red) ? theme.red : root.accentColor)
+                    : root.mutedColor
+                }
 
-                    MouseArea {
-                      id: stpMouse
-                      anchors.fill: parent
-                      hoverEnabled: true
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: {
-                        var srvId = (serverList && serverList.length > 0) ? String(serverList[0].id) : "";
-                        if (srvId && ocloud.containerAction) {
-                          ocloud.containerAction(srvId, modelData.id, "stop");
-                        }
-                      }
+                MouseArea {
+                  id: stpMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    var srvId = (serverList && serverList.length > 0) ? String(serverList[0].id) : "";
+                    if (srvId && ocloud.containerAction) {
+                      ocloud.containerAction(srvId, modelData.id, "stop");
                     }
                   }
                 }
@@ -315,10 +326,10 @@ Item {
         }
       }
 
-      Item { Layout.preferredHeight: 6 }
+      Item { Layout.preferredHeight: 4 }
 
       // =========================================================
-      // 1-CLICK WORKLOAD TEMPLATES
+      // 1-CLICK WORKLOAD TEMPLATES (RESPONSIVE 2-COLUMN GRID)
       // =========================================================
       Text {
         text: "WORKLOAD TEMPLATES"
@@ -326,137 +337,106 @@ Item {
         font.pixelSize: 10
         font.bold: true
         color: root.mutedColor
+        font.letterSpacing: 1.2
       }
 
-      ColumnLayout {
+      GridLayout {
         Layout.fillWidth: true
-        spacing: 6
+        columns: root.width > 800 ? 2 : 1
+        columnSpacing: 10
+        rowSpacing: 8
 
-        // Postgres Template
-        Rectangle {
-          Layout.fillWidth: true
-          implicitHeight: 48
-          radius: 4
-          color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
-          border.color: root.borderCol
-          border.width: 1
+        Repeater {
+          model: root.workloadTemplates
 
-          RowLayout {
-            anchors.fill: parent
-            anchors.margins: 10
-            spacing: 10
+          delegate: Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: 52
+            radius: 4
+            color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
+            border.color: tMouse.containsMouse ? root.accentColor : root.borderCol
+            border.width: 1
 
+            MouseArea {
+              id: tMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              acceptedButtons: Qt.NoButton
+            }
+
+            // Left icon
             ThemeIcon {
-              Layout.preferredWidth: 18
-              Layout.preferredHeight: 18
-              source: "icons/database.svg"
-              color: root.textColor
+              id: tIcon
+              anchors.left: parent.left
+              anchors.leftMargin: 12
+              anchors.verticalCenter: parent.verticalCenter
+              width: 18
+              height: 18
+              source: modelData.icon
+              color: tMouse.containsMouse ? root.accentColor : root.textColor
             }
 
-            ColumnLayout {
-              Layout.fillWidth: true
-              spacing: 1
-              Text { text: "PostgreSQL 16"; font.family: root.appFontFamily; font.pixelSize: 12; font.bold: true; color: root.textColor }
-              Text { text: "Relational database with persistent volume mounted to Storage Box"; font.family: root.appFontFamily; font.pixelSize: 10; color: root.mutedColor; elide: Text.ElideRight }
-            }
-
+            // Right Deploy Button: Pinned flush to right edge
             Rectangle {
-              implicitWidth: depPgText.implicitWidth + 14
-              implicitHeight: 22
+              id: tBtn
+              anchors.right: parent.right
+              anchors.rightMargin: 12
+              anchors.verticalCenter: parent.verticalCenter
+              implicitWidth: tBtnText.implicitWidth + 16
+              implicitHeight: 24
               radius: 2
-              color: depPgMouse.containsMouse
+              color: tBtnMouse.containsMouse
                 ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
                 : "transparent"
-              border.color: depPgMouse.containsMouse ? root.accentColor : root.borderCol
+              border.color: tBtnMouse.containsMouse ? root.accentColor : root.borderCol
               border.width: 1
-              Text { id: depPgText; anchors.centerIn: parent; text: "Deploy"; font.family: root.appFontFamily; font.pixelSize: 10; font.bold: true; color: depPgMouse.containsMouse ? root.accentColor : root.textColor }
-              MouseArea { id: depPgMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: offloadModal.openModal() }
-            }
-          }
-        }
 
-        // Redis Template
-        Rectangle {
-          Layout.fillWidth: true
-          implicitHeight: 48
-          radius: 4
-          color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
-          border.color: root.borderCol
-          border.width: 1
+              Text {
+                id: tBtnText
+                anchors.centerIn: parent
+                text: "Deploy"
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                font.bold: true
+                color: tBtnMouse.containsMouse ? root.accentColor : root.textColor
+              }
 
-          RowLayout {
-            anchors.fill: parent
-            anchors.margins: 10
-            spacing: 10
-
-            ThemeIcon {
-              Layout.preferredWidth: 18
-              Layout.preferredHeight: 18
-              source: "icons/bolt.svg"
-              color: root.textColor
+              MouseArea {
+                id: tBtnMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: offloadModal.openModal()
+              }
             }
 
+            // Center Text Block: bounded strictly between icon and button
             ColumnLayout {
-              Layout.fillWidth: true
-              spacing: 1
-              Text { text: "Redis Cache"; font.family: root.appFontFamily; font.pixelSize: 12; font.bold: true; color: root.textColor }
-              Text { text: "Ultra-fast in-memory cache and pub/sub message broker"; font.family: root.appFontFamily; font.pixelSize: 10; color: root.mutedColor; elide: Text.ElideRight }
-            }
+              anchors.left: tIcon.right
+              anchors.leftMargin: 10
+              anchors.right: tBtn.left
+              anchors.rightMargin: 10
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: 2
 
-            Rectangle {
-              implicitWidth: depRdText.implicitWidth + 14
-              implicitHeight: 22
-              radius: 2
-              color: depRdMouse.containsMouse
-                ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
-                : "transparent"
-              border.color: depRdMouse.containsMouse ? root.accentColor : root.borderCol
-              border.width: 1
-              Text { id: depRdText; anchors.centerIn: parent; text: "Deploy"; font.family: root.appFontFamily; font.pixelSize: 10; font.bold: true; color: depRdMouse.containsMouse ? root.accentColor : root.textColor }
-              MouseArea { id: depRdMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: offloadModal.openModal() }
-            }
-          }
-        }
+              Text {
+                Layout.fillWidth: true
+                text: modelData.name
+                font.family: root.appFontFamily
+                font.pixelSize: 12
+                font.bold: true
+                color: root.textColor
+                elide: Text.ElideRight
+              }
 
-        // Nginx Ingress Template
-        Rectangle {
-          Layout.fillWidth: true
-          implicitHeight: 48
-          radius: 4
-          color: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "transparent"
-          border.color: root.borderCol
-          border.width: 1
-
-          RowLayout {
-            anchors.fill: parent
-            anchors.margins: 10
-            spacing: 10
-
-            ThemeIcon {
-              Layout.preferredWidth: 18
-              Layout.preferredHeight: 18
-              source: "icons/world.svg"
-              color: root.textColor
-            }
-
-            ColumnLayout {
-              Layout.fillWidth: true
-              spacing: 1
-              Text { text: "Nginx Ingress"; font.family: root.appFontFamily; font.pixelSize: 12; font.bold: true; color: root.textColor }
-              Text { text: "Reverse proxy and TLS certificate automation for remote services"; font.family: root.appFontFamily; font.pixelSize: 10; color: root.mutedColor; elide: Text.ElideRight }
-            }
-
-            Rectangle {
-              implicitWidth: depNgText.implicitWidth + 14
-              implicitHeight: 22
-              radius: 2
-              color: depNgMouse.containsMouse
-                ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
-                : "transparent"
-              border.color: depNgMouse.containsMouse ? root.accentColor : root.borderCol
-              border.width: 1
-              Text { id: depNgText; anchors.centerIn: parent; text: "Deploy"; font.family: root.appFontFamily; font.pixelSize: 10; font.bold: true; color: depNgMouse.containsMouse ? root.accentColor : root.textColor }
-              MouseArea { id: depNgMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: offloadModal.openModal() }
+              Text {
+                Layout.fillWidth: true
+                text: modelData.desc
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                color: root.mutedColor
+                elide: Text.ElideRight
+              }
             }
           }
         }

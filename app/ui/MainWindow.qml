@@ -74,7 +74,7 @@ FloatingWindow {
 
   readonly property var tabModel: [
     { id: "fleet", name: "Compute Nodes", shortName: "Fleet", iconSvg: "icons/server.svg", count: serverList.length },
-    { id: "workloads", name: "Workloads & Docker", shortName: "Docker", iconSvg: "icons/box.svg", count: 0 },
+    { id: "workloads", name: "Workloads & Docker", shortName: "Docker", iconSvg: "icons/docker.svg", count: 0 },
     { id: "storage", name: "Storage & Drives", shortName: "Storage", iconSvg: "icons/hard-drive.svg", count: mountedDrivesCount },
     { id: "accounts", name: "Cloud Accounts", shortName: "Accounts", iconSvg: "icons/user-circle.svg", count: cloudAccountsCount },
     { id: "apps", name: "App Streaming", shortName: "Apps", iconSvg: "icons/terminal.svg", count: 0 },
@@ -446,17 +446,16 @@ FloatingWindow {
                 visible: !window.isHalf
                 anchors.left: parent.left
                 anchors.leftMargin: 12
-                anchors.right: badgeRect.visible ? badgeRect.left : parent.right
-                anchors.rightMargin: badgeRect.visible ? 6 : 10
+                anchors.right: badgeText.visible ? badgeText.left : parent.right
+                anchors.rightMargin: badgeText.visible ? 6 : 10
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 10
 
-                Image {
-                  width: 16
-                  height: 16
-                  source: Qt.resolvedUrl(modelData.iconSvg)
-                  fillMode: Image.PreserveAspectFit
-                  smooth: true
+                ThemeIcon {
+                  Layout.preferredWidth: 16
+                  Layout.preferredHeight: 16
+                  source: modelData.iconSvg
+                  color: activeTab === modelData.id ? theme.accent : theme.textSecondary
                 }
 
                 Text {
@@ -489,13 +488,12 @@ FloatingWindow {
                 visible: window.isHalf
                 anchors.fill: parent
 
-                Image {
+                ThemeIcon {
                   anchors.centerIn: parent
                   width: 18
                   height: 18
-                  source: Qt.resolvedUrl(modelData.iconSvg)
-                  fillMode: Image.PreserveAspectFit
-                  smooth: true
+                  source: modelData.iconSvg
+                  color: activeTab === modelData.id ? theme.accent : theme.textSecondary
                 }
 
                 // Dot badge for rail mode
@@ -638,13 +636,12 @@ FloatingWindow {
               anchors.centerIn: parent
               spacing: 2
 
-              Image {
+              ThemeIcon {
                 Layout.alignment: Qt.AlignHCenter
                 width: 16
                 height: 16
-                source: Qt.resolvedUrl(modelData.iconSvg)
-                fillMode: Image.PreserveAspectFit
-                smooth: true
+                source: modelData.iconSvg
+                color: activeTab === modelData.id ? theme.accent : theme.textMuted
               }
 
               Text {

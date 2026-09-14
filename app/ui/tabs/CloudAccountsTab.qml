@@ -178,17 +178,20 @@ Item {
       }
 
       // =========================================================
-      // CONNECTED ACCOUNTS LIST (ONLY CONNECTED SERVICES)
+      // CONNECTED ACCOUNTS LIST (RESPONSIVE 2-COLUMN GRID)
       // =========================================================
-      ColumnLayout {
+      GridLayout {
         Layout.fillWidth: true
-        spacing: 8
+        columns: root.width > 800 ? 2 : 1
+        columnSpacing: 10
+        rowSpacing: 8
         visible: root.activeAccounts.length > 0
 
         Repeater {
           model: root.activeAccounts
 
           delegate: AccountCard {
+            Layout.fillWidth: true
             accountName: modelData.providerName || modelData.name
             accountType: (modelData.type === "drive" || modelData.type === "onedrive" || modelData.type === "dropbox") ? "Personal Cloud" : "Object Storage"
             iconSource: (modelData.iconDataUri && modelData.iconDataUri.length > 0) ? modelData.iconDataUri : (modelData.iconSvg || "icons/cloud.svg")

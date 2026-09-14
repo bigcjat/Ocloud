@@ -34,7 +34,7 @@ Rectangle {
     ? ((typeof theme !== "undefined" && theme.green) ? theme.green : accentColor)
     : ((typeof theme !== "undefined" && theme.muted) ? theme.muted : "#555555")
 
-  implicitHeight: cardContent.implicitHeight + 16
+  implicitHeight: 52
 
   MouseArea {
     id: cardMouse
@@ -43,13 +43,14 @@ Rectangle {
     acceptedButtons: Qt.NoButton
   }
 
+  // Left Details: Status dot + Brand icon + Name and Path
   RowLayout {
-    id: cardContent
-    anchors.top: parent.top
     anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.margins: 12
-    spacing: 12
+    anchors.leftMargin: 12
+    anchors.right: actionRow.left
+    anchors.rightMargin: 10
+    anchors.verticalCenter: parent.verticalCenter
+    spacing: 10
 
     // Status Dot (Flea-style 6px indicator)
     Rectangle {
@@ -59,7 +60,7 @@ Rectangle {
       color: root.dotColor
     }
 
-    // Theme-Reactive Monochrome Brand Icon (Dynamic OS Theme Color)
+    // Theme-Reactive Monochrome Brand Icon
     ThemeIcon {
       Layout.preferredWidth: 20
       Layout.preferredHeight: 20
@@ -68,7 +69,7 @@ Rectangle {
       color: cardMouse.containsMouse ? root.accentColor : root.textColor
     }
 
-    // Account Name and Path (Zero badges, pure typography)
+    // Account Name and Path
     ColumnLayout {
       Layout.fillWidth: true
       spacing: 2
@@ -76,7 +77,7 @@ Rectangle {
       Text {
         text: root.accountName
         font.family: root.appFontFamily
-        font.pixelSize: 13
+        font.pixelSize: 12
         font.bold: true
         color: root.textColor
         elide: Text.ElideRight
@@ -92,11 +93,15 @@ Rectangle {
         Layout.fillWidth: true
       }
     }
+  }
 
-    // Restrained Desktop Action Buttons (Theme Colors)
-    RowLayout {
-      Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-      spacing: 6
+  // Restrained Desktop Action Buttons: Pinned flush to right edge
+  RowLayout {
+    id: actionRow
+    anchors.right: parent.right
+    anchors.rightMargin: 12
+    anchors.verticalCenter: parent.verticalCenter
+    spacing: 6
 
       // Open in File Manager button (if connected)
       Rectangle {
@@ -202,4 +207,3 @@ Rectangle {
       }
     }
   }
-}

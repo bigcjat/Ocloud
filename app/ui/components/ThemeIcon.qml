@@ -5,6 +5,7 @@ Item {
   id: root
   property string source: ""
   property color color: (typeof theme !== "undefined" && theme.textPrimary) ? theme.textPrimary : "#c0caf5"
+  readonly property bool isBrandLogo: source.indexOf("data:image") >= 0
 
   implicitWidth: 20
   implicitHeight: 20
@@ -22,13 +23,13 @@ Item {
     sourceSize.height: Math.max(48, root.height * 2)
     fillMode: Image.PreserveAspectFit
     smooth: true
-    visible: false
+    visible: root.isBrandLogo
   }
 
   MultiEffect {
+    visible: !root.isBrandLogo
     anchors.fill: parent
     source: rawIcon
-    brightness: 1.0
     colorization: 1.0
     colorizationColor: root.color
   }

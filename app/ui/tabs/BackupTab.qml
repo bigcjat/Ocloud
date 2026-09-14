@@ -99,25 +99,23 @@ Item {
 
         Item { Layout.fillWidth: true }
 
-        // Take Snapshot Button
+        // Take Snapshot Button: Pinned flush right
         Rectangle {
           implicitWidth: snapText.implicitWidth + 16
-          implicitHeight: 24
+          implicitHeight: 28
           radius: 2
-          color: snapMouse.containsMouse ? root.accentColor : "transparent"
-          border.color: root.accentColor
-          border.width: 1
+          color: snapMouse.containsMouse
+            ? Qt.darker(root.accentColor, 1.2)
+            : root.accentColor
 
           Text {
             id: snapText
             anchors.centerIn: parent
             text: "+ Take Snapshot Now"
             font.family: root.appFontFamily
-            font.pixelSize: 10
+            font.pixelSize: 11
             font.bold: true
-            color: snapMouse.containsMouse
-              ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
-              : root.accentColor
+            color: (typeof theme !== "undefined" && theme.background) ? theme.background : "#000000"
           }
 
           MouseArea {
@@ -141,52 +139,54 @@ Item {
       }
 
       // =========================================================
-      // SCHEDULE CONFIGURATION
+      // TOP SUMMARY METRICS (3 INDUSTRIAL TILES)
       // =========================================================
-      Rectangle {
+      GridLayout {
         Layout.fillWidth: true
-        implicitHeight: schedCol.implicitHeight + 20
-        radius: 2
-        color: root.cardBg
-        border.color: root.borderCol
-        border.width: 1
+        columns: root.width > 750 ? 3 : 1
+        columnSpacing: 10
+        rowSpacing: 8
 
-        ColumnLayout {
-          id: schedCol
-          anchors.fill: parent
-          anchors.margins: 10
-          spacing: 10
+        // Card 1: Automation Status
+        Rectangle {
+          Layout.fillWidth: true
+          implicitHeight: 56
+          radius: 4
+          color: root.cardBg
+          border.color: root.borderCol
+          border.width: 1
 
           RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 10
 
             Rectangle {
-              width: 6
-              height: 6
-              radius: 3
+              Layout.preferredWidth: 6
+              Layout.preferredHeight: 6
+              Layout.alignment: Qt.AlignVCenter
               color: enableSwitch.checked
-                ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+                ? ((typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor)
                 : root.mutedColor
             }
 
-            Text {
-              text: "SCHEDULE CONFIGURATION"
-              font.family: root.appFontFamily
-              font.pixelSize: 10
-              font.bold: true
-              color: root.mutedColor
-            font.letterSpacing: 1.2
-            }
-
-            Item { Layout.fillWidth: true }
-
-            Text {
-              text: "AUTOMATION:"
-              font.family: root.appFontFamily
-              font.pixelSize: 9
-              font.bold: true
-              color: root.mutedColor
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 2
+              Text {
+                text: "AUTOMATION ENGINE"
+                font.family: root.appFontFamily
+                font.pixelSize: 9
+                font.bold: true
+                color: root.mutedColor
+              }
+              Text {
+                text: enableSwitch.checked ? ("Enabled · " + (scheduleConfig.interval || "daily")) : "Paused"
+                font.family: root.appFontFamily
+                font.pixelSize: 12
+                font.bold: true
+                color: root.textColor
+              }
             }
 
             AppSwitch {
@@ -198,82 +198,204 @@ Item {
               }
             }
           }
+        }
 
-          // Source folder row
-          ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 3
+        // Card 2: Destination Volume
+        Rectangle {
+          Layout.fillWidth: true
+          implicitHeight: 56
+          radius: 4
+          color: root.cardBg
+          border.color: root.borderCol
+          border.width: 1
 
-            Text {
-              text: "SOURCE DIRECTORY"
-              font.family: root.appFontFamily
-              font.pixelSize: 9
-              font.bold: true
-              color: root.mutedColor
-            }
-
-            RowLayout {
-              Layout.fillWidth: true
-              spacing: 6
-
-              TextField {
-                id: srcField
-                Layout.fillWidth: true
-                implicitHeight: 24
-                font.family: root.appFontFamily
-                font.pixelSize: 11
-                text: (scheduleConfig && scheduleConfig.source) || "~"
-                placeholderText: "Enter directory (e.g. ~/Projects)"
-                color: root.textColor
-                background: Rectangle {
-                  color: "transparent"
-                  border.color: root.borderCol
-                  border.width: 1
-                  radius: 2
-                }
-              }
-
-              Repeater {
-                model: ["~", "~/Projects", "~/Documents"]
-                delegate: Rectangle {
-                  implicitWidth: pText.implicitWidth + 10
-                  implicitHeight: 24
-                  radius: 2
-                  color: pMouse.containsMouse
-                    ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
-                    : "transparent"
-                  border.color: root.borderCol
-                  border.width: 1
-
-                  Text {
-                    id: pText
-                    anchors.centerIn: parent
-                    text: modelData
-                    font.family: root.appFontFamily
-                    font.pixelSize: 10
-                    color: root.textColor
-                  }
-
-                  MouseArea {
-                    id: pMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: srcField.text = modelData
-                  }
-                }
-              }
-            }
-          }
-
-          // Target Destination & Frequency row
           RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 10
+
+            ThemeIcon {
+              Layout.preferredWidth: 18
+              Layout.preferredHeight: 18
+              Layout.alignment: Qt.AlignVCenter
+              source: "icons/hard-drive.svg"
+              color: root.accentColor
+            }
 
             ColumnLayout {
               Layout.fillWidth: true
-              spacing: 3
+              spacing: 2
+              Text {
+                text: "TARGET VOLUME"
+                font.family: root.appFontFamily
+                font.pixelSize: 9
+                font.bold: true
+                color: root.mutedColor
+              }
+              Text {
+                text: destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].name : "Storage Box"
+                font.family: root.appFontFamily
+                font.pixelSize: 12
+                font.bold: true
+                color: root.textColor
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+              }
+            }
+          }
+        }
+
+        // Card 3: Integrity & Encryption
+        Rectangle {
+          Layout.fillWidth: true
+          implicitHeight: 56
+          radius: 4
+          color: root.cardBg
+          border.color: root.borderCol
+          border.width: 1
+
+          RowLayout {
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 10
+
+            ThemeIcon {
+              Layout.preferredWidth: 18
+              Layout.preferredHeight: 18
+              Layout.alignment: Qt.AlignVCenter
+              source: "icons/shield.svg"
+              color: (typeof theme !== "undefined" && theme.green) ? theme.green : root.accentColor
+            }
+
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 2
+              Text {
+                text: "INTEGRITY & VAULT"
+                font.family: root.appFontFamily
+                font.pixelSize: 9
+                font.bold: true
+                color: root.mutedColor
+              }
+              Text {
+                text: "AES-256 · SHA-256 Ledger"
+                font.family: root.appFontFamily
+                font.pixelSize: 12
+                font.bold: true
+                color: root.textColor
+              }
+            }
+          }
+        }
+      }
+
+      // =========================================================
+      // MAIN WORKSPACE: 2-COLUMN RESPONSIVE LAYOUT
+      // =========================================================
+      GridLayout {
+        Layout.fillWidth: true
+        columns: root.width > 900 ? 2 : 1
+        columnSpacing: 10
+        rowSpacing: 10
+
+        // =======================================================
+        // LEFT COLUMN: SCHEDULE & REPOSITORY CONFIGURATION
+        // =======================================================
+        Rectangle {
+          Layout.fillWidth: true
+          Layout.fillHeight: true
+          implicitHeight: schedInnerCol.implicitHeight + 24
+          radius: 4
+          color: root.cardBg
+          border.color: root.borderCol
+          border.width: 1
+
+          ColumnLayout {
+            id: schedInnerCol
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 12
+
+            Text {
+              text: "CONFIGURATION & PARAMETERS"
+              font.family: root.appFontFamily
+              font.pixelSize: 10
+              font.bold: true
+              color: root.mutedColor
+              font.letterSpacing: 1.2
+            }
+
+            // Source Directory
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 4
+
+              Text {
+                text: "SOURCE DIRECTORY"
+                font.family: root.appFontFamily
+                font.pixelSize: 9
+                font.bold: true
+                color: root.mutedColor
+              }
+
+              RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
+
+                TextField {
+                  id: srcField
+                  Layout.fillWidth: true
+                  implicitHeight: 26
+                  font.family: root.appFontFamily
+                  font.pixelSize: 11
+                  text: (scheduleConfig && scheduleConfig.source) || "~"
+                  placeholderText: "Enter directory (e.g. ~/Projects)"
+                  color: root.textColor
+                  background: Rectangle {
+                    color: "transparent"
+                    border.color: root.borderCol
+                    border.width: 1
+                    radius: 2
+                  }
+                }
+
+                Repeater {
+                  model: ["~", "~/Projects", "~/Documents"]
+                  delegate: Rectangle {
+                    implicitWidth: pText.implicitWidth + 10
+                    implicitHeight: 26
+                    radius: 2
+                    color: pMouse.containsMouse
+                      ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                      : "transparent"
+                    border.color: root.borderCol
+                    border.width: 1
+
+                    Text {
+                      id: pText
+                      anchors.centerIn: parent
+                      text: modelData
+                      font.family: root.appFontFamily
+                      font.pixelSize: 10
+                      color: root.textColor
+                    }
+
+                    MouseArea {
+                      id: pMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: srcField.text = modelData
+                    }
+                  }
+                }
+              }
+            }
+
+            // Destination volume
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 4
 
               Text {
                 text: "DESTINATION DRIVE"
@@ -286,7 +408,7 @@ Item {
               AppComboBox {
                 id: destCombo
                 Layout.fillWidth: true
-                implicitHeight: 24
+                implicitHeight: 26
                 model: destinationList.map(function(d) { return d.name; })
                 currentIndex: {
                   var savedDest = (scheduleConfig && scheduleConfig.destination) || "storagebox";
@@ -300,12 +422,13 @@ Item {
               }
             }
 
+            // Frequency
             ColumnLayout {
-              implicitWidth: 120
-              spacing: 3
+              Layout.fillWidth: true
+              spacing: 4
 
               Text {
-                text: "FREQUENCY"
+                text: "AUTOMATION FREQUENCY"
                 font.family: root.appFontFamily
                 font.pixelSize: 9
                 font.bold: true
@@ -314,237 +437,232 @@ Item {
 
               AppComboBox {
                 id: intervalCombo
-                implicitHeight: 24
-                implicitWidth: 120
+                Layout.fillWidth: true
+                implicitHeight: 26
                 model: ["daily", "hourly", "weekly"]
                 currentIndex: {
                   if (scheduleConfig.interval === "hourly") return 1;
                   if (scheduleConfig.interval === "weekly") return 2;
                   return 0;
                 }
-                onCurrentValueChanged: {
-                  var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
-                  ocloud.setBackupSchedule(enableSwitch.checked, currentValue, srcField.text.trim(), targetDest);
-                }
               }
             }
 
-            Rectangle {
-              Layout.alignment: Qt.AlignBottom
-              implicitWidth: saveText.implicitWidth + 14
-              implicitHeight: 24
-              radius: 2
-              color: saveMouse.containsMouse ? root.accentColor : "transparent"
-              border.color: root.accentColor
-              border.width: 1
+            // Retention & Integrity Specs
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: 4
 
               Text {
-                id: saveText
-                anchors.centerIn: parent
-                text: "Save"
+                text: "RETENTION POLICY"
                 font.family: root.appFontFamily
-                font.pixelSize: 10
+                font.pixelSize: 9
                 font.bold: true
-                color: saveMouse.containsMouse
-                  ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
-                  : root.accentColor
+                color: root.mutedColor
               }
 
-              MouseArea {
-                id: saveMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                  var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
-                  ocloud.setBackupSchedule(enableSwitch.checked, intervalCombo.currentValue, srcField.text.trim(), targetDest);
+              Text {
+                text: "Keeps 7 daily and 4 weekly snapshots. Automatic pruning on destination volume."
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                color: root.mutedColor
+              }
+            }
+
+            Item { Layout.fillHeight: true }
+
+            // Save configuration button: Pinned flush right
+            RowLayout {
+              Layout.fillWidth: true
+              Item { Layout.fillWidth: true }
+
+              Rectangle {
+                implicitWidth: saveText.implicitWidth + 18
+                implicitHeight: 26
+                radius: 2
+                color: saveMouse.containsMouse
+                  ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                  : "transparent"
+                border.color: saveMouse.containsMouse ? root.accentColor : root.borderCol
+                border.width: 1
+
+                Text {
+                  id: saveText
+                  anchors.centerIn: parent
+                  text: "Save Schedule"
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  font.bold: true
+                  color: saveMouse.containsMouse ? root.accentColor : root.textColor
+                }
+
+                MouseArea {
+                  id: saveMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    var targetDest = destinationList[destCombo.currentIndex] ? destinationList[destCombo.currentIndex].id : "storagebox";
+                    ocloud.setBackupSchedule(enableSwitch.checked, intervalCombo.currentValue, srcField.text.trim(), targetDest);
+                  }
                 }
               }
             }
           }
         }
-      }
 
-      // =========================================================
-      // RECENT SNAPSHOT HISTORY
-      // =========================================================
-      ColumnLayout {
-        Layout.fillWidth: true
-        spacing: 8
-
-        RowLayout {
-          Layout.fillWidth: true
-          Text {
-            text: "SNAPSHOT HISTORY"
-            font.family: root.appFontFamily
-            font.pixelSize: 10
-            font.bold: true
-            color: root.mutedColor
-            font.letterSpacing: 1.2
-          }
-          Item { Layout.fillWidth: true }
-          Text {
-            text: root.recentBackups.length + " entries in ledger"
-            font.family: root.appFontFamily
-            font.pixelSize: 10
-            color: root.mutedColor
-          }
-        }
-
-        // Empty state
+        // =======================================================
+        // RIGHT COLUMN: SNAPSHOT LEDGER HISTORY
+        // =======================================================
         Rectangle {
-          visible: root.recentBackups.length === 0
           Layout.fillWidth: true
-          height: 44
-          radius: 2
-          color: "transparent"
+          Layout.fillHeight: true
+          implicitHeight: Math.max(schedInnerCol.implicitHeight + 24, snapListCol.implicitHeight + 24)
+          radius: 4
+          color: root.cardBg
           border.color: root.borderCol
           border.width: 1
 
-          RowLayout {
+          ColumnLayout {
+            id: snapListCol
             anchors.fill: parent
-            anchors.margins: 10
+            anchors.margins: 12
             spacing: 8
-            Text {
+
+            RowLayout {
               Layout.fillWidth: true
-              text: "No manual or automated snapshots recorded in the ledger yet."
-              font.family: root.appFontFamily
-              font.pixelSize: 11
-              color: root.mutedColor
+              Text {
+                text: "SNAPSHOT HISTORY LEDGER"
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                font.bold: true
+                color: root.mutedColor
+                font.letterSpacing: 1.2
+              }
+              Item { Layout.fillWidth: true }
+              Text {
+                text: root.recentBackups.length + " entries"
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                color: root.mutedColor
+              }
             }
-          }
-        }
 
-        // Single-column snapshot rows
-        ColumnLayout {
-          Layout.fillWidth: true
-          spacing: 6
-          visible: root.recentBackups.length > 0
-
-          Repeater {
-            model: root.recentBackups
-
-            delegate: Rectangle {
+            // Empty state
+            Rectangle {
+              visible: root.recentBackups.length === 0
               Layout.fillWidth: true
-              implicitHeight: 36
+              Layout.fillHeight: true
+              implicitHeight: 120
               radius: 2
-              color: snapRowMouse.containsMouse
-                ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : root.cardBg)
-                : root.cardBg
-              border.color: snapRowMouse.containsMouse ? root.accentColor : root.borderCol
+              color: "transparent"
+              border.color: root.borderCol
               border.width: 1
 
-              RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 10
-                anchors.rightMargin: 10
-                spacing: 8
-
-                // Status dot
-                Rectangle {
-                  width: 6
-                  height: 6
-                  radius: 3
-                  color: modelData.status === "success"
-                    ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
-                    : ((typeof theme !== "undefined" && theme.danger) ? theme.danger : "#f7768e")
-                }
-
+              ColumnLayout {
+                anchors.centerIn: parent
+                spacing: 6
                 Text {
-                  text: modelData.id
+                  Layout.alignment: Qt.AlignHCenter
+                  text: "No Snapshots in Ledger"
                   font.family: root.appFontFamily
-                  font.pixelSize: 11
+                  font.pixelSize: 12
                   font.bold: true
                   color: root.textColor
                 }
-
                 Text {
-                  text: modelData.timestamp
+                  Layout.alignment: Qt.AlignHCenter
+                  text: "Click \"+ Take Snapshot Now\" to generate your first backup."
                   font.family: root.appFontFamily
                   font.pixelSize: 10
                   color: root.mutedColor
                 }
-
-                Item { Layout.fillWidth: true }
-
-                Text {
-                  text: (modelData.bytes_transferred || "0 B") + " (" + (modelData.duration_seconds || 0) + "s)"
-                  font.family: root.appFontFamily
-                  font.pixelSize: 10
-                  color: root.accentColor
-                }
-
-                Text {
-                  text: (modelData.status || "success").toUpperCase()
-                  font.family: root.appFontFamily
-                  font.pixelSize: 9
-                  font.bold: true
-                  color: modelData.status === "success"
-                    ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
-                    : root.mutedColor
-                }
-              }
-
-              MouseArea {
-                id: snapRowMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                acceptedButtons: Qt.NoButton
               }
             }
-          }
-        }
-      }
 
-      // =========================================================
-      // DISASTER RECOVERY SPECS (COMPACT ROW)
-      // =========================================================
-      Rectangle {
-        Layout.fillWidth: true
-        implicitHeight: drCol.implicitHeight + 16
-        radius: 2
-        color: root.cardBg
-        border.color: root.borderCol
-        border.width: 1
+            // Snapshot ledger rows
+            Repeater {
+              model: root.recentBackups
 
-        ColumnLayout {
-          id: drCol
-          anchors.fill: parent
-          anchors.margins: 10
-          spacing: 6
+              delegate: Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: 44
+                radius: 2
+                color: snapRowMouse.containsMouse
+                  ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : "transparent")
+                  : "transparent"
+                border.color: snapRowMouse.containsMouse ? root.accentColor : root.borderCol
+                border.width: 1
 
-          Text {
-            text: "DISASTER RECOVERY & INTEGRITY"
-            font.family: root.appFontFamily
-            font.pixelSize: 10
-            font.bold: true
-            color: root.mutedColor
-            font.letterSpacing: 1.2
-          }
+                MouseArea {
+                  id: snapRowMouse
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  acceptedButtons: Qt.NoButton
+                }
 
-          RowLayout {
-            Layout.fillWidth: true
-            spacing: 16
+                // Left details: status dot + snapshot id + metadata
+                RowLayout {
+                  anchors.left: parent.left
+                  anchors.leftMargin: 10
+                  anchors.right: snapActionRow.left
+                  anchors.rightMargin: 8
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: 8
 
-            ColumnLayout {
-              Layout.fillWidth: true
-              spacing: 2
-              Text { text: "ENCRYPTION"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
-              Text { text: "AES-256 via Vault"; font.family: root.appFontFamily; font.pixelSize: 11; color: root.textColor }
-            }
+                  Rectangle {
+                    width: 6
+                    height: 6
+                    radius: 3
+                    color: modelData.status === "success"
+                      ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+                      : ((typeof theme !== "undefined" && theme.danger) ? theme.danger : "#f7768e")
+                  }
 
-            ColumnLayout {
-              Layout.fillWidth: true
-              spacing: 2
-              Text { text: "RETENTION"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
-              Text { text: "7 daily, 4 weekly"; font.family: root.appFontFamily; font.pixelSize: 11; color: root.textColor }
-            }
+                  ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 1
 
-            ColumnLayout {
-              Layout.fillWidth: true
-              spacing: 2
-              Text { text: "INTEGRITY"; font.family: root.appFontFamily; font.pixelSize: 9; font.bold: true; color: root.mutedColor }
-              Text { text: "SHA-256 ledger verified"; font.family: root.appFontFamily; font.pixelSize: 11; color: root.textColor }
+                    Text {
+                      Layout.fillWidth: true
+                      text: modelData.id || "snapshot"
+                      font.family: root.appFontFamily
+                      font.pixelSize: 11
+                      font.bold: true
+                      color: root.textColor
+                      elide: Text.ElideRight
+                    }
+
+                    Text {
+                      Layout.fillWidth: true
+                      text: (modelData.timestamp || "Recent") + " · " + (modelData.bytes_transferred || "0 B")
+                      font.family: root.appFontFamily
+                      font.pixelSize: 9
+                      color: root.mutedColor
+                      elide: Text.ElideRight
+                    }
+                  }
+                }
+
+                // Action buttons: Pinned flush right!
+                RowLayout {
+                  id: snapActionRow
+                  anchors.right: parent.right
+                  anchors.rightMargin: 10
+                  anchors.verticalCenter: parent.verticalCenter
+                  spacing: 6
+
+                  Text {
+                    text: (modelData.status || "success").toUpperCase()
+                    font.family: root.appFontFamily
+                    font.pixelSize: 9
+                    font.bold: true
+                    color: modelData.status === "success"
+                      ? ((typeof theme !== "undefined" && theme.success) ? theme.success : "#9ece6a")
+                      : root.mutedColor
+                  }
+                }
+              }
             }
           }
         }

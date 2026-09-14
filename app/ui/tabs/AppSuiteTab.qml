@@ -476,11 +476,13 @@ Item {
       }
 
       // =========================================================
-      // APPLICATIONS LIST (SINGLE-COLUMN DESKTOP ROWS)
+      // APPLICATIONS LIST (RESPONSIVE 2-COLUMN DESKTOP GRID)
       // =========================================================
-      ColumnLayout {
+      GridLayout {
         Layout.fillWidth: true
-        spacing: 6
+        columns: root.width > 800 ? 2 : 1
+        columnSpacing: 10
+        rowSpacing: 6
 
         Repeater {
           model: root.filteredApps
@@ -488,7 +490,7 @@ Item {
           delegate: Rectangle {
             id: appRow
             Layout.fillWidth: true
-            implicitHeight: 38
+            implicitHeight: 44
             radius: 2
             color: rowMouse.containsMouse
               ? ((typeof theme !== "undefined" && theme.selection) ? theme.selection : root.cardBg)
@@ -498,13 +500,57 @@ Item {
 
             readonly property bool isInstalled: Boolean(root.installedAppMap[modelData.cmd] || root.installedAppMap[modelData.cmd.toLowerCase()] || root.installedAppMap[modelData.id])
 
-            RowLayout {
+            MouseArea {
+              id: rowMouse
               anchors.fill: parent
-              anchors.leftMargin: 10
+              hoverEnabled: true
+              acceptedButtons: Qt.NoButton
+            }
+
+            // Launch Button: Pinned to the right!
+            Rectangle {
+              id: launchBtn
+              anchors.right: parent.right
               anchors.rightMargin: 10
+              anchors.verticalCenter: parent.verticalCenter
+              implicitWidth: launchText.implicitWidth + 14
+              implicitHeight: 24
+              radius: 2
+              color: launchMouse.containsMouse ? root.accentColor : "transparent"
+              border.color: root.accentColor
+              border.width: 1
+
+              Text {
+                id: launchText
+                anchors.centerIn: parent
+                text: appRow.isInstalled ? "Launch" : "Install & Run"
+                font.family: root.appFontFamily
+                font.pixelSize: 10
+                font.bold: true
+                color: launchMouse.containsMouse
+                  ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
+                  : root.accentColor
+              }
+
+              MouseArea {
+                id: launchMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.requestLaunch(modelData.cmd, modelData.name, modelData.minRamMb || 0)
+              }
+            }
+
+            // Left details row: bounded strictly between left margin and launch button
+            RowLayout {
+              anchors.left: parent.left
+              anchors.leftMargin: 10
+              anchors.right: launchBtn.left
+              anchors.rightMargin: 8
+              anchors.verticalCenter: parent.verticalCenter
               spacing: 8
 
-              // Status dot (green = installed/ready, muted = install on demand)
+              // Status dot
               Rectangle {
                 width: 6
                 height: 6
@@ -514,7 +560,6 @@ Item {
                   : root.mutedColor
               }
 
-              // Terminal icon or generic icon
               ThemeIcon {
                 width: 14
                 height: 14
@@ -522,63 +567,29 @@ Item {
                 color: root.textColor
               }
 
-              // App Name
-              Text {
-                text: modelData.name || modelData.cmd
-                font.family: root.appFontFamily
-                font.pixelSize: 11
-                font.bold: true
-                color: root.textColor
-                Layout.preferredWidth: 110
-                elide: Text.ElideRight
-              }
-
-              // Category / Description
-              Text {
+              ColumnLayout {
                 Layout.fillWidth: true
-                text: modelData.desc || ("Command: " + modelData.cmd)
-                font.family: root.appFontFamily
-                font.pixelSize: 10
-                color: root.mutedColor
-                elide: Text.ElideRight
-              }
-
-              // Launch Button
-              Rectangle {
-                implicitWidth: launchText.implicitWidth + 14
-                implicitHeight: 22
-                radius: 2
-                color: launchMouse.containsMouse ? root.accentColor : "transparent"
-                border.color: root.accentColor
-                border.width: 1
+                spacing: 1
 
                 Text {
-                  id: launchText
-                  anchors.centerIn: parent
-                  text: appRow.isInstalled ? "Launch" : "Install & Run"
+                  Layout.fillWidth: true
+                  text: modelData.name || modelData.cmd
                   font.family: root.appFontFamily
-                  font.pixelSize: 10
+                  font.pixelSize: 11
                   font.bold: true
-                  color: launchMouse.containsMouse
-                    ? ((typeof theme !== "undefined" && theme.background) ? theme.background : "#000000")
-                    : root.accentColor
+                  color: root.textColor
+                  elide: Text.ElideRight
                 }
 
-                MouseArea {
-                  id: launchMouse
-                  anchors.fill: parent
-                  hoverEnabled: true
-                  cursorShape: Qt.PointingHandCursor
-                  onClicked: root.requestLaunch(modelData.cmd, modelData.name, modelData.minRamMb || 0)
+                Text {
+                  Layout.fillWidth: true
+                  text: modelData.desc || ("Command: " + modelData.cmd)
+                  font.family: root.appFontFamily
+                  font.pixelSize: 9
+                  color: root.mutedColor
+                  elide: Text.ElideRight
                 }
               }
-            }
-
-            MouseArea {
-              id: rowMouse
-              anchors.fill: parent
-              hoverEnabled: true
-              acceptedButtons: Qt.NoButton
             }
           }
         }
