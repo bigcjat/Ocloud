@@ -89,6 +89,26 @@ function setStreamingEngine(engine) {
   } catch (e) {}
 }
 
+function getStreamingAudio() {
+  try {
+    const settings = loadSettings();
+    return settings.app_streaming_audio !== false;
+  } catch (e) {
+    return true;
+  }
+}
+
+function setStreamingAudio(enabled) {
+  try {
+    const settings = loadSettings();
+    settings.app_streaming_audio = Boolean(enabled);
+    const cfgPath = getSettingsPath();
+    fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
+    fs.writeFileSync(cfgPath, JSON.stringify(settings, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+
 function recordRecentApp(cmdStr) {
   try {
     const settings = loadSettings();
@@ -515,6 +535,28 @@ async function cmdApp(subcmd, rest, context = {}) {
     throw new Error('Invalid engine. Choose from: xpra (Option B · Persistent & Smooth), waypipe (Original · Direct Wayland)');
   }
 
+  if (subcmd === 'audio') {
+    const targetAudio = rest[0];
+    if (!targetAudio || targetAudio === 'get') {
+      const current = getStreamingAudio();
+      console.log(JSON.stringify({ audio: current }));
+      return;
+    }
+    const clean = targetAudio.toLowerCase();
+    if (['on', 'true', '1', 'yes', 'enable'].includes(clean)) {
+      setStreamingAudio(true);
+      console.log(JSON.stringify({ success: true, audio: true }));
+      return;
+    }
+    if (['off', 'false', '0', 'no', 'disable'].includes(clean)) {
+      setStreamingAudio(false);
+      console.log(JSON.stringify({ success: true, audio: false }));
+      return;
+    }
+    throw new Error('Invalid audio option. Choose from: on, off');
+  }
+
+
   if (subcmd === 'sessions') {
     const targetServer = rest[0];
     if (!targetServer) {
@@ -572,10 +614,17 @@ async function cmdApp(subcmd, rest, context = {}) {
   }
 
   if (subcmd === 'attach') {
-    const targetServer = rest[0];
-    const display = (rest[1] || '100').replace(':', '');
+    let audio = getStreamingAudio();
+    const filteredRest = [];
+    for (const arg of rest) {
+      if (arg === '--audio') audio = true;
+      else if (arg === '--no-audio') audio = false;
+      else filteredRest.push(arg);
+    }
+    const targetServer = filteredRest[0];
+    const display = (filteredRest[1] || '100').replace(':', '');
     if (!targetServer) {
-      throw new Error('Usage: ocloud app attach <server_id_or_name> [display_number]');
+      throw new Error('Usage: ocloud app attach <server_id_or_name> [display_number] [--audio|--no-audio]');
     }
     const { server, host, user, port, keyPath } = await resolveServer(targetServer, registry);
     const runUser = ensureRunnerUser(host, port, user, keyPath);
@@ -600,8 +649,8 @@ async function cmdApp(subcmd, rest, context = {}) {
     const attachArgs = [
       'attach',
       '--splash=no',
-      '--speaker=on',
-      '--speaker-codec=opus',
+      audio ? '--speaker=on' : '--speaker=off',
+      ...(audio ? ['--speaker-codec=opus'] : []),
       '--av-sync=no',
       '--encoding=vp8',
       '--speed=90',
@@ -628,12 +677,17 @@ async function cmdApp(subcmd, rest, context = {}) {
 
   if (subcmd === 'launch' || subcmd === 'stream') {
     let engine = getStreamingEngine();
+    let audio = getStreamingAudio();
     const filteredRest = [];
     for (let i = 0; i < rest.length; i++) {
       if (rest[i].startsWith('--engine=')) {
         engine = rest[i].split('=')[1].toLowerCase();
       } else if (rest[i] === '-e' && rest[i + 1]) {
         engine = rest[++i].toLowerCase();
+      } else if (rest[i] === '--audio') {
+        audio = true;
+      } else if (rest[i] === '--no-audio') {
+        audio = false;
       } else {
         filteredRest.push(rest[i]);
       }
@@ -642,7 +696,7 @@ async function cmdApp(subcmd, rest, context = {}) {
     const targetServer = filteredRest[0];
     const cmd = filteredRest.slice(1).join(' ');
     if (!targetServer || !cmd) {
-      throw new Error('Usage: ocloud app launch <server_id_or_name> <command> [--engine=xpra|waypipe]');
+      throw new Error('Usage: ocloud app launch <server_id_or_name> <command> [--engine=xpra|waypipe] [--audio|--no-audio]');
     }
 
     const { server, host, user, port, keyPath, isTailscale } = await resolveServer(targetServer, registry);
@@ -800,12 +854,12 @@ async function cmdApp(subcmd, rest, context = {}) {
       }
 
       const providerLabel = server.providerName || (server.provider ? server.provider.toUpperCase() : 'Cloud');
-      console.log(`\x1b[36m🔗 Attaching to display :${displayNum} with tuned VP8 video and decoupled Opus audio...\x1b[0m`);
+      console.log(`\x1b[36m🔗 Attaching to display :${displayNum} with tuned VP8 video and ${audio ? 'decoupled Opus audio' : 'audio disabled'}...\x1b[0m`);
       const attachArgs = [
         'attach',
         '--splash=no',
-        '--speaker=on',
-        '--speaker-codec=opus',
+        audio ? '--speaker=on' : '--speaker=off',
+        ...(audio ? ['--speaker-codec=opus'] : []),
         '--av-sync=no',
         '--encoding=vp8',
         '--speed=90',
@@ -837,6 +891,7 @@ async function cmdApp(subcmd, rest, context = {}) {
       // ENGINE 2: Waypipe Direct (Original - Pure Wayland protocol over SSH)
       console.log(`\x1b[33m🪟 [Original: Waypipe Direct] Streaming "${cmd}" from ${server.name} via Waypipe...\x1b[0m`);
       console.log(`   Engine:   Direct Wayland socket proxy (LZ4 compression)`);
+      console.log(`   Audio:    ${audio ? 'PulseAudio UNIX tunnel' : 'Disabled'}`);
       console.log(`   Latency:  Synchronous Wayland frame callbacks`);
       console.log(`   Runner:   Unprivileged (${runUser})`);
 
@@ -858,9 +913,14 @@ async function cmdApp(subcmd, rest, context = {}) {
         '-o', 'Compression=no',
         '-o', 'IPQoS=throughput',
         ...getSshSecurityArgs(),
-        '-R', `${remotePulseSocket}:${localPulseSocket}`,
-        `${runUser}@${host}`,
-        `trap 'rm -f ${remotePulseSocket}' EXIT INT TERM; env PULSE_SERVER=unix:${remotePulseSocket} ${cmd}`
+        ...(audio ? [
+          '-R', `${remotePulseSocket}:${localPulseSocket}`,
+          `${runUser}@${host}`,
+          `trap 'rm -f ${remotePulseSocket}' EXIT INT TERM; env PULSE_SERVER=unix:${remotePulseSocket} ${cmd}`
+        ] : [
+          `${runUser}@${host}`,
+          cmd
+        ])
       ];
 
       const child = spawn(waypipeBin, waypipeArgs, { env, stdio: 'ignore', detached: true });
@@ -872,7 +932,7 @@ async function cmdApp(subcmd, rest, context = {}) {
     throw new Error(`Unknown streaming engine: '${engine}'. Must be 'xpra' or 'waypipe'.`);
   }
 
-  console.log('Usage: ocloud app [list | launch <server> <cmd> [--engine=xpra|waypipe] | attach <server> [display] | sessions <server> | stop <server> [display] | engine [get|set]]');
+  console.log('Usage: ocloud app [list | launch <server> <cmd> [--engine=xpra|waypipe] [--audio|--no-audio] | attach <server> [display] [--audio|--no-audio] | sessions <server> | stop <server> [display] | engine [get|set] | audio [get|on|off]]');
 }
 
 module.exports = { cmdApp };

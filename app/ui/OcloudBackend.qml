@@ -697,17 +697,21 @@ Item {
     }, 300000);
   }
 
-  function launchApp(serverId, app, engine) {
+  function launchApp(serverId, app, engine, audio) {
     var args = ["app", "launch", serverId, app];
     if (engine) args.push("--engine=" + engine);
+    if (audio === true) args.push("--audio");
+    else if (audio === false) args.push("--no-audio");
     runCliDirect(args, function(out, ok) {
       root.actionCompleted("launchApp", ok, out);
     }, 300000);
   }
 
-  function attachAppSession(serverId, display) {
+  function attachAppSession(serverId, display, audio) {
     var args = ["app", "attach", serverId];
     if (display) args.push(display);
+    if (audio === true) args.push("--audio");
+    else if (audio === false) args.push("--no-audio");
     runCliDirect(args, function(out, ok) {
       root.actionCompleted("attachAppSession", ok, out);
     }, 30000);
@@ -756,6 +760,23 @@ Item {
       try {
         var parsed = JSON.parse(out.trim());
         if (parsed && parsed.engine) res = parsed.engine;
+      } catch (e) {}
+      if (callback) callback(res);
+    });
+  }
+
+  function setStreamingAudio(audio, callback) {
+    runCli(["app", "audio", audio ? "on" : "off"], function(out, ok) {
+      if (callback) callback(ok);
+    });
+  }
+
+  function getStreamingAudio(callback) {
+    runCli(["app", "audio", "get"], function(out, ok) {
+      var res = true;
+      try {
+        var parsed = JSON.parse(out.trim());
+        if (parsed && parsed.audio !== undefined) res = Boolean(parsed.audio);
       } catch (e) {}
       if (callback) callback(res);
     });

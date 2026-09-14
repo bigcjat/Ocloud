@@ -13,6 +13,7 @@ Item {
 
   property string selectedServerId: serverList.length > 0 ? String(serverList[0].id) : ""
   property string streamingEngine: "xpra"
+  property bool streamingAudio: true
   property bool isSessionAttached: false
   property string activeSessionDisplay: ""
   property string activeCategory: "All"
@@ -133,7 +134,7 @@ Item {
     if (!root.selectedServerId) return;
     var isInstalled = Boolean(root.installedAppMap[cmd] || root.installedAppMap[cmd.toLowerCase()]);
     if (isInstalled) {
-      ocloud.launchApp(root.selectedServerId, cmd, root.streamingEngine);
+      ocloud.launchApp(root.selectedServerId, cmd, root.streamingEngine, root.streamingAudio);
       return;
     }
     ocloud.probeApp(root.selectedServerId, cmd, function(res, ok) {
@@ -141,7 +142,7 @@ Item {
         var map = Object.assign({}, root.installedAppMap);
         map[cmd] = true;
         root.installedAppMap = map;
-        ocloud.launchApp(root.selectedServerId, cmd, root.streamingEngine);
+        ocloud.launchApp(root.selectedServerId, cmd, root.streamingEngine, root.streamingAudio);
       } else {
         var srvName = (res && res.serverName) ? res.serverName : targetCombo.currentText;
         installModal.openForApp(name || cmd, cmd, srvName, root.selectedServerId, minRamMb || 0, root.serverRamMb);
@@ -166,6 +167,9 @@ Item {
           }
         }
       }
+    });
+    ocloud.getStreamingAudio(function(aud) {
+      root.streamingAudio = aud;
     });
     reloadApps();
   }
@@ -251,6 +255,16 @@ Item {
               }
             }
           }
+
+          AppButton {
+            implicitHeight: 30
+            variant: root.streamingAudio ? "primary" : "secondary"
+            text: root.streamingAudio ? "🔊 Audio: ON" : "🔇 Audio: OFF"
+            onClicked: {
+              root.streamingAudio = !root.streamingAudio;
+              ocloud.setStreamingAudio(root.streamingAudio);
+            }
+          }
         }
       }
 
@@ -292,7 +306,7 @@ Item {
             text: "⚡ Re-attach Window"
             variant: "primary"
             implicitHeight: 28
-            onClicked: ocloud.attachAppSession(root.selectedServerId, root.activeSessionDisplay)
+            onClicked: ocloud.attachAppSession(root.selectedServerId, root.activeSessionDisplay, root.streamingAudio)
           }
 
           AppButton {
@@ -587,7 +601,7 @@ Item {
           root.installedAppMap = map;
           root.probeAll();
           installModal.visible = false;
-          ocloud.launchApp(srvId, command, root.streamingEngine);
+          ocloud.launchApp(srvId, command, root.streamingEngine, root.streamingAudio);
         } else {
           installModal.statusMessage = "Installation failed: " + (out || "Unknown error");
           installModal.appendLog("✖ Error: " + (out || "Installation failed"));
