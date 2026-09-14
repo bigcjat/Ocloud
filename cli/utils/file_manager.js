@@ -104,6 +104,7 @@ function launchFileManager(targetPath) {
   const args = tokens.slice(1);
 
   const env = Object.assign({}, process.env);
+  env.FLEA_PATH = expPath;
   const localBin = path.join(os.homedir(), '.local', 'bin');
   if (!env.PATH || !env.PATH.includes(localBin)) {
     env.PATH = `${localBin}:${env.PATH || ''}`;

@@ -168,6 +168,8 @@ async function mountAndVerifyRemote(remoteTarget, mountPoint, rcloneBin, env, re
   const child = spawn(rcloneBin, [
     'mount', remoteTarget, mountPoint,
     '--vfs-cache-mode', 'full',
+    '--dir-cache-time', '15s',
+    '--poll-interval', '15s',
     '--daemon',
     `--log-file=${logFile}`,
     '--log-level=NOTICE'
