@@ -36,6 +36,39 @@ function findBinary(binName) {
   return binName;
 }
 
+function getDefaultFileManager() {
+  const cfg = loadSettings();
+  if (cfg.fileManager && cfg.fileManager !== 'default') {
+    return cfg.fileManager;
+  }
+  if (process.platform === 'linux') {
+    try {
+      const out = spawnSync('xdg-mime', ['query', 'default', 'inode/directory'], {
+        encoding: 'utf8',
+        timeout: 1000
+      });
+      const mime = (out.stdout || '').trim().toLowerCase();
+      if (mime.includes('flea')) return 'flea';
+      if (mime.includes('nautilus')) return 'nautilus';
+      if (mime.includes('dolphin')) return 'dolphin';
+      if (mime.includes('thunar')) return 'thunar';
+    } catch (e) {}
+  }
+  return 'default';
+}
+
+function isFleaDefault() {
+  const fm = getDefaultFileManager();
+  if (fm === 'flea') return true;
+  if (fm === 'default' && process.platform === 'linux') {
+    try {
+      const out = spawnSync('xdg-mime', ['query', 'default', 'inode/directory'], { encoding: 'utf8', timeout: 1000 });
+      if ((out.stdout || '').toLowerCase().includes('flea')) return true;
+    } catch (e) {}
+  }
+  return false;
+}
+
 function resolveFileManagerCommand(targetPath, settings) {
   const cfg = settings || loadSettings();
   const fmId = cfg.fileManager || 'default';
@@ -129,6 +162,9 @@ function launchFileManager(targetPath) {
 
 module.exports = {
   loadSettings,
+  findBinary,
+  getDefaultFileManager,
+  isFleaDefault,
   resolveFileManagerCommand,
   probeMount,
   launchFileManager

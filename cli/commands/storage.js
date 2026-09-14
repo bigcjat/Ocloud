@@ -4,6 +4,7 @@ const os = require('os');
 const { execSync, spawn } = require('child_process');
 const { isDriveMounted, resolveMountPath, safeUnmount } = require('../utils/format');
 const { launchFileManager, loadSettings } = require('../utils/file_manager');
+const { syncStorageBookmark } = require('../utils/sidebar_bookmarks');
 
 function ensureAutostartFile(enable = true) {
   const autostartDir = path.join(os.homedir(), '.config', 'autostart');
@@ -200,6 +201,7 @@ async function mountAndVerifyRemote(remoteTarget, mountPoint, rcloneBin, env, re
   }
 
   console.log(`✔ '${remoteName}' mounted at ${mountPoint}`);
+  syncStorageBookmark(remoteName, mountPoint, 'add');
   if (!noOpen && isDriveMounted(mountPoint)) {
     launchFileManager(mountPoint);
   }
@@ -350,6 +352,7 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     const ok = safeUnmount(mountPoint);
     if (ok) {
       console.log(`✔ Unmounted ${mountPoint}`);
+      syncStorageBookmark(acc ? acc.name : target, mountPoint, 'remove');
     } else {
       throw new Error(`Failed to unmount ${mountPoint}`);
     }
@@ -417,8 +420,11 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
       // Unmount first if mounted
       const accounts = getCloudAccounts(registry, vault);
       const acc = accounts.find(a => a.name.toLowerCase() === target.toLowerCase());
-      if (acc && acc.isMounted) {
-        safeUnmount(acc.mountPath);
+      if (acc) {
+        if (acc.isMounted) {
+          safeUnmount(acc.mountPath);
+        }
+        syncStorageBookmark(target, acc.mountPath, 'remove');
       }
       execSync(`${rcloneBin} config delete "${target}"`, { env, stdio: 'inherit' });
       console.log(`✔ Removed remote '${target}'`);
