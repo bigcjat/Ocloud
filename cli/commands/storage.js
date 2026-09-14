@@ -128,7 +128,7 @@ async function mountAndVerifyRemote(remoteTarget, mountPoint, rcloneBin, env, re
   // Pre-flight check: verify remote is reachable before attempting FUSE mount
   console.log(`Verifying connection to '${remoteName}'...`);
   try {
-    execSync(`${rcloneBin} lsd "${remoteTarget}" --contimeout 8s --timeout 8s --retries 1 --low-level-retries 1 --log-level=ERROR`, {
+    execSync(`${rcloneBin} lsd "${remoteName}:" --contimeout 8s --timeout 8s --retries 1 --low-level-retries 1 --log-level=ERROR`, {
       env,
       encoding: 'utf8',
       timeout: 12000,
@@ -140,6 +140,16 @@ async function mountAndVerifyRemote(remoteTarget, mountPoint, rcloneBin, env, re
     let lastLine = lines.length > 0 ? lines[lines.length - 1] : 'Remote connection failed or timed out';
     lastLine = lastLine.replace(/^[\d/:\s]+(ERROR|WARNING|NOTICE)\s*:\s*/i, '');
     throw new Error(`Connection verification failed: ${lastLine}`);
+  }
+
+  // Ensure target bucket/directory exists if scoped
+  if (remoteTarget.includes(':') && remoteTarget.split(':')[1]) {
+    try {
+      execSync(`${rcloneBin} mkdir "${remoteTarget}" --contimeout 8s --timeout 8s`, {
+        env,
+        stdio: 'ignore'
+      });
+    } catch(e) {}
   }
 
   const logFile = `/tmp/rclone-mount-${remoteName.replace(/[^a-zA-Z0-9_-]/g, '_')}.log`;
