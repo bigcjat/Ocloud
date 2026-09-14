@@ -215,7 +215,7 @@ Item {
                 text: "SSH Terminal"
                 iconSource: "icons/terminal.svg"
                 variant: "secondary"
-                onClicked: ocloud.openTerminal(modelData.name, modelData.ipv4, modelData.user || "root")
+                onClicked: ocloud.openTerminal(modelData.name, modelData.tailscale_ip || modelData.ipv4, modelData.user || "root")
               }
 
               AppButton {

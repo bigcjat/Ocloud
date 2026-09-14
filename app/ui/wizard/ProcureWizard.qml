@@ -393,7 +393,14 @@ Rectangle {
       }
     }
     function onComputePluginsUpdated(pluginsJson) {
-      loadProviders();
+      try {
+        if (pluginsJson && pluginsJson.length > 2) {
+          var list = JSON.parse(pluginsJson);
+          if (list && list.length > 0) {
+            providers = list;
+          }
+        }
+      } catch (e) {}
     }
     function onActionCompleted(action, success, msg) {
       if (action === "procureServer") {

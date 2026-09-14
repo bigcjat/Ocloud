@@ -463,7 +463,7 @@ async function handleToolCall(name, args = {}) {
       const keyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
       let fullCmd = '';
       if (streamGui) {
-        fullCmd = `waypipe ssh -o BatchMode=yes -o ConnectTimeout=5 -i "${keyPath}" root@${server} ${cmd}`;
+        fullCmd = `waypipe --title-prefix '[☁ Hetzner · ${server}] ' --video=h264,bpf=1200000 --compress=zstd=1 --threads 4 ssh -c aes128-gcm@openssh.com -o Compression=no -o IPQoS=throughput -o BatchMode=yes -o ConnectTimeout=5 -i "${keyPath}" -R 4713:localhost:4713 root@${server} 'env PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=16 QSG_RENDER_LOOP=basic ${cmd}'`;
       } else {
         fullCmd = `ssh -o BatchMode=yes -o ConnectTimeout=5 -i "${keyPath}" root@${server} "${cmd}"`;
       }

@@ -403,9 +403,8 @@ Panel {
 
   Timer {
     interval: 15000
-    running: true
+    running: root.opened
     repeat: true
-    triggeredOnStart: true
     onTriggered: root.refreshAll()
   }
 
@@ -951,8 +950,9 @@ Panel {
                         var targetIp = modelData.tailscale_ip || modelData.ipv4;
                         Quickshell.execDetached([
                           "foot",
+                          "-H",
                           "-T", ("Cloud Terminal [" + modelData.name + " · " + targetIp + "]"),
-                          "-e", "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=accept-new", "-t", (modelData.user ? (modelData.user + "@") : "root@") + targetIp
+                          "ssh", "-i", Quickshell.env("HOME") + "/.ssh/id_ed25519", "-o", "StrictHostKeyChecking=accept-new", "-t", (modelData.user ? (modelData.user + "@") : "root@") + targetIp
                         ]);
                       }
                     }

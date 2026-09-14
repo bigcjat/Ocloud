@@ -14,6 +14,7 @@ const { cmdApp } = require('./commands/app');
 const { cmdGui } = require('./commands/gui');
 const { cmdDocs } = require('./commands/docs');
 const { cmdSettings } = require('./commands/settings');
+const { cmdBridge } = require('./commands/bridge');
 
 async function main() {
   // Initialize Core Subsystems
@@ -57,10 +58,12 @@ async function main() {
       } else {
         await cmdApp(subcmd || 'list', rest, context);
       }
+    } else if (command === 'bridge' || command === 'daemon') {
+      cmdBridge();
     } else if (command === 'settings' || command === 'config' || command === 'preference') {
       await cmdSettings(subcmd, rest);
     } else {
-      console.log('Usage: ocloud [status | providers | catalog | vm | node | storage | backup | vault | app | settings | mcp | docs | gui]');
+      console.log('Usage: ocloud [status | providers | catalog | vm | node | storage | backup | vault | app | settings | mcp | docs | gui | bridge]');
     }
   } catch (err) {
     console.error(`\x1b[31mError:\x1b[0m ${err.message}`);

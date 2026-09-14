@@ -53,11 +53,11 @@ Item {
     reloadPlugins();
   }
 
-  Timer {
-    interval: 3000
-    running: true
-    repeat: true
-    onTriggered: reloadAccounts()
+  onVisibleChanged: {
+    if (visible) {
+      reloadAccounts();
+      reloadPlugins();
+    }
   }
 
   Connections {

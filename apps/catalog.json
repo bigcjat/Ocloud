@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "apps": [
+    {
+      "id": "firefox",
+      "name": "Firefox",
+      "cmd": "firefox",
+      "aliases": ["firefox-esr"],
+      "category": "Dev & Web",
+      "tag": "BROWSER",
+      "desc": "Secure high-speed web browsing & media streaming without local RAM exhaustion.",
+      "minRamMb": 512,
+      "packages": {
+        "debian": ["firefox-esr"],
+        "arch": ["firefox"],
+        "fedora": ["firefox"],
+        "alpine": ["firefox"]
+      }
+    },
+    {
+      "id": "code",
+      "name": "VS Code",
+      "cmd": "code",
+      "aliases": ["codium", "code-oss"],
+      "category": "Dev & Web",
+      "tag": "DEV",
+      "desc": "Full development IDE with language servers and cloud-native compilation.",
+      "minRamMb": 1024,
+      "packages": {
+        "debian": ["code"],
+        "arch": ["code"],
+        "fedora": ["code"],
+        "alpine": ["code-oss"]
+      }
+    },
+    {
+      "id": "tradingview",
+      "name": "TradingView",
+      "cmd": "tradingview",
+      "aliases": ["tradingview-desktop"],
+      "category": "Dev & Web",
+      "tag": "FINANCE",
+      "desc": "24/7 real-time market charts, technical indicators, and price alerts.",
+      "minRamMb": 1024,
+      "packages": {
+        "debian": ["tradingview"],
+        "arch": ["tradingview"],
+        "fedora": ["tradingview"],
+        "alpine": ["tradingview"]
+      }
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "cmd": "slack",
+      "aliases": ["slack-desktop"],
+      "category": "Work & Office",
+      "tag": "WORK",
+      "desc": "Workplace collaboration with persistent 24/7 active online presence.",
+      "minRamMb": 1024,
+      "packages": {
+        "debian": ["slack-desktop"],
+        "arch": ["slack-desktop"],
+        "fedora": ["slack"],
+        "alpine": ["slack-desktop"]
+      }
+    },
+    {
+      "id": "teams",
+      "name": "Microsoft Teams",
+      "cmd": "teams-for-linux",
+      "aliases": ["teams"],
+      "category": "Work & Office",
+      "tag": "ENTERPRISE",
+      "desc": "Enterprise chat, channels, meetings, and always-available status.",
+      "minRamMb": 1024,
+      "packages": {
+        "debian": ["teams-for-linux"],
+        "arch": ["teams-for-linux"],
+        "fedora": ["teams-for-linux"],
+        "alpine": ["teams-for-linux"]
+      }
+    },
+    {
+      "id": "thunderbird",
+      "name": "Thunderbird",
+      "cmd": "thunderbird",
+      "aliases": ["betterbird"],
+      "category": "Work & Office",
+      "tag": "EMAIL",
+      "desc": "Corporate email archive, background indexing, and calendar sync.",
+      "minRamMb": 512,
+      "packages": {
+        "debian": ["thunderbird"],
+        "arch": ["thunderbird"],
+        "fedora": ["thunderbird"],
+        "alpine": ["thunderbird"]
+      }
+    },
+    {
+      "id": "zoom",
+      "name": "Zoom",
+      "cmd": "zoom",
+      "aliases": ["zoom-desktop"],
+      "category": "Work & Office",
+      "tag": "MEETINGS",
+      "desc": "Video conferencing and client calling standby.",
+      "minRamMb": 1024,
+      "packages": {
+        "debian": ["zoom"],
+        "arch": ["zoom"],
+        "fedora": ["zoom"],
+        "alpine": ["zoom"]
+      }
+    },
+    {
+      "id": "mattermost",
+      "name": "Mattermost",
+      "cmd": "mattermost-desktop",
+      "aliases": ["mattermost"],
+      "category": "Work & Office",
+      "tag": "TEAM",
+      "desc": "Open source sovereign team collaboration platform.",
+      "minRamMb": 512,
+      "packages": {
+        "debian": ["mattermost-desktop"],
+        "arch": ["mattermost-desktop"],
+        "fedora": ["mattermost-desktop"],
+        "alpine": ["mattermost-desktop"]
+      }
+    },
+    {
+      "id": "obs",
+      "name": "OBS Studio",
+      "cmd": "obs",
+      "aliases": ["obs-studio"],
+      "category": "Creative & Media",
+      "tag": "BROADCAST",
+      "desc": "Live video broadcasting and recording with datacenter uplink bandwidth.",
+      "minRamMb": 1500,
+      "packages": {
+        "debian": ["obs-studio"],
+        "arch": ["obs-studio"],
+        "fedora": ["obs-studio"],
+        "alpine": ["obs-studio"]
+      }
+    },
+    {
+      "id": "handbrake",
+      "name": "HandBrake",
+      "cmd": "ghb",
+      "aliases": ["handbrake", "HandBrakeCLI"],
+      "category": "Creative & Media",
+      "tag": "TRANSCODE",
+      "desc": "Batch video encoding and compression without overheating local CPU.",
+      "minRamMb": 1024,
+      "packages": {
+        "debian": ["handbrake", "handbrake-cli"],
+        "arch": ["handbrake", "handbrake-cli"],
+        "fedora": ["handbrake"],
+        "alpine": ["handbrake"]
+      }
+    },
+    {
+      "id": "blender",
+      "name": "Blender",
+      "cmd": "blender",
+      "aliases": [],
+      "category": "Creative & Media",
+      "tag": "3D",
+      "desc": "Open source 3D graphics creation and cloud Cycles rendering.",
+      "minRamMb": 2048,
+      "packages": {
+        "debian": ["blender"],
+        "arch": ["blender"],
+        "fedora": ["blender"],
+        "alpine": ["blender"]
+      }
+    },
+    {
+      "id": "gimp",
+      "name": "GIMP",
+      "cmd": "gimp",
+      "aliases": [],
+      "category": "Creative & Media",
+      "tag": "GRAPHICS",
+      "desc": "High resolution image manipulation without local memory constraints.",
+      "minRamMb": 1024,
+      "packages": {
+        "debian": ["gimp"],
+        "arch": ["gimp"],
+        "fedora": ["gimp"],
+        "alpine": ["gimp"]
+      }
+    },
+    {
+      "id": "discord",
+      "name": "Discord",
+      "cmd": "discord",
+      "aliases": ["discord-ptb", "discord-canary"],
+      "category": "Communication",
+      "tag": "COMMUNITY",
+      "desc": "Voice, video, and community channels running 24/7 without eating local RAM.",
+      "minRamMb": 1024,
+      "packages": {
+        "debian": ["discord"],
+        "arch": ["discord"],
+        "fedora": ["discord"],
+        "alpine": ["discord"]
+      }
+    },
+    {
+      "id": "telegram",
+      "name": "Telegram",
+      "cmd": "telegram-desktop",
+      "aliases": ["telegram"],
+      "category": "Communication",
+      "tag": "MESSAGING",
+      "desc": "Fast messaging, community channels, and large media sharing.",
+      "minRamMb": 512,
+      "packages": {
+        "debian": ["telegram-desktop"],
+        "arch": ["telegram-desktop"],
+        "fedora": ["telegram-desktop"],
+        "alpine": ["telegram-desktop"]
+      }
+    },
+    {
+      "id": "signal",
+      "name": "Signal",
+      "cmd": "signal-desktop",
+      "aliases": ["signal"],
+      "category": "Communication",
+      "tag": "PRIVATE",
+      "desc": "Encrypted private messaging with zero local disk footprint when closed.",
+      "minRamMb": 512,
+      "packages": {
+        "debian": ["signal-desktop"],
+        "arch": ["signal-desktop"],
+        "fedora": ["signal-desktop"],
+        "alpine": ["signal-desktop"]
+      }
+    }
+  ]
+}

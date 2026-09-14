@@ -39,7 +39,11 @@ Item {
       isScanning = false;
     }
     function onNetworkSharesUpdated(jsonStr) {
-      refreshShares();
+      try {
+        mountedShares = JSON.parse(jsonStr);
+      } catch (e) {
+        mountedShares = [];
+      }
     }
   }
 

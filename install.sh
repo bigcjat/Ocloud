@@ -76,7 +76,18 @@ rm -rf "$PLUGIN_LINK"
 ln -sf "$SCRIPT_DIR/plugin" "$PLUGIN_LINK"
 echo "✔ Symlinked plugin: $PLUGIN_LINK -> $SCRIPT_DIR/plugin"
 
-# 7. Verification
+# 7. Register Hyprland Window Rules for Cloud Windows
+if [ -d "$HOME/.config/hypr" ]; then
+  echo "Registering Hyprland cloud window rules..."
+  if [ -f "$HOME/.config/hypr/hyprland.lua" ] && ! grep -q "Xpra" "$HOME/.config/hypr/hyprland.lua"; then
+    echo "" >> "$HOME/.config/hypr/hyprland.lua"
+    echo "-- Ocloud: Distinct red border for remote cloud windows" >> "$HOME/.config/hypr/hyprland.lua"
+    echo 'o.window({ class = "Xpra" }, { border_color = "rgba(ef4444ff) rgba(b91c1cff) 45deg", border_size = 3 })' >> "$HOME/.config/hypr/hyprland.lua"
+    echo "✔ Added cloud window border rule to $HOME/.config/hypr/hyprland.lua"
+  fi
+fi
+
+# 8. Verification
 echo ""
 echo "Verifying installation..."
 "$HOME/.local/bin/ocloud" status --json >/dev/null 2>&1 && echo "✔ CLI status test passed." || echo "ℹ CLI ready."

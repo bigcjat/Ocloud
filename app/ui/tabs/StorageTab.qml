@@ -43,11 +43,8 @@ Item {
     reloadMountedShares();
   }
 
-  Timer {
-    interval: 3000
-    running: true
-    repeat: true
-    onTriggered: {
+  onVisibleChanged: {
+    if (visible) {
       root.refreshCapacities();
       root.reloadCloudAccounts();
       root.reloadMountedShares();

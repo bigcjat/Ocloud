@@ -233,7 +233,7 @@ Item {
                   text: "Exec Shell"
                   variant: "secondary"
                   onClicked: {
-                    var ip = (serverList && serverList.length > 0) ? serverList[0].ipv4 : "";
+                    var ip = (serverList && serverList.length > 0) ? (serverList[0].tailscale_ip || serverList[0].ipv4) : "";
                     ocloud.openTerminal(modelData.name, ip);
                   }
                 }

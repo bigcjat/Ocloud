@@ -38,11 +38,71 @@ Item {
   property var cachedCatalogsMap: ({})
   property string cachedSettings: "{}"
 
-  // Helper to run a command and collect output
+  // ==========================================
+  // PERSISTENT NODE BRIDGE (ZERO-FORK IPC)
+  // ==========================================
+  property bool bridgeReady: false
+  property var pendingCallbacks: ({})
+  property int nextReqId: 1
+
+  Process {
+    id: bridgeProc
+    command: [root.ocloudBin, "bridge"]
+    running: true
+    stdinEnabled: true
+    stdout: SplitParser {
+      onRead: data => {
+        try {
+          var msg = JSON.parse(data);
+          if (msg.type === "ready") {
+            root.bridgeReady = true;
+            return;
+          }
+          if (msg.id && root.pendingCallbacks[msg.id]) {
+            var cb = root.pendingCallbacks[msg.id];
+            delete root.pendingCallbacks[msg.id];
+            cb(msg.output || "", msg.ok);
+          }
+        } catch(e) {}
+      }
+    }
+    onExited: (code, status) => {
+      root.bridgeReady = false;
+      bridgeRestartTimer.start();
+    }
+  }
+
+  Timer {
+    id: bridgeRestartTimer
+    interval: 2000
+    repeat: false
+    onTriggered: {
+      if (!bridgeProc.running) bridgeProc.running = true;
+    }
+  }
+
+  // Helper to run a command and collect output (uses warm Bridge first, fallback to CLI fork)
   function runCli(args, onDone, timeoutMs) {
+    if (root.bridgeReady && bridgeProc.running) {
+      var reqId = "req_" + (root.nextReqId++);
+      root.pendingCallbacks[reqId] = onDone;
+      bridgeProc.write(JSON.stringify({ id: reqId, args: args }) + "\n");
+      return;
+    }
+
     var proc = dynamicProcComp.createObject(root, {
       "command": [root.ocloudBin].concat(args),
       "timeoutMs": timeoutMs || 15000
+    });
+    proc.finishedCallback = onDone;
+    proc.running = true;
+  }
+
+  // Helper to run a command directly via dedicated CLI process (for streaming viewers and long installers)
+  function runCliDirect(args, onDone, timeoutMs) {
+    var proc = dynamicProcComp.createObject(root, {
+      "command": [root.ocloudBin].concat(args),
+      "timeoutMs": timeoutMs || 30000
     });
     proc.finishedCallback = onDone;
     proc.running = true;
@@ -101,6 +161,85 @@ Item {
             cb(finalMsg, isOk);
           }
           wrapper.destroy();
+        }
+      }
+    }
+  }
+
+  // Streaming runner for live line-by-line terminal output
+  function runCliStreaming(args, onLine, onDone, timeoutMs) {
+    var proc = streamingProcComp.createObject(root, {
+      "command": [root.ocloudBin].concat(args),
+      "timeoutMs": timeoutMs || 300000
+    });
+    proc.lineCallback = onLine;
+    proc.finishedCallback = onDone;
+    proc.running = true;
+  }
+
+  Component {
+    id: streamingProcComp
+    Item {
+      id: streamWrapper
+      property alias command: sp.command
+      property alias running: sp.running
+      property var lineCallback: null
+      property var finishedCallback: null
+      property int timeoutMs: 300000
+      property string capturedStdout: ""
+      property string capturedStderr: ""
+
+      Timer {
+        id: streamTimeoutTimer
+        interval: streamWrapper.timeoutMs
+        running: sp.running
+        repeat: false
+        onTriggered: {
+          if (sp.running) {
+            sp.running = false;
+            if (streamWrapper.finishedCallback) {
+              var cb = streamWrapper.finishedCallback;
+              streamWrapper.finishedCallback = null;
+              cb("Operation timed out after " + Math.round(streamWrapper.timeoutMs / 1000) + "s", false);
+            }
+            streamWrapper.destroy();
+          }
+        }
+      }
+
+      Process {
+        id: sp
+        running: false
+        stdout: SplitParser {
+          onRead: data => {
+            var line = String(data || "");
+            streamWrapper.capturedStdout += line + "\n";
+            if (streamWrapper.lineCallback) {
+              streamWrapper.lineCallback(line);
+            }
+          }
+        }
+        stderr: SplitParser {
+          onRead: data => {
+            var line = String(data || "");
+            streamWrapper.capturedStderr += line + "\n";
+            if (streamWrapper.lineCallback) {
+              streamWrapper.lineCallback("[stderr] " + line);
+            }
+          }
+        }
+        onExited: (code, status) => {
+          streamTimeoutTimer.stop();
+          if (streamWrapper.finishedCallback) {
+            var cb = streamWrapper.finishedCallback;
+            streamWrapper.finishedCallback = null;
+            var isOk = (code === 0);
+            var stdOut = streamWrapper.capturedStdout.trim();
+            var stdErr = streamWrapper.capturedStderr.trim();
+            var finalMsg = isOk ? (stdOut.length > 0 ? stdOut : "Success") : (stdErr.length > 0 ? stdErr : (stdOut.length > 0 ? stdOut : "Process exited with code " + code));
+            cb(finalMsg, isOk);
+          }
+          streamWrapper.destroy();
         }
       }
     }
@@ -173,7 +312,7 @@ Item {
                 }
               }
             }
-            fleetPollTimer.interval = hasTrans ? 3000 : 10000;
+            fleetPollTimer.interval = hasTrans ? 4000 : 30000;
           } catch(e) {}
         }
       }
@@ -182,7 +321,7 @@ Item {
 
   Timer {
     id: fleetPollTimer
-    interval: 10000
+    interval: 30000
     running: true
     repeat: true
     onTriggered: {
@@ -409,7 +548,7 @@ Item {
   }
 
   function getNetworkShares() {
-    if (!sharesProc.running) {
+    if (!sharesProc.running && root.cachedNetworkShares === "[]") {
       sharesProc.running = true;
     }
     return root.cachedNetworkShares;
@@ -524,6 +663,18 @@ Item {
     });
   }
 
+  function probeAllApps(serverId, callback) {
+    runCli(["app", "probe-all", serverId], function(out, ok) {
+      var res = { success: false, apps: {} };
+      try {
+        res = JSON.parse(out.trim());
+      } catch (e) {
+        res = { success: false, error: out, apps: {} };
+      }
+      if (callback) callback(res, ok);
+    }, 20000);
+  }
+
   function probeApp(serverId, app, callback) {
     runCli(["app", "probe", serverId, app], function(out, ok) {
       var res = null;
@@ -535,14 +686,78 @@ Item {
   }
 
   function installApp(serverId, app, callback) {
-    runCli(["app", "install", serverId, app], function(out, ok) {
+    runCliDirect(["app", "install", serverId, app], function(out, ok) {
       if (callback) callback(ok, out);
+    }, 300000);
+  }
+
+  function installAppStreaming(serverId, app, onLine, callback) {
+    runCliStreaming(["app", "install", serverId, app], onLine, function(out, ok) {
+      if (callback) callback(ok, out);
+    }, 300000);
+  }
+
+  function launchApp(serverId, app, engine) {
+    var args = ["app", "launch", serverId, app];
+    if (engine) args.push("--engine=" + engine);
+    runCliDirect(args, function(out, ok) {
+      root.actionCompleted("launchApp", ok, out);
+    }, 300000);
+  }
+
+  function attachAppSession(serverId, display) {
+    var args = ["app", "attach", serverId];
+    if (display) args.push(display);
+    runCliDirect(args, function(out, ok) {
+      root.actionCompleted("attachAppSession", ok, out);
+    }, 30000);
+  }
+
+  function detachAppSession(callback) {
+    runCli(["app", "detach"], function(out, ok) {
+      root.actionCompleted("detachAppSession", ok, out);
+      if (callback) callback(ok);
     });
   }
 
-  function launchApp(serverId, app) {
-    runCli(["app", "launch", serverId, app], function(out, ok) {
-      root.actionCompleted("launchApp", ok, out);
+  function stopAppSession(serverId, display, callback) {
+    runCli(["app", "stop", serverId, display || ":100"], function(out, ok) {
+      root.actionCompleted("stopAppSession", ok, out);
+      if (callback) callback(ok);
+    });
+  }
+
+  function checkAppAttached(callback) {
+    runCli(["app", "is-attached"], function(out, ok) {
+      var attached = false;
+      try {
+        var parsed = JSON.parse(out.trim());
+        if (parsed) attached = Boolean(parsed.attached);
+      } catch (e) {}
+      if (callback) callback(attached);
+    });
+  }
+
+  function fetchAppSessions(serverId, callback) {
+    runCli(["app", "sessions", serverId], function(out, ok) {
+      if (callback) callback(out, ok);
+    });
+  }
+
+  function setStreamingEngine(engine, callback) {
+    runCli(["app", "engine", engine], function(out, ok) {
+      if (callback) callback(ok);
+    });
+  }
+
+  function getStreamingEngine(callback) {
+    runCli(["app", "engine", "get"], function(out, ok) {
+      var res = "xpra";
+      try {
+        var parsed = JSON.parse(out.trim());
+        if (parsed && parsed.engine) res = parsed.engine;
+      } catch (e) {}
+      if (callback) callback(res);
     });
   }
 
@@ -566,10 +781,17 @@ Item {
 
   function openTerminal(name, ip, user) {
     var u = user || "root";
-    var proc = dynamicProcComp.createObject(root, {
-      "command": ["foot", "-T", ("SSH: " + name + " (" + ip + ")"), "ssh", "-i", (root.homeDir + "/.ssh/id_ed25519"), "-o", "StrictHostKeyChecking=accept-new", (u + "@" + ip)]
-    });
-    proc.running = true;
+    var targetIp = ip || "";
+    if (!targetIp) return;
+    var sshKey = root.homeDir + "/.ssh/id_ed25519";
+    var title = "SSH: " + name + " (" + targetIp + ")";
+    var termCmd = [
+      "foot",
+      "-T", title,
+      "bash", "-c",
+      "ssh -i \"" + sshKey + "\" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 \"" + u + "@" + targetIp + "\" || (echo ''; echo '❌ SSH connection closed or failed. Press Enter to close...'; read _)"
+    ];
+    Quickshell.execDetached(termCmd);
   }
 
   function launchRcloneConfig() {
@@ -601,10 +823,10 @@ Item {
   // CATALOG & PROCUREMENT
   // ==========================================
   function fetchComputePlugins() {
-    refreshComputePluginsAsync();
     if (root.cachedComputePlugins && root.cachedComputePlugins.length > 5) {
       return root.cachedComputePlugins;
     }
+    refreshComputePluginsAsync();
     return JSON.stringify([
       {
         "id": "custom",

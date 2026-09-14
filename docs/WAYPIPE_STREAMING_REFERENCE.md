@@ -18,6 +18,26 @@ This document captures architectural lessons, packaging quirks, and protocol con
 
 ---
 
+## 1.1 Remote Application Streaming Architecture: Waypipe vs. Xpra (Option B)
+
+### The Waypipe WAN Bottleneck
+Waypipe forwards Wayland protocol events and pixel buffers (`wl_shm` / `dmabuf`) across the network. While excellent over LAN (<5ms latency):
+1. **Network RTT Lockstep:** The Wayland protocol requires client and compositor synchronization via `wl_surface.frame` callbacks. Over a 100ms–300ms WAN ping, this throttles frame rates to ~1–3 FPS.
+2. **Buffer Flooding / Crash:** Disabling Wayland vsync (`widget.wayland.vsync.enabled=false`) breaks the lockstep, but causes browsers to flood 60 `create_pool` calls per second over SSH, overwhelming socket buffers and triggering Hyprland `invalid object 406` protocol crashes.
+3. **No Disconnect Resilience:** If your laptop sleeps, you close the lid, or Wi-Fi drops, Waypipe drops the socket and the remote application dies immediately.
+
+### The Xpra Architecture (Proven Butter-Smooth Solution)
+Ocloud uses **Xpra Seamless Sessions** (`ocloud app launch` / `attach`):
+1. **Decoupled Local Frame Pacing:** Applications run against a local headless Xvfb display on the cloud VM (`0.01ms` latency). Rendering happens at full native speed regardless of WAN latency.
+2. **Adaptive Video Compression:** Xpra captures windows and encodes frame updates into adaptive H.264/VP9 video packets over the wire, dropping intermediate frames gracefully when network jitter occurs.
+3. **24/7 Cloud Persistence:** Closing your laptop lid or disconnecting from Wi-Fi does **not** close your cloud applications. Firefox, video streams, and IDEs remain alive 24/7 on the cloud VM and re-attach instantly when you reopen your laptop.
+4. **Pristine Opus / PipeWire Audio:** Audio is encoded in Opus 48kHz stereo and streamed into your laptop's native PipeWire speakers without requiring manual SSH socket plumbing.
+
+### WAN Audio Buffer Dynamics (Intercontinental Latency)
+When streaming audio across >250ms WAN hops (e.g. Korea to Germany with ~300ms RTT), network jitter (packet arrival variance of ±15–30ms) causes default small jitter buffers (50ms) to experience minor micro-underruns. Disabling AV sync (`--av-sync=no`) prevents these packet gaps from blocking video frames, maintaining buttery-smooth visual rendering while keeping audio continuous and low-latency.
+
+---
+
 ## 2. Headless Qt6 / PySide6 / QML Missing Formats: SVGs & WebP
 
 Headless minimal server images strip out GUI dependencies. When running modern QML launchers or apps:
@@ -132,35 +152,66 @@ player_cmd = shutil.which("pw-play") or shutil.which("paplay") or shutil.which("
 Wayland clients synchronize rendering via `wl_surface.frame` callbacks:
 1. The client draws a frame and submits it with a frame callback request.
 2. The compositor receives the frame and signals the callback when ready for the next frame.
-3. Over WAN, this requires a full round trip:
-   $$\text{Frame Time} = \text{Network RTT} + \text{Buffer Compression/Transfer Time}$$
+3. Over WAN, if the client waits for the compositor before drawing the next frame:
+   $$\text{Max FPS} \le \frac{1000}{\text{Network RTT (ms)}}$$
 
-### Real-World Measured Performance
-| Server Region | User Location | Latency (RTT) | Observed FPS | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| **Nuremberg (nbg1)** | East Asia (GMT+9) | ~292 ms | **~2.5 FPS** | Physics ceiling: $292\text{ms} + 100\text{ms} \approx 400\text{ms} \rightarrow 2.5\text{ FPS}$ |
-| **Singapore (sin)** | East Asia (GMT+9) | **~35–45 ms** | **25–30+ FPS** | Smooth interactive gaming & desktop use |
+### The Frame Callback Timeout Solution: `QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=16`
+* **The Pitfall of `1500`**: Setting `QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500` instructs Qt to wait up to **1.5 full seconds** on high network ping or compositor delay before forcing a render.
+* **The High-FPS Fix**: Set `QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=16` (or `0`) and `QSG_RENDER_LOOP=basic`. When network latency is higher than 16ms, Qt's timer fires and delivers the next frame anyway, completely decoupling local rendering speed from WAN network round-trip time.
 
-### Waypipe Compression Tuning
-Benchmarking `waypipe bench` for graphical desktop buffers:
-* **`--compress lz4`**: Has almost 0% compression on raw graphical RGBA buffers (ratio ~1.004). Transmits ~4.8 MB uncompressed per frame at 1440x900, saturating WAN bandwidth.
-* **`--compress zstd=1 --threads 4`**: Achieves ~0.80 ratio at >770 MB/s compression throughput, saving 20–30% bandwidth without CPU lag.
+### Dual-Tier Hardware vs. CPU Acceleration
+
+#### Tier 1: Hardware Graphics (Integrated iGPU or Dedicated GPU)
+* **Bare Metal Consumer Hardware (Hetzner Auction / Robot)**: Consumer CPUs (Intel Core i7-7700, i7-8700, i5-12500/13500) feature **Intel QuickSync Video (UHD Graphics)**; AMD Ryzen consumer processors feature **Radeon APUs**.
+* **Capabilities**:
+  - Exposes `/dev/dri/renderD128` via `i915`, `xe`, or `amdgpu` kernel drivers.
+  - Waypipe passes `--video=h264,hw,bpf=1500000` to utilize Intel QuickSync / VAAPI hardware encoders.
+  - Frames are compressed directly in dedicated CPU silicon with **0% CPU load**, leaving all cores free for the application.
+  - Zero-copy DMABUF transfers eliminate RAM copy overhead.
+
+#### Tier 2: Pure Headless Virtual VPS (No iGPU or Dedicated GPU)
+* **Software Rasterization**: Launch with `GALLIUM_DRIVER=llvmpipe LP_NUM_THREADS=<cores> LIBGL_ALWAYS_SOFTWARE=1`.
+* **Compression Tuning**:
+  - **NEVER use `--compress lz4` on graphical buffers**: LZ4 has virtually 0% compression on raw 32-bit RGBA pixels (ratio ~1.004), transmitting 8.3 MB per 1080p frame and choking WAN bandwidth to 2–4 FPS.
+  - **Use `--video=h264,bpf=1200000` with fallback to `--compress=zstd=1`**: ZSTD level 1 achieves >770 MB/s compression throughput, reducing bandwidth by 20–30% without CPU lag.
+
+### Transport Optimization (Tailscale & SSH)
+1. **Tailscale Mesh (Peer-to-Peer WireGuard)**:
+   - When connecting over Tailscale, the connection is already secured end-to-end via kernel-space WireGuard.
+2. **OpenSSH Acceleration**:
+   - `-c aes128-gcm@openssh.com`: Utilizes CPU AES-NI hardware instructions (3–5× faster stream throughput than default `chacha20-poly1305`).
+   - `-o Compression=no`: Explicitly disables SSH zlib re-compression to prevent CPU saturation and buffer bloat over pre-encoded video streams.
+   - `-o IPQoS=throughput`: Prevents packet delivery pauses for streaming data.
 
 ---
 
 ## 7. Recommended Production Launch Command
 
-To launch any remote cloud application with optimized Waypipe, H.264 video encoding, watchdog timeout adjustments, dynamic title tagging, and bidirectional audio:
+To launch any remote cloud application with tuned Waypipe, dual-tier graphics detection, decoupled 60 FPS pacing, and bidirectional audio:
 
 ```bash
+# Production launch command:
 WAYLAND_DISPLAY=wayland-1 \
 XDG_RUNTIME_DIR=/run/user/1000 \
 waypipe --title-prefix '[☁ Hetzner] ' \
-  --video=h264 \
+  --video=h264,hw,bpf=1500000 \
+  --compress=zstd=1 \
   --threads 4 \
-  ssh -i ~/.ssh/id_ed25519 -R 4713:localhost:4713 \
-  root@companion-ip \
-  'env PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 <command>'
+  ssh \
+    -p 22 \
+    -i ~/.ssh/id_ed25519 \
+    -c aes128-gcm@openssh.com \
+    -o Compression=no \
+    -o IPQoS=throughput \
+    -o TCPKeepAlive=no \
+    -R 4713:localhost:4713 \
+    root@companion-ip \
+    'env \
+       PULSE_SERVER=tcp:localhost:4713 \
+       QT_QPA_PLATFORM=wayland \
+       QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=16 \
+       QSG_RENDER_LOOP=basic \
+       <command>'
 ```
 
 ---
@@ -280,4 +331,32 @@ if [ -t 1 ]; then
 fi
 ```
 Every SSH or terminal connection immediately displays the OS ASCII art logo, kernel, uptime, and system resource gauges.
+
+---
+
+## 10. Session Lifecycle: Detaching vs. Terminating
+
+When running persistent cloud applications over Xpra:
+
+### 1. Close Window vs. Detach Viewer
+* **Normal Close (`Super+Q` / `killactive` / Window `X` button):** Sends `WM_DELETE_WINDOW` to the application inside the virtual display. Applications like Firefox will prompt to exit or terminate.
+* **Detach (`ocloud app detach`):** Disconnects the local viewer process. The remote application, virtual display (`:100`), PulseAudio server, and audio/video state **remain running 24/7 in the cloud**.
+
+### 2. Bringing Back the Session (Re-attach)
+* **Ocloud UI:** Navigate to the **Cloud App Suite** tab. The live session card detects the background session (`:100`). Click **`[⚡ Re-attach Window]`**.
+* **CLI:**
+  ```bash
+  ocloud app attach <server-name-or-id>
+  ```
+
+### 3. Recommended Hyprland Shortcuts
+Add to `~/.config/hypr/hyprland.conf`:
+```ini
+# Detach cloud streaming window (leaves app alive 24/7 on remote VM)
+bind = $mainMod SHIFT, D, exec, ocloud app detach
+
+# Re-attach cloud streaming window instantly
+bind = $mainMod SHIFT, A, exec, ocloud app attach omarchy-companion
+```
+
 

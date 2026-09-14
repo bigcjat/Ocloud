@@ -328,7 +328,7 @@ Rectangle {
         AppButton {
           text: "SSH Terminal"
           variant: "secondary"
-          onClicked: ocloud.openTerminal(serverData.name, serverData.ipv4, serverData.user || "root")
+          onClicked: ocloud.openTerminal(serverData.name, serverData.tailscale_ip || serverData.ipv4, serverData.user || "root")
         }
 
         Item { Layout.fillWidth: true }

@@ -220,40 +220,9 @@ async function cmdVm(subcmd, args, { registry, vault }) {
     }
   } else if (subcmd === 'app') {
     const appCmd = args[1] || 'arcade';
-    const keyPath = server.keyPath || path.join(os.homedir(), '.ssh', 'id_ed25519');
-    const user = server.user || 'root';
-    const port = server.port || 22;
-
-    const isHome = Boolean(server.isHomeWorkstation);
-    const titlePrefix = isHome ? '[🏠 Home Workstation] ' : '[☁ Hetzner Cloud] ';
-
-    const localWaypipe = [
-      path.join(os.homedir(), '.local', 'bin', 'waypipe'),
-      '/usr/bin/waypipe',
-      '/usr/local/bin/waypipe'
-    ].find((p) => fs.existsSync(p)) || 'waypipe';
-
-    console.log(`Launching '${appCmd}' on ${server.name} via Waypipe...`);
-    console.log(`Prefix: "${titlePrefix}" (triggers desktop window rules)`);
-
-    const remoteExec = `env PATH=/root/.local/bin:/home/${user}/.local/bin:/usr/local/bin:/usr/bin:$PATH PULSE_SERVER=tcp:localhost:4713 QT_QPA_PLATFORM=wayland QT_WAYLAND_FRAME_CALLBACK_TIMEOUT=1500 ${appCmd}`;
-
-    spawn(
-      localWaypipe,
-      [
-        '--title-prefix', titlePrefix,
-        '--video=h264',
-        '--threads', '4',
-        'ssh',
-        '-p', String(port),
-        '-i', keyPath,
-        '-o', 'StrictHostKeyChecking=no',
-        '-R', '4713:localhost:4713',
-        `${user}@${ip}`,
-        remoteExec
-      ],
-      { stdio: 'inherit' }
-    );
+    const { cmdApp } = require('./app');
+    await cmdApp('launch', [server.name, appCmd], { registry, vault });
+    return;
   } else if (subcmd === 'mount' || subcmd === 'mount-ephemeral') {
     const vmMountPoint = path.join(os.homedir(), 'Companion-VM');
     if (isDriveMounted(vmMountPoint)) {
