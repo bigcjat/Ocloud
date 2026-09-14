@@ -10,21 +10,29 @@ function cmdGui(subcmd, args = [], context = {}) {
     process.exit(1);
   }
 
-  // Single-Instance Enforcement: prevent duplicate Quickshell processes
+  // Single-Instance Enforcement: check if an Ocloud window is actually open
   try {
     const existingPids = execSync('pgrep -f "quickshell.*shell\\.qml"', { encoding: 'utf8' }).trim();
     if (existingPids) {
       const pids = existingPids.split('\n').filter(Boolean);
       if (pids.length > 0) {
-        console.log(`✔ Ocloud Desktop GUI is already running (PID: ${pids.join(', ')}). Bringing window to focus...`);
-        // Attempt to focus the existing window via Hyprland IPC if running in Hyprland
+        let hasWindow = false;
         try {
           const sig = execSync('ls -1 /run/user/$(id -u)/hypr/ 2>/dev/null | head -n 1', { encoding: 'utf8' }).trim();
           if (sig) {
-            execSync(`HYPRLAND_INSTANCE_SIGNATURE="${sig}" hyprctl dispatch focuswindow "title:Ocloud" 2>/dev/null || true`, { stdio: 'ignore' });
+            const clientsJson = execSync(`HYPRLAND_INSTANCE_SIGNATURE="${sig}" hyprctl clients -j 2>/dev/null || echo "[]"`, { encoding: 'utf8' }).trim();
+            const clients = JSON.parse(clientsJson);
+            hasWindow = clients.some(c => c.title && c.title.includes('Ocloud'));
+            if (hasWindow) {
+              console.log(`✔ Ocloud Desktop GUI is already running (PID: ${pids.join(', ')}). Bringing window to focus...`);
+              execSync(`HYPRLAND_INSTANCE_SIGNATURE="${sig}" hyprctl dispatch focuswindow "title:Ocloud" 2>/dev/null || true`, { stdio: 'ignore' });
+              return;
+            }
           }
         } catch (e) {}
-        return;
+
+        // If no visible Ocloud window exists, kill lingering headless/stale process so a fresh window opens
+        execSync(`kill -9 ${pids.join(' ')} 2>/dev/null || true`);
       }
     }
   } catch (e) {
