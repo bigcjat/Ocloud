@@ -651,6 +651,21 @@ Item {
     }, 45000);
   }
 
+  function addFilenStorage(name, email, password, twofa, mountPath, callback) {
+    root.busyChanged(true, "Configuring Filen in Vault & mounting...");
+    var args = ["storage", "add-filen", name, email, password];
+    args.push(twofa ? twofa : "");
+    args.push(mountPath ? mountPath : "");
+    runCli(args, function(out, ok) {
+      root.busyChanged(false, "");
+      var msg = ok ? ("Mounted " + name + " to " + (mountPath || "~/Filen")) : (out || "Failed to add Filen storage");
+      root.actionCompleted("addFilenStorage", ok, msg);
+      root.refreshStatusAsync();
+      root.fetchCloudAccountsAsync();
+      if (callback) callback(ok, msg);
+    }, 45000);
+  }
+
   function addS3Storage(name, endpoint, bucket, key, secret, mountPath, callback) {
     root.busyChanged(true, "Configuring S3 in Vault & mounting...");
     runCli(["storage", "add-s3", name, endpoint, bucket || "", key, secret, mountPath || ""], function(out, ok) {

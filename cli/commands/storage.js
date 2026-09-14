@@ -561,6 +561,50 @@ async function cmdStorage(subcmd, args, { registry, vault }) {
     return;
   }
 
+  if (subcmd === 'add-filen') {
+    const [name, email, password, twofactor, mountPoint] = args;
+    if (!email || !password) {
+      throw new Error('Usage: ocloud storage add-filen <name> <email> <password> [twofactor] [mount_point]');
+    }
+    const remoteName = (name || 'filen').toLowerCase().replace(/ /g, '-');
+    const expMount = resolveMountPath(mountPoint || '~/Filen');
+
+    // 1. Save in Vault
+    if (vault) {
+      vault.setScopedCredentials(remoteName, { email, password, twofactor: twofactor || '' });
+      vault.ensureRcloneEncrypted(rcloneBin);
+    }
+
+    // 2. Create in Rclone
+    const cmdArgs = [
+      rcloneBin, 'config', 'create', remoteName, 'filen',
+      'email', email,
+      'password', password
+    ];
+    if (twofactor && twofactor.trim().length > 0) {
+      cmdArgs.push('twofactor', twofactor.trim());
+    }
+    cmdArgs.push('--non-interactive');
+
+    fs.mkdirSync(expMount, { recursive: true });
+    try {
+      execSync(cmdArgs.map(a => `"${a}"`).join(' '), { env, stdio: 'pipe' });
+      console.log(`✔ Configured Filen remote '${remoteName}' in Rclone.`);
+    } catch(e) {
+      throw new Error(`Error configuring Filen: ${e.message}`);
+    }
+
+    try {
+      await mountAndVerifyRemote(`${remoteName}:`, expMount, rcloneBin, env, remoteName);
+      console.log(`✔ Mounted Filen '${remoteName}' to ${expMount}`);
+    } catch(e) {
+      try { execSync(`${rcloneBin} config delete "${remoteName}"`, { env, stdio: 'ignore' }); } catch(ex) {}
+      try { if (fs.readdirSync(expMount).length === 0) fs.rmdirSync(expMount); } catch(ex) {}
+      throw new Error(`Failed to mount Filen '${remoteName}': ${e.message}`);
+    }
+    return;
+  }
+
   if (subcmd === 'add-s3') {
     const [name, endpoint, bucket, key, secret, mountPoint] = args;
     const remoteName = (name || 's3').toLowerCase().replace(/ /g, '-');

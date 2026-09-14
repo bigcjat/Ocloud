@@ -1,0 +1,64 @@
+{
+  "id": "ovhcloud_s3",
+  "name": "OVHcloud Object Storage",
+  "type": "storage",
+  "category": "cloud",
+  "authType": "s3",
+  "rcloneType": "s3",
+  "defaultRemoteName": "ovh-s3",
+  "defaultMount": "~/OVH-Storage",
+  "badge": "European Sovereign",
+  "badgeColor": "#000E9C",
+  "brandColor": "#000E9C",
+  "tagline": "S3-compatible High Performance Object Storage hosted in European OVHcloud datacenters.",
+  "dashboardUrl": "https://www.ovh.com/manager/",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><title>OVH</title><path fill=\"#000E9C\" d=\"m19.881 10.095 2.563-4.45A11.93 11.93 0 0 1 24 11.555c0 2.88-1.017 5.523-2.71 7.594h-6.62l2.04-3.541h-2.696l3.176-5.513zm-2.32-5.243L9.333 19.14l.003.009H2.709A11.95 11.95 0 0 1 0 11.555c0-2.152.57-4.17 1.561-5.918L5.855 13.1 10.6 4.852z\"/></svg>",
+  "instructions": {
+    "navBreadcrumb": "OVHcloud Control Panel › Public Cloud › Storage › Users & S3 Credentials",
+    "step1": "Log into OVHcloud Manager and select your Public Cloud project.",
+    "step2": "Under Storage, create an S3 user and copy the generated Access Key and Secret Key.",
+    "step3": "Enter your regional S3 endpoint (e.g. https://s3.gra.cloud.ovh.net) and bucket name."
+  },
+  "fields": [
+    {
+      "key": "endpoint",
+      "label": "OVHcloud S3 Endpoint URL",
+      "placeholder": "https://s3.gra.cloud.ovh.net",
+      "default": "https://s3.gra.cloud.ovh.net",
+      "type": "text",
+      "required": true,
+      "helper": "Regional endpoint (e.g. https://s3.gra.cloud.ovh.net, https://s3.rbx.cloud.ovh.net)"
+    },
+    {
+      "key": "bucket",
+      "label": "Bucket Name (Optional)",
+      "placeholder": "my-ovh-bucket",
+      "type": "text",
+      "required": false,
+      "helper": "Target bucket name (leave empty to mount all buckets)"
+    },
+    {
+      "key": "key",
+      "label": "S3 Access Key",
+      "placeholder": "Paste Access Key",
+      "type": "text",
+      "required": true,
+      "helper": "Generated under Public Cloud > Storage > S3 Users"
+    },
+    {
+      "key": "secret",
+      "label": "S3 Secret Key",
+      "placeholder": "Paste Secret Key",
+      "type": "password",
+      "required": true,
+      "helper": "Generated under Public Cloud > Storage > S3 Users"
+    }
+  ],
+  "allowedDomains": [
+    "*.cloud.ovh.net"
+  ],
+  "permissions": {
+    "network": true,
+    "rclone": true
+  }
+}

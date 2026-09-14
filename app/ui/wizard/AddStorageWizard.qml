@@ -2103,6 +2103,8 @@ Rectangle {
                   ocloud.addMegaStorage(sName, keyField.text.trim(), secretField.text.trim(), mPath, handleResult);
                 } else if (rType === "koofr" || (method && method.rcloneType === "koofr") || (platform && platform.id === "koofr")) {
                   ocloud.addKoofrStorage(sName, keyField.text.trim(), secretField.text.trim(), mPath, handleResult);
+                } else if (rType === "filen" || (method && method.rcloneType === "filen") || (platform && platform.id === "filen")) {
+                  ocloud.addFilenStorage(sName, keyField.text.trim(), secretField.text.trim(), twofaField.text.trim(), mPath, handleResult);
                 } else if (aType === "webdav" || rType === "webdav") {
                   var vendor = (method && method.vendor) ? method.vendor : (platform ? platform.vendor || "" : "");
                   ocloud.addWebdavStorage(sName, endpointField.text.trim(), keyField.text.trim(), secretField.text.trim(), vendor, mPath, handleResult);
