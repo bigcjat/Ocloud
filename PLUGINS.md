@@ -183,6 +183,16 @@ These plugins have complete JSON manifests, embedded SVGs, credential schema def
   * Running an end-to-end credential link with an active Icedrive Pro/Lite WebDAV key.
   * Verifying VFS directory listing and upload sync.
 
+#### `storj.json`
+* **Path:** `providers/plugins/storage/storj.json`
+* **Type:** Storj DCS Decentralized Cloud Storage (S3 Compatible)
+* **Status:** ⏳ **Manifest Implemented & Audited — Awaiting Live S3 Key Link**
+* **What is ready:**
+  * Clean vector SVG logo and canonical `#2683ff` Storj brand styling.
+  * Standard S3 Gateway endpoint (`https://gateway.storjshare.io`), Access Key ID, Secret Access Key, and Bucket Name schema.
+  * Passed zero-trust security audit (`./ocloud providers audit storj`).
+  * Virtual mount destination: `~/Storj`.
+
 ---
 
 ## 3. Plugins That Need To Be Made Still

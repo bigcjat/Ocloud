@@ -1,0 +1,62 @@
+{
+  "id": "storj",
+  "name": "Storj DCS",
+  "type": "storage",
+  "category": "cloud",
+  "authType": "s3",
+  "rcloneType": "s3",
+  "defaultRemoteName": "storj",
+  "defaultMount": "~/Storj",
+  "badge": "25 GB Free · E2EE",
+  "badgeColor": "#2683ff",
+  "brandColor": "#2683ff",
+  "tagline": "Decentralized, end-to-end encrypted S3 storage with 25GB free tier and zero egress fees.",
+  "dashboardUrl": "https://identity.storjshare.io",
+  "endpointPlaceholder": "https://gateway.storjshare.io",
+  "iconSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"#2683ff\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" viewBox=\"0 0 24 24\"><path d=\"M3 17a1 1 0 1 0 2 0 1 1 0 1 0-2 0M3 7a1 1 0 1 0 2 0 1 1 0 1 0-2 0m16 10a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0-10a1 1 0 1 0 2 0 1 1 0 1 0-2 0m-8-4a1 1 0 1 0 2 0 1 1 0 1 0-2 0m0 18a1 1 0 1 0 2 0 1 1 0 1 0-2 0\"/><path d=\"m12 21-8-4V7l8-4 8 4v10z\"/><path d=\"M9.1 15a2.1 2.1 0 0 1-.648-4.098C8.734 9.254 9.771 8 11.5 8c1.694 0 2.906 1.203 3.23 2.8h.17a2.1 2.1 0 0 1 .202 4.19L14.9 15zM4 7l4.323 2.702m8.09 5.056L20 17M4 17l3.529-2.206m7.08-4.424L20 7m-8-4v5m0 7v6\"/></svg>",
+  "instructions": {
+    "navBreadcrumb": "Storj Satellite › Access › Create S3 Credentials",
+    "step1": "Log in to your Storj Satellite dashboard and go to Access.",
+    "step2": "Click 'Create S3 Credentials' with read and write permissions for your bucket.",
+    "step3": "Enter your Bucket Name, Access Key ID, and Secret Access Key into Ocloud."
+  },
+  "fields": [
+    {
+      "key": "endpoint",
+      "label": "Storj Gateway Endpoint",
+      "placeholder": "https://gateway.storjshare.io",
+      "default": "https://gateway.storjshare.io",
+      "helper": "Official Storj S3 Gateway: https://gateway.storjshare.io",
+      "type": "text"
+    },
+    {
+      "key": "bucket",
+      "label": "Storj Bucket Name",
+      "placeholder": "e.g. my-storj-bucket",
+      "helper": "The specific Storj bucket to mount into your filesystem",
+      "type": "text"
+    },
+    {
+      "key": "key",
+      "label": "Access Key ID",
+      "placeholder": "Paste Storj S3 Access Key ID",
+      "helper": "Generated in Storj Satellite under Access › S3 Credentials",
+      "type": "text"
+    },
+    {
+      "key": "secret",
+      "label": "Secret Access Key",
+      "placeholder": "Paste Storj S3 Secret Access Key",
+      "helper": "Secret key shown only once upon S3 credential generation",
+      "type": "password"
+    }
+  ],
+  "allowedDomains": [
+    "*.storjshare.io",
+    "storj.io"
+  ],
+  "permissions": {
+    "network": true,
+    "rclone": true
+  }
+}
