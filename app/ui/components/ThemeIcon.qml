@@ -9,15 +9,8 @@ Item {
   implicitWidth: 20
   implicitHeight: 20
 
-  Rectangle {
-    id: fillRect
-    anchors.fill: parent
-    color: root.color
-    visible: false
-  }
-
   Image {
-    id: maskImage
+    id: rawIcon
     anchors.fill: parent
     source: {
       if (!root.source) return "";
@@ -25,6 +18,8 @@ Item {
       if (root.source.indexOf("icons/") === 0) return Qt.resolvedUrl("../" + root.source);
       return Qt.resolvedUrl(root.source);
     }
+    sourceSize.width: Math.max(48, root.width * 2)
+    sourceSize.height: Math.max(48, root.height * 2)
     fillMode: Image.PreserveAspectFit
     smooth: true
     visible: false
@@ -32,8 +27,9 @@ Item {
 
   MultiEffect {
     anchors.fill: parent
-    source: fillRect
-    maskEnabled: true
-    maskSource: maskImage
+    source: rawIcon
+    brightness: 1.0
+    colorization: 1.0
+    colorizationColor: root.color
   }
 }
