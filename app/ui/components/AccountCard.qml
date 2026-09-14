@@ -59,31 +59,13 @@ Rectangle {
       color: root.dotColor
     }
 
-    // Theme-Reactive Monochrome Brand Icon
-    Item {
-      Layout.preferredWidth: 22
-      Layout.preferredHeight: 22
+    // Theme-Reactive Monochrome Brand Icon (Dynamic OS Theme Color)
+    ThemeIcon {
+      Layout.preferredWidth: 20
+      Layout.preferredHeight: 20
       Layout.alignment: Qt.AlignVCenter
-
-      Image {
-        id: rawIcon
-        anchors.fill: parent
-        source: {
-          if (root.iconSource.indexOf(":") >= 0) return root.iconSource;
-          if (root.iconSource.indexOf("icons/") === 0) return Qt.resolvedUrl("../" + root.iconSource);
-          return Qt.resolvedUrl(root.iconSource);
-        }
-        fillMode: Image.PreserveAspectFit
-        smooth: true
-        visible: false
-      }
-
-      MultiEffect {
-        anchors.fill: parent
-        source: rawIcon
-        colorization: 1.0
-        colorizationColor: cardMouse.containsMouse ? root.accentColor : root.textColor
-      }
+      source: root.iconSource
+      color: cardMouse.containsMouse ? root.accentColor : root.textColor
     }
 
     // Account Name and Path (Zero badges, pure typography)

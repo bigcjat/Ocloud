@@ -210,29 +210,15 @@ Rectangle {
             }
           }
 
-          // Provider Logo (when selected)
-          Item {
+          ThemeIcon {
             visible: !!modal.selectedPlatform && modal.stepName !== "providers"
-            Layout.preferredWidth: 20
-            Layout.preferredHeight: 20
+            Layout.preferredWidth: 18
+            Layout.preferredHeight: 18
             Layout.alignment: Qt.AlignVCenter
-
-            Image {
-              id: selIcon
-              anchors.fill: parent
-              source: (modal.selectedPlatform && modal.selectedPlatform.iconDataUri && modal.selectedPlatform.iconDataUri.length > 0)
-                ? modal.selectedPlatform.iconDataUri
-                : (modal.selectedPlatform ? Qt.resolvedUrl(modal.selectedPlatform.iconSvg || "../icons/cloud.svg") : "")
-              fillMode: Image.PreserveAspectFit
-              visible: false
-            }
-
-            MultiEffect {
-              anchors.fill: parent
-              source: selIcon
-              colorization: 1.0
-              colorizationColor: modal.accentColor
-            }
+            source: (modal.selectedPlatform && modal.selectedPlatform.iconDataUri && modal.selectedPlatform.iconDataUri.length > 0)
+              ? modal.selectedPlatform.iconDataUri
+              : (modal.selectedPlatform ? Qt.resolvedUrl(modal.selectedPlatform.iconSvg || "../icons/cloud.svg") : "")
+            color: modal.accentColor
           }
 
           Text {
@@ -370,28 +356,14 @@ Rectangle {
                   spacing: 10
 
                   // Monochrome Icon (Theme-reactive)
-                  Item {
-                    Layout.preferredWidth: 22
-                    Layout.preferredHeight: 22
+                  ThemeIcon {
+                    Layout.preferredWidth: 20
+                    Layout.preferredHeight: 20
                     Layout.alignment: Qt.AlignVCenter
-
-                    Image {
-                      id: pIcon
-                      anchors.fill: parent
-                      source: (modelData.iconDataUri && modelData.iconDataUri.length > 0)
-                        ? modelData.iconDataUri
-                        : Qt.resolvedUrl(modelData.iconSvg || "../icons/cloud.svg")
-                      fillMode: Image.PreserveAspectFit
-                      smooth: true
-                      visible: false
-                    }
-
-                    MultiEffect {
-                      anchors.fill: parent
-                      source: pIcon
-                      colorization: 1.0
-                      colorizationColor: tileMouse.containsMouse ? modal.accentColor : modal.textColor
-                    }
+                    source: (modelData.iconDataUri && modelData.iconDataUri.length > 0)
+                      ? modelData.iconDataUri
+                      : Qt.resolvedUrl(modelData.iconSvg || "../icons/cloud.svg")
+                    color: tileMouse.containsMouse ? modal.accentColor : modal.textColor
                   }
 
                   // Provider Name (Zero badges)
