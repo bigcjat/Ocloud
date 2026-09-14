@@ -239,7 +239,7 @@ FloatingWindow {
   Rectangle {
     id: windowRootFrame
     anchors.fill: parent
-    color: theme.bgDark
+    color: Qt.rgba(theme.bgDark.r, theme.bgDark.g, theme.bgDark.b, 0.90)
     radius: (typeof theme !== "undefined" && theme.cornerRadius) ? theme.cornerRadius : 8
     border.color: theme.borderSubtle
     border.width: 1
