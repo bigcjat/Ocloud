@@ -77,7 +77,6 @@ FloatingWindow {
     { id: "workloads", name: "Workloads & Docker", shortName: "Docker", iconSvg: "icons/box.svg", count: 0 },
     { id: "storage", name: "Storage & Drives", shortName: "Storage", iconSvg: "icons/hard-drive.svg", count: mountedDrivesCount },
     { id: "accounts", name: "Cloud Accounts", shortName: "Accounts", iconSvg: "icons/user-circle.svg", count: cloudAccountsCount },
-    { id: "shares", name: "Network Shares", shortName: "Shares", iconSvg: "icons/network.svg", count: networkSharesCount },
     { id: "apps", name: "App Streaming", shortName: "Apps", iconSvg: "icons/terminal.svg", count: 0 },
     { id: "backups", name: "Automated Backups", shortName: "Backups", iconSvg: "icons/archive.svg", count: 0 },
     { id: "settings", name: "Settings & Preferences", shortName: "Settings", iconSvg: "icons/settings.svg", count: 0 }
@@ -114,10 +113,9 @@ FloatingWindow {
   Shortcut { sequence: "Alt+2"; onActivated: activeTab = "workloads" }
   Shortcut { sequence: "Alt+3"; onActivated: activeTab = "storage" }
   Shortcut { sequence: "Alt+4"; onActivated: activeTab = "accounts" }
-  Shortcut { sequence: "Alt+5"; onActivated: activeTab = "shares" }
-  Shortcut { sequence: "Alt+6"; onActivated: activeTab = "apps" }
-  Shortcut { sequence: "Alt+7"; onActivated: activeTab = "backups" }
-  Shortcut { sequence: "Alt+8"; onActivated: activeTab = "settings" }
+  Shortcut { sequence: "Alt+5"; onActivated: activeTab = "apps" }
+  Shortcut { sequence: "Alt+6"; onActivated: activeTab = "backups" }
+  Shortcut { sequence: "Alt+7"; onActivated: activeTab = "settings" }
 
   function reloadAll() {
     ocloud.refreshStatusAsync();
@@ -140,7 +138,7 @@ FloatingWindow {
       var accsInit = JSON.parse(rawAccs);
       cloudAccountsCount = accsInit.filter(function(a) { return a.type !== "smb"; }).length;
       var mountedClouds = accsInit.filter(function(a) { return a.isMounted; }).length;
-      mountedDrivesCount = mountedClouds + networkSharesCount;
+      mountedDrivesCount = mountedClouds;
     } catch (e) {}
 
     var startModal = Quickshell.env("OCLOUD_MODAL") || (typeof openModalOnStart !== "undefined" ? openModalOnStart : "");
@@ -232,7 +230,7 @@ FloatingWindow {
         var accs = JSON.parse(jsonStr);
         cloudAccountsCount = accs.filter(function(a) { return a.type !== "smb"; }).length;
         var mountedClouds = accs.filter(function(a) { return a.isMounted; }).length;
-        mountedDrivesCount = mountedClouds + networkSharesCount;
+        mountedDrivesCount = mountedClouds;
       } catch (e) {}
     }
   }
@@ -475,7 +473,7 @@ FloatingWindow {
               // Pinned Count (Full view) - Clean quiet muted text, no chunky light-on-light pill
               Text {
                 id: badgeText
-                visible: !window.isHalf && modelData.count > 0 && (modelData.id === "fleet" || modelData.id === "storage" || modelData.id === "accounts" || modelData.id === "shares")
+                visible: !window.isHalf && modelData.count > 0 && (modelData.id === "fleet" || modelData.id === "storage" || modelData.id === "accounts")
                 anchors.right: parent.right
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
@@ -502,7 +500,7 @@ FloatingWindow {
 
                 // Dot badge for rail mode
                 Rectangle {
-                  visible: modelData.count > 0 && (modelData.id === "fleet" || modelData.id === "storage" || modelData.id === "accounts" || modelData.id === "shares")
+                  visible: modelData.count > 0 && (modelData.id === "fleet" || modelData.id === "storage" || modelData.id === "accounts")
                   anchors.top: parent.top
                   anchors.right: parent.right
                   anchors.topMargin: 6
@@ -597,10 +595,9 @@ FloatingWindow {
             if (activeTab === "workloads") return 1;
             if (activeTab === "storage") return 2;
             if (activeTab === "accounts") return 3;
-            if (activeTab === "shares") return 4;
-            if (activeTab === "apps") return 5;
-            if (activeTab === "backups") return 6;
-            if (activeTab === "settings") return 7;
+            if (activeTab === "apps") return 4;
+            if (activeTab === "backups") return 5;
+            if (activeTab === "settings") return 6;
             return 0;
           }
 
@@ -608,7 +605,6 @@ FloatingWindow {
           WorkloadsTab { id: workloadsView }
           StorageTab { id: storageView }
           CloudAccountsTab { id: cloudAccountsView }
-          NetworkSharesTab { id: networkSharesView }
           AppSuiteTab { id: appSuiteView }
           BackupTab { id: backupView }
           SettingsTab { id: settingsView }

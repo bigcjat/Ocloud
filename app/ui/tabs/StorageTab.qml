@@ -15,7 +15,6 @@ Item {
   readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
 
   property var cloudAccounts: []
-  property var mountedShares: []
   property var rootCapacities: ({})
 
   function refreshCapacities() {
@@ -33,15 +32,6 @@ Item {
     }
   }
 
-  function reloadMountedShares() {
-    try {
-      var raw = ocloud.getNetworkShares();
-      mountedShares = JSON.parse(raw || "[]");
-    } catch (e) {
-      mountedShares = [];
-    }
-  }
-
   Connections {
     target: ocloud
     function onCloudAccountsUpdated(jsonStr) {
@@ -49,13 +39,6 @@ Item {
         cloudAccounts = JSON.parse(jsonStr);
       } catch (e) {
         cloudAccounts = [];
-      }
-    }
-    function onNetworkSharesUpdated(jsonStr) {
-      try {
-        mountedShares = JSON.parse(jsonStr);
-      } catch (e) {
-        mountedShares = [];
       }
     }
     function onActionCompleted(action, success, msg) {
@@ -68,7 +51,6 @@ Item {
 
   Component.onCompleted: {
     reloadCloudAccounts();
-    reloadMountedShares();
     refreshCapacities();
   }
 
@@ -102,7 +84,7 @@ Item {
           }
 
           Text {
-            text: (1 + root.cloudAccounts.length + root.mountedShares.length) + " storage volumes available"
+            text: (1 + root.cloudAccounts.length) + " storage volumes available"
             font.family: root.appFontFamily
             font.pixelSize: 12
             color: root.textColor
@@ -141,7 +123,6 @@ Item {
             onClicked: {
               root.refreshCapacities();
               root.reloadCloudAccounts();
-              root.reloadMountedShares();
               ocloud.listComputeServers();
             }
           }
@@ -279,61 +260,6 @@ Item {
               onDisconnectClicked: {
                 if (modelData.name) {
                   ocloud.disconnectCloudAccount(modelData.name);
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // =========================================================
-      // 3. MOUNTED NETWORK SHARES (RESPONSIVE 1 OR 2 COLUMNS)
-      // =========================================================
-      ColumnLayout {
-        Layout.fillWidth: true
-        spacing: 8
-        visible: root.mountedShares.length > 0
-
-        Text {
-          text: "NETWORK SHARES (" + root.mountedShares.length + ")"
-          font.family: root.appFontFamily
-          font.pixelSize: 10
-          font.bold: true
-          color: root.mutedColor
-        }
-
-        GridLayout {
-          Layout.fillWidth: true
-          columns: root.width > 800 ? 2 : 1
-          columnSpacing: 10
-          rowSpacing: 8
-
-          Repeater {
-            model: root.mountedShares
-
-            delegate: NativeDriveCard {
-              Layout.fillWidth: true
-              driveName: modelData.name || "Network Share"
-              driveType: (modelData.protocol || "SMB") + " · " + (modelData.host || "")
-              iconSource: "icons/network.svg"
-              mountPath: modelData.mountPath || ""
-              capacityText: "Active Share"
-              isMounted: true
-              showDisconnect: true
-              showSettings: false
-              onOpenClicked: {
-                if (modelData.mountPath) {
-                  ocloud.openCloudFolder(modelData.mountPath);
-                }
-              }
-              onUnmountClicked: {
-                if (modelData.name) {
-                  ocloud.unmountNetworkShare(modelData.name);
-                }
-              }
-              onDisconnectClicked: {
-                if (modelData.name) {
-                  ocloud.unmountNetworkShare(modelData.name);
                 }
               }
             }
