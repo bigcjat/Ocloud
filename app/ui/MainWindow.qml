@@ -20,7 +20,7 @@ FloatingWindow {
   }
   minimumSize: Qt.size(340, 360)
   title: "Ocloud — Cloud Storage & Compute Manager"
-  color: theme.background
+  color: "transparent"
 
   // Live System Theme Provider matching Omarchy OS colors and typography
   Theme {
@@ -584,7 +584,7 @@ FloatingWindow {
       Rectangle {
         Layout.fillWidth: true
         Layout.fillHeight: true
-        color: theme.background
+        color: Qt.rgba(theme.background.r, theme.background.g, theme.background.b, 0.88)
 
         StackLayout {
           anchors.fill: parent
