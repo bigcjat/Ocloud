@@ -52,15 +52,15 @@ QtObject {
   readonly property color bgDark: background
   readonly property color headerBg: darkBackground
   readonly property color sidebarBg: darkerBackground
-  readonly property color cardBg: lighterBackground
-  readonly property color cardBgAlt: darkBackground
+  readonly property color cardBg: isDark ? lighterBackground : darkBackground
+  readonly property color cardBgAlt: isDark ? darkBackground : darkerBackground
 
-  readonly property color borderSubtle: Qt.rgba(foreground.r, foreground.g, foreground.b, isDark ? 0.14 : 0.20)
+  readonly property color borderSubtle: Qt.rgba(foreground.r, foreground.g, foreground.b, isDark ? 0.14 : 0.12)
   readonly property color borderActive: accent
 
   readonly property color textPrimary: brightForeground
   readonly property color textSecondary: foreground
-  readonly property color textMuted: darkForeground
+  readonly property color textMuted: isDark ? darkForeground : Qt.rgba(foreground.r, foreground.g, foreground.b, 0.55)
 
   readonly property color accentSky: accent
   readonly property color accentHover: Qt.lighter(accent, 1.15)
