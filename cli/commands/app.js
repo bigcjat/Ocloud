@@ -215,7 +215,7 @@ async function resolveServer(targetServer, registry) {
 
   const isTailscale = Boolean(tailscaleIp);
   const host = tailscaleIp || server.ipv4 || server.ip;
-  const user = server.user || (server.isHomeWorkstation ? (process.env.USER || 'bigcjat') : 'root');
+  const user = server.user || (server.isHomeWorkstation ? (process.env.USER || os.userInfo().username || '') : 'root');
   const port = server.port || 22;
 
   const keyCandidates = [

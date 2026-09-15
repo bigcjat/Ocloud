@@ -5,7 +5,7 @@ import Quickshell.Io
 QtObject {
   id: theme
 
-  readonly property string home: Quickshell.env("HOME") || "/home/bigcjat"
+  readonly property string home: Quickshell.env("HOME") || ""
   readonly property string stateHome: home + "/.local/state"
   readonly property string currentThemePath: stateHome + "/omarchy/current/theme"
 

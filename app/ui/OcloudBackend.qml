@@ -30,7 +30,7 @@ Item {
   // ==========================================
   // CACHED STATE & PATHS
   // ==========================================
-  readonly property string homeDir: Quickshell.env("HOME") || "/home/bigcjat"
+  readonly property string homeDir: Quickshell.env("HOME") || ""
   readonly property string ocloudBin: homeDir + "/.local/bin/ocloud"
 
   property string cachedStatus: "{}"

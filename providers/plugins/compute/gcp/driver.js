@@ -312,9 +312,10 @@ ${tsKey ? `tailscale up --authkey=${tsKey} --hostname=${name} --accept-routes` :
       { key: 'startup-script', value: startupScript }
     ];
     if (pubKey) {
+      const currentLocalUser = process.env.USER || 'admin';
       metadataItems.push({
         key: 'ssh-keys',
-        value: `root:${pubKey} root\nbigcjat:${pubKey} bigcjat\nubuntu:${pubKey} ubuntu\ndebian:${pubKey} debian`
+        value: `root:${pubKey} root\n${currentLocalUser}:${pubKey} ${currentLocalUser}\nubuntu:${pubKey} ubuntu\ndebian:${pubKey} debian`
       });
     }
 

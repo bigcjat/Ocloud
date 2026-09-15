@@ -331,6 +331,16 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       return { ok: false, error: 'no_viewer', installHint };
     }
 
+    if (protocol === 'vnc' && !user) {
+      const msg = `A username is required to authenticate with ${m.name}. Please enter your macOS username in Credentials.`;
+      if (isJson) {
+        console.log(JSON.stringify({ ok: false, error: 'missing_user', message: msg }));
+      } else {
+        console.log(`\x1b[31m✖ ${msg}\x1b[0m`);
+      }
+      return { ok: false, error: 'missing_user', message: msg };
+    }
+
     let spawnArgs = [];
     if (viewer.name === 'wlfreerdp' || viewer.name === 'xfreerdp' || viewer.name === 'sdl-freerdp') {
       spawnArgs = [

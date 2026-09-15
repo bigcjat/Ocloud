@@ -1,9 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 function cmdVault(subcmd, args, { vault }) {
   if (subcmd === 'scan-keys' || subcmd === 'find-keys') {
-    const homedir = process.env.HOME || '/home/bigcjat';
+    const homedir = os.homedir() || process.env.HOME;
     const searchDirs = [
       path.join(homedir, 'Downloads'),
       homedir,

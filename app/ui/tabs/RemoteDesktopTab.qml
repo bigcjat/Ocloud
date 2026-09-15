@@ -44,18 +44,32 @@ Item {
 
   function launchDesktop() {
     if (!currentMachine) return;
+    if (currentMachine.os === "macos" && !usernameInput.trim()) {
+      statusMessage = "macOS requires your macOS user account name. Enter it in the Credentials field above.";
+      statusIsError = true;
+      if (ocloud.showToast) ocloud.showToast("Please enter your macOS username above");
+      return;
+    }
     statusMessage = "Connecting to " + currentMachine.name + "...";
     statusIsError = false;
 
     if (ocloud.launchDesktopBreakout) {
-      ocloud.launchDesktopBreakout(currentMachine.id, usernameInput, passwordInput, function(ok, out) {
+      ocloud.launchDesktopBreakout(currentMachine.id, usernameInput.trim(), passwordInput, function(ok, out) {
         try {
           var res = JSON.parse(out);
-          if (res && !res.ok && res.error === "no_viewer") {
-            statusMessage = "Viewer missing: " + (res.installHint || "sudo pacman -S freerdp tigervnc");
-            statusIsError = true;
-            if (ocloud.showToast) ocloud.showToast("Viewer missing: " + (res.installHint || "sudo pacman -S freerdp tigervnc"));
-            return;
+          if (res && !res.ok) {
+            if (res.error === "no_viewer") {
+              statusMessage = "Viewer missing: " + (res.installHint || "sudo pacman -S freerdp tigervnc");
+              statusIsError = true;
+              if (ocloud.showToast) ocloud.showToast(statusMessage);
+              return;
+            }
+            if (res.error === "missing_user") {
+              statusMessage = res.message || "Enter your macOS username in Credentials.";
+              statusIsError = true;
+              if (ocloud.showToast) ocloud.showToast(statusMessage);
+              return;
+            }
           }
         } catch (e) {}
 

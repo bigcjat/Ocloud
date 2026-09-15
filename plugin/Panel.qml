@@ -24,7 +24,7 @@ Panel {
   readonly property color urgentColor: (bar && bar.urgent) ? bar.urgent : "#ef4444"
 
   readonly property string ocloudBin: {
-    var home = Quickshell.env("HOME") || "/home/bigcjat";
+    var home = Quickshell.env("HOME") || "";
     return home + "/.local/bin/ocloud";
   }
 
@@ -194,7 +194,7 @@ Panel {
   }
 
   function resolveFileManagerCmd(folderPath) {
-    var home = Quickshell.env("HOME") || "/home/bigcjat";
+    var home = Quickshell.env("HOME") || "";
     var p = folderPath;
     if (p && p.indexOf("~/") === 0) p = home + p.substring(1);
 
@@ -246,7 +246,7 @@ Panel {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        var home = Quickshell.env("HOME") || "/home/bigcjat";
+        var home = Quickshell.env("HOME") || "";
         root.storageMounted = (text.indexOf(home + "/Cloud") !== -1) || (text.indexOf("/Cloud type fuse") !== -1);
         root.vmMounted = (text.indexOf(home + "/Companion-VM") !== -1) || (text.indexOf("/Companion-VM type fuse") !== -1);
       }
