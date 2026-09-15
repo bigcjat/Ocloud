@@ -586,8 +586,8 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
         'scale=1',
         'viewmode=1',
         'window_maximize=1',
-        'colordepth=32',
-        'quality=9',
+        'colordepth=16',
+        'quality=2',
         'disableclipboard=0'
       ];
 
