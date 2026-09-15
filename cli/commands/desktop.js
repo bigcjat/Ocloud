@@ -119,15 +119,27 @@ async function discoverMachines(registry) {
 /**
  * Finds the best installed client viewer for a protocol.
  */
-/**
- * Finds the best installed client viewer for a protocol.
- */
 function findInstalledViewer(protocol) {
   const candidates = protocol === 'rdp'
     ? ['wlfreerdp', 'xfreerdp', 'sdl-freerdp', 'remmina']
     : ['vncviewer', 'tigervnc', 'wlvncc', 'remmina'];
 
+  const searchDirs = [
+    path.join(os.homedir(), '.local', 'bin'),
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin'
+  ];
+
   for (const bin of candidates) {
+    for (const dir of searchDirs) {
+      const full = path.join(dir, bin);
+      try {
+        if (fs.existsSync(full) && fs.statSync(full).isFile()) {
+          return { name: bin, path: full };
+        }
+      } catch (e) {}
+    }
     try {
       const out = execSync(`command -v ${bin} 2>/dev/null`, { encoding: 'utf8' }).trim();
       if (out) return { name: bin, path: out };
@@ -452,7 +464,7 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     const term = findInstalledTerminal();
     if (!term) throw new Error('No native Wayland terminal found to run installer.');
 
-    const installCmd = "echo '==> Ocloud Remote Desktop: Installing FreeRDP & TigerVNC...'; echo ''; sudo pacman -S --needed freerdp tigervnc; echo ''; echo '==> Installation complete! Press Enter to close.'; read -r";
+    const installCmd = "echo '==> Ocloud Remote Desktop: Installing FreeRDP & TigerVNC...'; echo ''; if sudo pacman -S --needed freerdp tigervnc; then echo ''; echo '==> Installation successful! Press Enter to close.'; else echo ''; echo '==> Installation failed (incorrect password or cancelled). Press Enter to close.'; fi; read -r";
     const child = spawn(term.path, ['-e', 'sh', '-c', installCmd], {
       detached: true,
       stdio: 'ignore',
