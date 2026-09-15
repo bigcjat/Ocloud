@@ -633,9 +633,9 @@ EOF
     if (fs.existsSync(keyPath)) {
       sshArgs.push('-i', keyPath);
     }
-    sshArgs.push(`${user}@${host}`, `echo "${b64}" | base64 -d | bash`);
+    sshArgs.push(`${user}@${host}`);
 
-    const out = execSync(`ssh ${sshArgs.join(' ')}`, {
+    const out = execSync(`ssh ${sshArgs.join(' ')} 'echo "${b64}" | base64 -d | bash'`, {
       encoding: 'utf8',
       timeout: 180000
     });
