@@ -1000,12 +1000,12 @@ Item {
                   color: root.mutedColor
                 }
               }
+            }
 
-              MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: deployModal.useTailscaleMesh = !deployModal.useTailscaleMesh
-              }
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: deployModal.useTailscaleMesh = !deployModal.useTailscaleMesh
             }
           }
         }
