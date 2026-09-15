@@ -121,6 +121,16 @@ async function discoverMachines(registry) {
  * Finds the best installed client viewer for a protocol.
  */
 function findInstalledViewer(protocol) {
+  if (protocol === 'xpra') {
+    const candidates = ['xpra'];
+    for (const bin of candidates) {
+      try {
+        const out = execSync(`command -v ${bin} 2>/dev/null`, { encoding: 'utf8' }).trim();
+        if (out) return { name: bin, path: out };
+      } catch (e) {}
+    }
+    return null;
+  }
   const candidates = protocol === 'rdp'
     ? ['xfreerdp', 'wlfreerdp', 'sdl-freerdp', 'remmina']
     : ['vncviewer', 'tigervnc', 'wlvncc', 'remmina'];
@@ -501,6 +511,34 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
           }
         } catch (e) {}
       }
+    } else if (viewer.name === 'xpra') {
+      const displayNum = targetPort && targetPort !== 5900 && targetPort !== 3389 ? String(targetPort).replace(':', '') : '200';
+      const xpraUser = user || 'root';
+      // Ensure the remote xpra desktop session is running with Opus audio and adaptive compression
+      try {
+        const defaultKey = path.join(os.homedir(), '.ssh', 'id_ed25519');
+        const keyPath = fs.existsSync(defaultKey) ? defaultKey : path.join(os.homedir(), '.ssh', 'id_rsa');
+        const keyArg = fs.existsSync(keyPath) ? `-i ${keyPath}` : '';
+        execSync(`ssh -o BatchMode=yes -o StrictHostKeyChecking=no ${keyArg} ${xpraUser}@${host} "xpra list | grep -q ':${displayNum}' || xpra start :${displayNum} --start=xfce4-session --pulseaudio=yes --speaker=on --speaker-codec=opus --daemon=yes --xvfb=Xvfb"`, { timeout: 15000, stdio: 'ignore' });
+      } catch (e) {}
+
+      spawnArgs = [
+        'attach',
+        '--splash=no',
+        '--speaker=on',
+        '--speaker-codec=opus',
+        '--av-sync=no',
+        '--encoding=vp8',
+        '--speed=90',
+        '--quality=55',
+        '--min-quality=30',
+        '--microphone=off',
+        '--reconnect=no',
+        '--window-close=disconnect',
+        '--border=#7aa2f7,2',
+        `--title=[☁ ${m.name}] @title@`,
+        `ssh://${xpraUser}@${host}:22/${displayNum}`
+      ];
     }
 
     const spawnEnv = Object.assign({}, process.env);
