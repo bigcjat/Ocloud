@@ -17,7 +17,11 @@ Item {
   readonly property color cardBg: (typeof theme !== "undefined" && theme.cardBg) ? theme.cardBg : "#111111"
 
   property var machines: []
-  property int selectedMachineIndex: 0
+  property int selectedMachineIndex: {
+    var envIdx = Quickshell.env("OCLOUD_DESKTOP_INDEX");
+    if (envIdx !== null && envIdx !== undefined && envIdx !== "") return parseInt(envIdx);
+    return 0;
+  }
   readonly property var currentMachine: (machines && machines.length > selectedMachineIndex) ? machines[selectedMachineIndex] : null
 
   property bool isConnected: false
