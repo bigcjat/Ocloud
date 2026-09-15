@@ -14,7 +14,11 @@ Item {
   readonly property color accentColor: (typeof theme !== "undefined" && theme.accent) ? theme.accent : "#7aa2f7"
   readonly property color borderCol: (typeof theme !== "undefined" && theme.borderSubtle) ? theme.borderSubtle : "#333333"
 
-  property int selectedServerIndex: 0
+  property int selectedServerIndex: {
+    var envIdx = Quickshell.env("OCLOUD_NODE_INDEX");
+    if (envIdx !== null && envIdx !== undefined && envIdx !== "") return parseInt(envIdx);
+    return 0;
+  }
   readonly property var currentServer: (serverList && serverList.length > selectedServerIndex) ? serverList[selectedServerIndex] : null
 
   property var activeContainers: []
