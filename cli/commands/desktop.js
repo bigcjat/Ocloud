@@ -177,6 +177,39 @@ function findInstalledTerminal() {
 }
 
 /**
+ * Encrypts password for Remmina profiles using native 3DES (DES-EDE3-CBC)
+ * matched to Remmina's secret key in ~/.config/remmina/remmina.pref.
+ */
+function encryptRemminaPassword(password) {
+  if (!password) return '';
+  try {
+    const prefPath = path.join(os.homedir(), '.config', 'remmina', 'remmina.pref');
+    let secretB64 = '';
+    if (fs.existsSync(prefPath)) {
+      const content = fs.readFileSync(prefPath, 'utf8');
+      const match = content.match(/^secret\s*=\s*(.+)$/m);
+      if (match) secretB64 = match[1].trim();
+    }
+    if (!secretB64) {
+      const randBuf = crypto.randomBytes(32);
+      secretB64 = randBuf.toString('base64');
+      const remminaConfDir = path.join(os.homedir(), '.config', 'remmina');
+      try { fs.mkdirSync(remminaConfDir, { recursive: true }); } catch (e) {}
+      fs.appendFileSync(prefPath, `\n[remmina]\nsecret=${secretB64}\n`);
+    }
+    const secretBuf = Buffer.from(secretB64, 'base64');
+    const key = secretBuf.subarray(0, 24);
+    const iv = secretBuf.subarray(24, 32);
+    const cipher = crypto.createCipheriv('des-ede3-cbc', key, iv);
+    let enc = cipher.update(password, 'utf8', 'base64');
+    enc += cipher.final('base64');
+    return enc;
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
  * Main CLI handler for `ocloud desktop`
  */
 async function cmdDesktop(subcmd, args = [], context = {}) {
@@ -543,21 +576,7 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       try { fs.mkdirSync(remminaDir, { recursive: true }); } catch (e) {}
       const profilePath = path.join(remminaDir, `${safeId}.remmina`);
 
-      let encPass = '';
-      if (pass) {
-        try {
-          const cp = require('child_process');
-          const enc = cp.spawnSync(viewer.path, ['--encrypt-password'], {
-            input: pass + '\n',
-            encoding: 'utf8',
-            env: Object.assign({}, process.env, { DBUS_SESSION_BUS_ADDRESS: '' })
-          });
-          if (enc.status === 0 && enc.stdout) {
-            encPass = enc.stdout.trim().split('\n').pop().trim();
-          }
-        } catch (e) {}
-      }
-
+      const encPass = encryptRemminaPassword(pass);
       const protoUpper = protocol === 'rdp' ? 'RDP' : 'VNC';
       const profileLines = [
         '[remmina]',
@@ -571,11 +590,20 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
         'quality=9',
         'disableclipboard=0'
       ];
-      if (user) profileLines.push(`username=${user}`);
+
+      if (protocol === 'vnc') {
+        // macOS Screen Sharing and standard VNC servers use RFC 6143 VncAuth password.
+        // disableencryption=1 restricts client auth schemes to { rfbNoAuth, rfbVncAuth, rfbMSLogon },
+        // preventing Apple Remote Desktop from prompting for interactive Diffie-Hellman credentials.
+        profileLines.push('disableencryption=1');
+        if (user && m.os !== 'macos') profileLines.push(`username=${user}`);
+      } else {
+        if (user) profileLines.push(`username=${user}`);
+      }
       if (encPass) profileLines.push(`password=${encPass}`);
 
       fs.writeFileSync(profilePath, profileLines.join('\n') + '\n', { mode: 0o600 });
-      spawnArgs = ['-c', profilePath];
+      spawnArgs = ['--disable-toolbar', '-c', profilePath];
     } else if (viewer.name === 'xpra') {
       const displayNum = targetPort && targetPort !== 5900 && targetPort !== 3389 ? String(targetPort).replace(':', '') : '200';
       const xpraUser = user || 'root';
