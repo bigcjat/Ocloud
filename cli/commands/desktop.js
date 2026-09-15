@@ -467,6 +467,11 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       return { ok: false, error: 'missing_user', message: msg };
     }
 
+    // Ensure local PipeWire/PulseAudio TCP network listener is active for incoming audio redirection
+    try {
+      execSync('pactl load-module module-native-protocol-tcp port=4713 auth-anonymous=1 2>/dev/null', { stdio: 'ignore' });
+    } catch (e) {}
+
     let spawnArgs = [];
     if (viewer.name === 'wlfreerdp' || viewer.name === 'xfreerdp' || viewer.name === 'sdl-freerdp') {
       spawnArgs = [
@@ -657,28 +662,45 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     const defaultKey = path.join(os.homedir(), '.ssh', 'id_ed25519');
     const keyPath = fs.existsSync(defaultKey) ? defaultKey : path.join(os.homedir(), '.ssh', 'id_rsa');
 
+    // Discover local Tailscale IP to tunnel audio back to local speakers
+    let localTsIp = '';
+    try {
+      const tsRaw = execSync('tailscale ip -4 2>/dev/null', { encoding: 'utf8' }).trim();
+      if (tsRaw) localTsIp = tsRaw.split('\n')[0].trim();
+    } catch (e) {}
+
     const setupScript = `
       set -e
       if [ -f /etc/debian_version ]; then
-        echo "Configuring XRDP on Debian/Ubuntu..."
+        echo "Configuring XRDP with PipeWire audio redirection on Debian/Ubuntu..."
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -y
-        apt-get install -y xrdp xfce4 xfce4-goodies ssl-cert dbus-x11
+        apt-get install -y xrdp xfce4 xfce4-goodies ssl-cert dbus-x11 pipewire pipewire-pulse wireplumber pipewire-module-xrdp
         adduser xrdp ssl-cert 2>/dev/null || true
         chmod 644 /etc/xrdp/key.pem 2>/dev/null || true
         killall -9 xfce4-session Xorg 2>/dev/null || true
         rm -rf /tmp/.X11-unix/* /tmp/.xorgxrdp*
-        echo "exec dbus-run-session startxfce4" > ~/.xsession
-        echo "${user}:${pass}" | chpasswd
+        cat << 'XSESSEOF' > ~/.xsession
+# Start PipeWire audio stack for XRDP session
+if command -v pipewire >/dev/null 2>&1; then
+    pipewire &
+    wireplumber &
+    pipewire-pulse &
+    (sleep 2 && /usr/libexec/pipewire-module-xrdp/load_pw_modules.sh) &
+fi
+exec dbus-run-session startxfce4
+XSESSEOF
+        chmod +x ~/.xsession
+        echo "\${user}:\${pass}" | chpasswd
         systemctl enable --now xrdp
         systemctl restart xrdp xrdp-sesman
       elif [ -f /etc/arch-release ]; then
-        echo "Configuring VNC Desktop on Arch Linux..."
+        echo "Configuring VNC Desktop with network audio on Arch Linux..."
         pacman -Sy --noconfirm tigervnc xorg-server-xvfb xfce4 xfce4-goodies
         mkdir -p ~/.vnc
-        echo "${pass}" | vncpasswd -f > ~/.vnc/passwd
+        echo "\${pass}" | vncpasswd -f > ~/.vnc/passwd
         chmod 600 ~/.vnc/passwd
-        cat << 'EOF' > /etc/systemd/system/ocloud-vnc.service
+        cat << EOF > /etc/systemd/system/ocloud-vnc.service
 [Unit]
 Description=Ocloud VNC Desktop Server
 After=network.target
@@ -686,8 +708,9 @@ After=network.target
 [Service]
 Type=simple
 User=root
+Environment="PULSE_SERVER=${localTsIp}:4713"
 ExecStart=/usr/bin/Xvnc :1 -geometry 1920x1080 -depth 24 -rfbport 5900 -rfbauth /root/.vnc/passwd -SecurityTypes VncAuth
-ExecStartPost=/bin/sh -c "sleep 1; DISPLAY=:1 exec dbus-run-session /usr/bin/startxfce4 &"
+ExecStartPost=/bin/sh -c "sleep 1; DISPLAY=:1 PULSE_SERVER=${localTsIp}:4713 exec dbus-run-session /usr/bin/startxfce4 &"
 Restart=always
 
 [Install]
@@ -699,7 +722,7 @@ EOF
       elif [ -f /etc/fedora-release ]; then
         echo "Configuring XRDP on Fedora..."
         dnf install -y xrdp xfce4
-        echo "${user}:${pass}" | chpasswd
+        echo "\${user}:\${pass}" | chpasswd
         systemctl enable --now xrdp
       elif [ "$(uname)" = "Darwin" ]; then
         echo "Configuring macOS Screen Sharing..."
