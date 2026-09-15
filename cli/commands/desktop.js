@@ -606,15 +606,40 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       exitCode = code;
     });
 
-    // Wait up to 1800ms for connection handshake verification
-    await new Promise((resolve) => setTimeout(resolve, 1800));
+    // Poll for real handshake lifecycle events (up to 4.5 seconds)
+    const startTime = Date.now();
+    let authFailed = false;
+    let windowReady = false;
 
-    const combinedLogs = (earlyOutput + '\n' + earlyError).trim();
-    const hasAuthFailure = combinedLogs.includes('Unknown security result from server') ||
-                           combinedLogs.includes('Authentication failure') ||
-                           combinedLogs.includes('ERRCONNECT_AUTHENTICATION_FAILED') ||
-                           combinedLogs.includes('Failed to connect to server') ||
-                           combinedLogs.includes('Connection refused');
+    while (Date.now() - startTime < 4500) {
+      if (hasExited) break;
+
+      const currentLogs = (earlyOutput + '\n' + earlyError);
+      if (currentLogs.includes('Unknown security result from server') ||
+          currentLogs.includes('Authentication failure') ||
+          currentLogs.includes('Bad obfuscated password') ||
+          currentLogs.includes('ERRCONNECT_AUTHENTICATION_FAILED') ||
+          currentLogs.includes('ERRCONNECT_SECURITY_NEGO_CONNECT_FAILED') ||
+          currentLogs.includes('Connection refused') ||
+          currentLogs.includes('Failed to connect to server')) {
+        authFailed = true;
+        break;
+      }
+
+      // TigerVNC emits "DesktopWindow" as soon as the session window is tiled
+      if (currentLogs.includes('DesktopWindow')) {
+        windowReady = true;
+        break;
+      }
+
+      // FreeRDP / Xpra: If 2s passed with no errors and process is alive and active
+      if (viewer.name !== 'vncviewer' && viewer.name !== 'tigervnc' && (Date.now() - startTime > 2000)) {
+        windowReady = true;
+        break;
+      }
+
+      await new Promise((r) => setTimeout(r, 100));
+    }
 
     if (hasExited && exitCode !== 0 && exitCode !== null) {
       const cleanErr = earlyError.trim().split('\n').filter(l => !l.includes('Fontconfig warning')).join(' ').slice(0, 300) || `Process exited with code ${exitCode}`;
@@ -633,7 +658,7 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       return failResult;
     }
 
-    if (hasAuthFailure) {
+    if (authFailed) {
       try { child.kill('SIGKILL'); } catch (e) {}
       const failResult = {
         ok: false,
@@ -642,7 +667,7 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
         host,
         protocol,
         viewer: viewer.name,
-        message: 'Authentication failed. Please check your password in Credentials.'
+        message: 'Authentication failed. Please check your credentials in Credentials tab.'
       };
       if (isJson) console.log(JSON.stringify(failResult));
       else console.log(`\x1b[31m✖ ${failResult.message}\x1b[0m`);
