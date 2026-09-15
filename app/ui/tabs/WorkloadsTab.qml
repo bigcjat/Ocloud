@@ -23,18 +23,21 @@ Item {
   property bool nodeDockerRunning: true
   property string nodeDockerVersion: ""
   property bool deploying: false
+  property bool loadingContainers: false
 
   function refreshCurrentServer() {
-    if (!currentServer) return;
+    if (!currentServer || loadingContainers) return;
+    loadingContainers = true;
     var srvId = String(currentServer.id);
     if (ocloud.checkNodeDocker) ocloud.checkNodeDocker(srvId);
     if (ocloud.fetchDockerContainers) ocloud.fetchDockerContainers(srvId);
-    if (ocloud.fetchWorkloadPlugins) ocloud.fetchWorkloadPlugins();
+    if (workloadPlugins.length === 0 && ocloud.fetchWorkloadPlugins) ocloud.fetchWorkloadPlugins();
   }
 
   Connections {
     target: ocloud
     function onDockerContainersUpdated(jsonStr) {
+      loadingContainers = false;
       try {
         activeContainers = JSON.parse(jsonStr) || [];
       } catch (e) {
@@ -56,13 +59,18 @@ Item {
       }
     }
     function onActionCompleted(action, success, msg) {
+      loadingContainers = false;
       if (action === "bootstrapDocker" || action === "deployContainer" || action === "containerAction" || action === "saveCustomWorkload" || action === "deleteCustomWorkload") {
         refreshCurrentServer();
       }
     }
     function onStatusUpdated(jsonStr) {
-      if (ocloud.fetchWorkloadPlugins) ocloud.fetchWorkloadPlugins();
-      refreshCurrentServer();
+      if (workloadPlugins.length === 0 && ocloud.fetchWorkloadPlugins) {
+        ocloud.fetchWorkloadPlugins();
+      }
+      if (activeContainers.length === 0 && !loadingContainers) {
+        refreshCurrentServer();
+      }
     }
   }
 
@@ -72,6 +80,7 @@ Item {
   }
 
   onCurrentServerChanged: {
+    loadingContainers = false;
     refreshCurrentServer();
   }
 

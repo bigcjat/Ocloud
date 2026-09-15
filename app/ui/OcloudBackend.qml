@@ -1089,7 +1089,7 @@ Item {
       } catch (e) {
         root.nodeDockerStatusUpdated(serverId, false, false, "");
       }
-    });
+    }, 40000);
   }
 
   function bootstrapNodeDocker(serverId) {
@@ -1100,7 +1100,7 @@ Item {
       root.actionCompleted("bootstrapDocker", ok, ok ? "Docker engine installed successfully!" : ("Bootstrap failed: " + out));
       checkNodeDocker(serverId);
       fetchDockerContainers(serverId);
-    });
+    }, 180000);
   }
 
   function fetchDockerContainers(serverId) {
@@ -1111,7 +1111,7 @@ Item {
         try { list = JSON.parse(out); } catch(e) {}
       }
       root.dockerContainersUpdated(JSON.stringify(list));
-    });
+    }, 40000);
   }
 
   function deployDockerContainer(serverId, config, callback) {
@@ -1134,7 +1134,7 @@ Item {
       root.actionCompleted("deployContainer", ok, ok ? "Container deployed successfully!" : ("Deploy failed: " + out));
       fetchDockerContainers(serverId);
       if (typeof callback === "function") callback(ok, out);
-    });
+    }, 120000);
   }
 
   function containerAction(serverId, containerId, action) {
@@ -1145,7 +1145,7 @@ Item {
       root.busyChanged(false, "");
       root.actionCompleted("containerAction", ok, out);
       fetchDockerContainers(serverId);
-    });
+    }, 45000);
   }
 
   function saveCustomWorkload(manifest, callback) {
