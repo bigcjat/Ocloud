@@ -1198,9 +1198,19 @@ Item {
 
     runCliDirect(args, function(out, ok) {
       root.busyChanged(false, "");
-      var msg = ok ? "Remote desktop breakout launched!" : ("Launch failed: " + out);
-      root.actionCompleted("launchDesktop", ok, msg);
-      if (typeof callback === "function") callback(ok, out);
+      var realOk = ok;
+      var errMsg = "";
+      try {
+        var parsed = JSON.parse(out);
+        if (parsed && parsed.ok === false) {
+          realOk = false;
+          errMsg = parsed.message || parsed.instructions || parsed.error || "Connection failed";
+        }
+      } catch (e) {}
+
+      var msg = realOk ? "Remote desktop session connected!" : (errMsg ? errMsg : ("Launch failed: " + out));
+      root.actionCompleted("launchDesktop", realOk, msg);
+      if (typeof callback === "function") callback(realOk, out);
     }, 30000);
   }
 

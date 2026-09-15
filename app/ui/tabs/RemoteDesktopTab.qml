@@ -54,10 +54,10 @@ Item {
       if (ocloud.showToast) ocloud.showToast(statusMessage);
       return;
     }
-    if (currentMachine.os === "macos" && !usernameInput.trim()) {
-      statusMessage = "macOS requires your macOS user account name. Enter it in the Credentials field above.";
+    if (currentMachine.os === "macos" && !usernameInput.trim() && !passwordInput) {
+      statusMessage = "macOS Screen Sharing requires either your VNC password or your macOS username & password.";
       statusIsError = true;
-      if (ocloud.showToast) ocloud.showToast("Please enter your macOS username above");
+      if (ocloud.showToast) ocloud.showToast(statusMessage);
       return;
     }
     statusMessage = "Connecting to " + currentMachine.name + "...";
@@ -65,35 +65,22 @@ Item {
 
     if (ocloud.launchDesktopBreakout) {
       ocloud.launchDesktopBreakout(currentMachine.id, usernameInput.trim(), passwordInput, function(ok, out) {
+        var parsed = null;
         try {
-          var res = JSON.parse(out);
-          if (res && !res.ok) {
-            if (res.error === "port_closed") {
-              statusMessage = res.instructions || res.message || "Port is closed on remote machine.";
-              statusIsError = true;
-              if (ocloud.showToast) ocloud.showToast(statusMessage);
-              return;
-            }
-            if (res.error === "no_viewer") {
-              statusMessage = "Viewer missing: " + (res.installHint || "sudo pacman -S freerdp tigervnc");
-              statusIsError = true;
-              if (ocloud.showToast) ocloud.showToast(statusMessage);
-              return;
-            }
-            if (res.error === "missing_user") {
-              statusMessage = res.message || "Enter your macOS username in Credentials.";
-              statusIsError = true;
-              if (ocloud.showToast) ocloud.showToast(statusMessage);
-              return;
-            }
-          }
+          parsed = JSON.parse(out);
         } catch (e) {}
 
+        if (parsed && !parsed.ok) {
+          statusMessage = parsed.instructions || parsed.message || ("Launch failed: " + (parsed.error || out));
+          statusIsError = true;
+          return;
+        }
+
         if (ok) {
-          statusMessage = "Launched native Wayland desktop session for " + currentMachine.name + "!";
+          statusMessage = "Connected to " + currentMachine.name + " desktop!";
           statusIsError = false;
           if (saveToVault && ocloud.saveDesktopCredentials) {
-            ocloud.saveDesktopCredentials(currentMachine.id, usernameInput, passwordInput);
+            ocloud.saveDesktopCredentials(currentMachine.id, usernameInput.trim(), passwordInput);
           }
         } else {
           statusMessage = "Launch failed: " + out;

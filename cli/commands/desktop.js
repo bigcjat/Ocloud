@@ -467,20 +467,16 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       return { ok: false, error: 'no_viewer', installHint };
     }
 
-    if (m.os === 'macos' && protocol === 'vnc' && !user) {
-      const msg = `A username is required to authenticate with ${m.name}. Please enter your macOS username in Credentials.`;
+    if (m.os === 'macos' && protocol === 'vnc' && !user && !pass) {
+      const msg = `Please enter your VNC password (or macOS username) in Credentials to authenticate with ${m.name}.`;
       if (isJson) {
-        console.log(JSON.stringify({ ok: false, error: 'missing_user', message: msg }));
+        console.log(JSON.stringify({ ok: false, error: 'missing_creds', message: msg }));
       } else {
         console.log(`\x1b[31m✖ ${msg}\x1b[0m`);
       }
-      return { ok: false, error: 'missing_user', message: msg };
+      process.exitCode = 1;
+      return { ok: false, error: 'missing_creds', message: msg };
     }
-
-    // Ensure local PipeWire/PulseAudio TCP network listener is active for incoming audio redirection
-    try {
-      execSync('pactl load-module module-native-protocol-tcp port=4713 auth-anonymous=1 2>/dev/null', { stdio: 'ignore' });
-    } catch (e) {}
 
     let spawnArgs = [];
     if (viewer.name === 'wlfreerdp' || viewer.name === 'xfreerdp' || viewer.name === 'sdl-freerdp') {
@@ -499,17 +495,43 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     } else if (viewer.name === 'vncviewer' || viewer.name === 'tigervnc') {
       const port = targetPort || m.detectedPort || 5900;
       spawnArgs = [`${host}:${port}`];
-      if (user && m.os === 'macos') spawnArgs.push(`-user=${user}`);
-      if (pass) {
-        try {
-          const pwFile = path.join(os.tmpdir(), `vnc_pw_${m.id}`);
-          const vncpasswdBin = path.join(os.homedir(), '.local', 'bin', 'vncpasswd');
-          const binToUse = fs.existsSync(vncpasswdBin) ? vncpasswdBin : 'vncpasswd';
-          execSync(`echo "${pass}" | ${binToUse} -f > "${pwFile}" 2>/dev/null && chmod 600 "${pwFile}"`);
-          if (fs.existsSync(pwFile) && fs.statSync(pwFile).size > 0) {
-            spawnArgs.push(`-passwd=${pwFile}`);
-          }
-        } catch (e) {}
+      if (m.os === 'macos') {
+        // macOS Screen Sharing with "VNC viewers may control screen with password"
+        // Enforcing -SecurityTypes=VncAuth uses the standard VNC DES password directly,
+        // preventing TigerVNC from triggering Apple's interactive Diffie-Hellman DH(30) modal.
+        if (pass) {
+          try {
+            const safeId = String(m.id || 'node').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const pwFile = path.join(os.tmpdir(), `vnc_pw_${safeId}`);
+            const vncpasswdBin = path.join(os.homedir(), '.local', 'bin', 'vncpasswd');
+            const binToUse = fs.existsSync(vncpasswdBin) ? vncpasswdBin : 'vncpasswd';
+            const cp = require('child_process');
+            const pwGen = cp.spawnSync(binToUse, ['-f'], { input: pass + '\n' });
+            if (pwGen.status === 0 && pwGen.stdout && pwGen.stdout.length > 0) {
+              fs.writeFileSync(pwFile, pwGen.stdout, { mode: 0o600 });
+              spawnArgs.push('-SecurityTypes=VncAuth');
+              spawnArgs.push(`-passwd=${pwFile}`);
+            }
+          } catch (e) {}
+        } else if (user) {
+          spawnArgs.push(`-user=${user}`);
+        }
+      } else {
+        if (user) spawnArgs.push(`-user=${user}`);
+        if (pass) {
+          try {
+            const safeId = String(m.id || 'node').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const pwFile = path.join(os.tmpdir(), `vnc_pw_${safeId}`);
+            const vncpasswdBin = path.join(os.homedir(), '.local', 'bin', 'vncpasswd');
+            const binToUse = fs.existsSync(vncpasswdBin) ? vncpasswdBin : 'vncpasswd';
+            const cp = require('child_process');
+            const pwGen = cp.spawnSync(binToUse, ['-f'], { input: pass + '\n' });
+            if (pwGen.status === 0 && pwGen.stdout && pwGen.stdout.length > 0) {
+              fs.writeFileSync(pwFile, pwGen.stdout, { mode: 0o600 });
+              spawnArgs.push(`-passwd=${pwFile}`);
+            }
+          } catch (e) {}
+        }
       }
     } else if (viewer.name === 'xpra') {
       const displayNum = targetPort && targetPort !== 5900 && targetPort !== 3389 ? String(targetPort).replace(':', '') : '200';
@@ -551,12 +573,84 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       spawnEnv.PATH = `${userLocalBin}:${spawnEnv.PATH}`;
     }
 
-    // Detach and run standalone window
+    // Spawn viewer and verify real connection handshake before reporting success
     const child = spawn(viewer.path, spawnArgs, {
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', 'pipe', 'pipe'],
       env: spawnEnv
     });
+
+    let earlyOutput = '';
+    let earlyError = '';
+    let hasExited = false;
+    let exitCode = null;
+
+    if (child.stdout) {
+      child.stdout.on('data', (d) => {
+        if (earlyOutput.length < 2000) earlyOutput += d.toString();
+      });
+    }
+    if (child.stderr) {
+      child.stderr.on('data', (d) => {
+        if (earlyError.length < 2000) earlyError += d.toString();
+      });
+    }
+
+    child.on('error', (err) => {
+      hasExited = true;
+      earlyError = err.message;
+    });
+
+    child.on('exit', (code) => {
+      hasExited = true;
+      exitCode = code;
+    });
+
+    // Wait up to 1800ms for connection handshake verification
+    await new Promise((resolve) => setTimeout(resolve, 1800));
+
+    const combinedLogs = (earlyOutput + '\n' + earlyError).trim();
+    const hasAuthFailure = combinedLogs.includes('Unknown security result from server') ||
+                           combinedLogs.includes('Authentication failure') ||
+                           combinedLogs.includes('ERRCONNECT_AUTHENTICATION_FAILED') ||
+                           combinedLogs.includes('Failed to connect to server') ||
+                           combinedLogs.includes('Connection refused');
+
+    if (hasExited && exitCode !== 0 && exitCode !== null) {
+      const cleanErr = earlyError.trim().split('\n').filter(l => !l.includes('Fontconfig warning')).join(' ').slice(0, 300) || `Process exited with code ${exitCode}`;
+      const failResult = {
+        ok: false,
+        error: 'connection_failed',
+        node: m.name,
+        host,
+        protocol,
+        viewer: viewer.name,
+        message: `Viewer failed: ${cleanErr}`
+      };
+      if (isJson) console.log(JSON.stringify(failResult));
+      else console.log(`\x1b[31m✖ Connection failed: ${failResult.message}\x1b[0m`);
+      process.exitCode = 1;
+      return failResult;
+    }
+
+    if (hasAuthFailure) {
+      try { child.kill('SIGKILL'); } catch (e) {}
+      const failResult = {
+        ok: false,
+        error: 'auth_failed',
+        node: m.name,
+        host,
+        protocol,
+        viewer: viewer.name,
+        message: 'Authentication failed. Please check your password in Credentials.'
+      };
+      if (isJson) console.log(JSON.stringify(failResult));
+      else console.log(`\x1b[31m✖ ${failResult.message}\x1b[0m`);
+      process.exitCode = 1;
+      return failResult;
+    }
+
+    // Process is alive and connected! Unref child so it continues independently
     child.unref();
 
     const result = {
