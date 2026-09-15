@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const net = require('net');
+const crypto = require('crypto');
 const { spawn, execSync } = require('child_process');
 
 /**
@@ -121,7 +122,7 @@ async function discoverMachines(registry) {
  */
 function findInstalledViewer(protocol) {
   const candidates = protocol === 'rdp'
-    ? ['wlfreerdp', 'xfreerdp', 'sdl-freerdp', 'remmina']
+    ? ['xfreerdp', 'wlfreerdp', 'sdl-freerdp', 'remmina']
     : ['vncviewer', 'tigervnc', 'wlvncc', 'remmina'];
 
   const searchDirs = [
@@ -187,11 +188,11 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
         return m;
       }
 
-      // Check RDP & VNC simultaneously
+      // Check RDP & VNC simultaneously with 1500ms timeout for cross-continent connections
       const [rdpRes, vncRes, sshRes] = await Promise.all([
-        probePort(targetIp, 3389, 500),
-        probePort(targetIp, 5900, 500),
-        probePort(targetIp, 22, 500)
+        probePort(targetIp, 3389, 1500),
+        probePort(targetIp, 5900, 1500),
+        probePort(targetIp, 22, 1500)
       ]);
 
       if (rdpRes.open) {
@@ -232,6 +233,7 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
           const creds = vault.get(`desktop_creds_${m.id}`) || {};
           m.hasSavedCreds = !!(creds.username || creds.password);
           m.savedUser = creds.username || '';
+          m.savedPass = creds.password || '';
         } catch (e) {}
       }
 
@@ -247,59 +249,28 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       console.log('━'.repeat(75));
       for (const m of enriched) {
         const statusDot = m.online ? '\x1b[32m●\x1b[0m' : '\x1b[90m○\x1b[0m';
-        const portStatus = m.portOpen ? `\x1b[32m${m.detectedProtocol.toUpperCase()} :${m.detectedPort}\x1b[0m` : `\x1b[90m${m.detectedProtocol.toUpperCase()} :${m.detectedPort} (closed)\x1b[0m`;
-        const lat = m.latencyMs > 0 ? `\x1b[33m${m.latencyMs}ms\x1b[0m` : '\x1b[90m-\x1b[0m';
-        console.log(`  ${statusDot} \x1b[1m${m.name.padEnd(24)}\x1b[0m \x1b[34m${(m.tailscaleIp || 'no-ip').padEnd(16)}\x1b[0m ${portStatus.padEnd(26)} ${lat}`);
+        const portStatus = m.portOpen
+          ? `\x1b[32m${m.detectedProtocol.toUpperCase()}:${m.detectedPort} OPEN (${m.latencyMs}ms)\x1b[0m`
+          : `\x1b[90m${m.detectedProtocol.toUpperCase()}:${m.detectedPort} (offline)\x1b[0m`;
+        const clientStatus = m.viewer ? `\x1b[32m${m.viewer}\x1b[0m` : '\x1b[33mNot Installed\x1b[0m';
+        console.log(`  ${statusDot} \x1b[1m${m.name.padEnd(26)}\x1b[0m ${(m.tailscaleIp || m.ipv4 || 'No IP').padEnd(16)} ${portStatus.padEnd(38)} Viewer: ${clientStatus}`);
       }
-      console.log('');
+      console.log('━'.repeat(75));
+      console.log('  Commands:');
+      console.log('    ocloud desktop launch <node>        Launch native standalone desktop session');
+      console.log('    ocloud desktop bootstrap <node>     1-click auto-configure remote desktop on server');
+      console.log('    ocloud desktop terminal <node>      Spawn native GPU-accelerated foot terminal');
+      console.log('    ocloud desktop install-viewers      Install FreeRDP & TigerVNC on this machine\n');
     }
     return enriched;
   }
 
   // ==========================================
-  // 2. PROBE TARGET NODE
+  // 2. PROBE SINGLE MACHINE
   // ==========================================
   if (subcmd === 'probe') {
     const target = filteredArgs[0];
-    if (!target) throw new Error('Usage: ocloud desktop probe <node-id-or-name>');
-    const machines = await discoverMachines(registry);
-    const m = machines.find((item) => item.id === target || item.name.toLowerCase() === target.toLowerCase());
-    if (!m) throw new Error(`Node '${target}' not found in fleet or tailnet.`);
-
-    const host = m.tailscaleIp || m.ipv4;
-    const [rdp, vnc, ssh] = await Promise.all([
-      probePort(host, 3389, 1000),
-      probePort(host, 5900, 1000),
-      probePort(host, 22, 1000)
-    ]);
-
-    const res = {
-      id: m.id,
-      name: m.name,
-      host,
-      os: m.os,
-      rdp: { port: 3389, open: rdp.open, ms: rdp.ms },
-      vnc: { port: 5900, open: vnc.open, ms: vnc.ms },
-      ssh: { port: 22, open: ssh.open, ms: ssh.ms }
-    };
-
-    if (isJson) {
-      console.log(JSON.stringify(res, null, 2));
-    } else {
-      console.log(`\n\x1b[1;36m🔍 Probe Results for ${m.name} (${host})\x1b[0m`);
-      console.log(`  • RDP (3389): ${rdp.open ? `\x1b[32mOPEN (${rdp.ms}ms)\x1b[0m` : '\x1b[90mClosed\x1b[0m'}`);
-      console.log(`  • VNC (5900): ${vnc.open ? `\x1b[32mOPEN (${vnc.ms}ms)\x1b[0m` : '\x1b[90mClosed\x1b[0m'}`);
-      console.log(`  • SSH (22):   ${ssh.open ? `\x1b[32mOPEN (${ssh.ms}ms)\x1b[0m` : '\x1b[90mClosed\x1b[0m'}\n`);
-    }
-    return res;
-  }
-
-  // ==========================================
-  // 3. LAUNCH BREAKOUT WINDOW
-  // ==========================================
-  if (subcmd === 'launch' || subcmd === 'breakout' || subcmd === 'connect') {
-    const target = filteredArgs[0];
-    if (!target) throw new Error('Usage: ocloud desktop launch <node> [--user=U] [--password=P]');
+    if (!target) throw new Error('Usage: ocloud desktop probe <node>');
 
     const machines = await discoverMachines(registry);
     const m = machines.find((item) => item.id === target || item.name.toLowerCase() === target.toLowerCase());
@@ -308,12 +279,54 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     const host = m.tailscaleIp || m.ipv4;
     if (!host) throw new Error(`Node '${m.name}' has no reachable IP address.`);
 
-    // Extract user/password from args or vault
+    const [rdpRes, vncRes, sshRes] = await Promise.all([
+      probePort(host, 3389, 1500),
+      probePort(host, 5900, 1500),
+      probePort(host, 22, 1500)
+    ]);
+
+    const res = {
+      node: m.name,
+      host,
+      rdp: rdpRes,
+      vnc: vncRes,
+      ssh: sshRes,
+      recommendedProtocol: rdpRes.open ? 'rdp' : (vncRes.open ? 'vnc' : (m.os === 'macos' ? 'vnc' : 'rdp'))
+    };
+
+    if (isJson) console.log(JSON.stringify(res, null, 2));
+    else {
+      console.log(`\nProbe Results for ${m.name} (${host}):`);
+      console.log(`  RDP (3389): ${rdpRes.open ? '\x1b[32mOPEN\x1b[0m' : '\x1b[90mCLOSED\x1b[0m'} (${rdpRes.ms}ms)`);
+      console.log(`  VNC (5900): ${vncRes.open ? '\x1b[32mOPEN\x1b[0m' : '\x1b[90mCLOSED\x1b[0m'} (${vncRes.ms}ms)`);
+      console.log(`  SSH (22):   ${sshRes.open ? '\x1b[32mOPEN\x1b[0m' : '\x1b[90mCLOSED\x1b[0m'} (${sshRes.ms}ms)`);
+      console.log(`  Target Protocol: \x1b[1;36m${res.recommendedProtocol.toUpperCase()}\x1b[0m\n`);
+    }
+    return res;
+  }
+
+  // ==========================================
+  // 3. LAUNCH STANDALONE DESKTOP BREAKOUT
+  // ==========================================
+  if (subcmd === 'launch' || subcmd === 'breakout' || subcmd === 'connect') {
+    const target = filteredArgs[0];
+    if (!target) throw new Error('Usage: ocloud desktop launch <node> [--user=U] [--password=P] [--protocol=rdp|vnc]');
+
+    const machines = await discoverMachines(registry);
+    const m = machines.find((item) => item.id === target || item.name.toLowerCase() === target.toLowerCase());
+    if (!m) throw new Error(`Node '${target}' not found in fleet or tailnet.`);
+
+    const host = m.tailscaleIp || m.ipv4;
+    if (!host) throw new Error(`Node '${m.name}' has no reachable IP address.`);
+
+    // Extract user/password/protocol from args or vault
     let user = '';
     let pass = '';
+    let explicitProto = '';
     for (const a of filteredArgs) {
       if (a.startsWith('--user=')) user = a.split('=')[1];
       if (a.startsWith('--password=')) pass = a.split('=')[1];
+      if (a.startsWith('--protocol=')) explicitProto = a.split('=')[1].toLowerCase();
     }
 
     if (!user || !pass) {
@@ -326,7 +339,28 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       }
     }
 
-    const protocol = m.os === 'windows' ? 'rdp' : (m.os === 'macos' ? 'vnc' : 'rdp');
+    // Dynamic protocol and port detection
+    let protocol = explicitProto;
+    let targetPort = 0;
+    if (!protocol) {
+      const [rdpCheck, vncCheck] = await Promise.all([
+        probePort(host, 3389, 1500),
+        probePort(host, 5900, 1500)
+      ]);
+      if (rdpCheck.open) {
+        protocol = 'rdp';
+        targetPort = 3389;
+      } else if (vncCheck.open) {
+        protocol = 'vnc';
+        targetPort = 5900;
+      } else {
+        protocol = m.os === 'windows' ? 'rdp' : (m.os === 'macos' ? 'vnc' : 'rdp');
+        targetPort = protocol === 'rdp' ? 3389 : 5900;
+      }
+    } else {
+      targetPort = protocol === 'rdp' ? 3389 : 5900;
+    }
+
     const viewer = findInstalledViewer(protocol);
 
     if (!viewer) {
@@ -343,7 +377,7 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       return { ok: false, error: 'no_viewer', installHint };
     }
 
-    if (protocol === 'vnc' && !user) {
+    if (m.os === 'macos' && protocol === 'vnc' && !user) {
       const msg = `A username is required to authenticate with ${m.name}. Please enter your macOS username in Credentials.`;
       if (isJson) {
         console.log(JSON.stringify({ ok: false, error: 'missing_user', message: msg }));
@@ -363,18 +397,41 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
         '/sound:sys:pulse',
         '+auto-reconnect'
       ];
-      if (user) spawnArgs.push(`/u:${user}`);
+      const rdpUser = user || (m.os === 'macos' ? '' : 'root');
+      if (rdpUser) spawnArgs.push(`/u:${rdpUser}`);
       if (pass) spawnArgs.push(`/p:${pass}`);
     } else if (viewer.name === 'vncviewer' || viewer.name === 'tigervnc') {
-      spawnArgs = [`${host}:5900`];
-      if (user) spawnArgs.push(`-user=${user}`);
+      const port = targetPort || m.detectedPort || 5900;
+      spawnArgs = [`${host}:${port}`];
+      if (user && m.os === 'macos') spawnArgs.push(`-user=${user}`);
+      if (pass) {
+        try {
+          const pwFile = path.join(os.tmpdir(), `vnc_pw_${m.id}`);
+          const vncpasswdBin = path.join(os.homedir(), '.local', 'bin', 'vncpasswd');
+          const binToUse = fs.existsSync(vncpasswdBin) ? vncpasswdBin : 'vncpasswd';
+          execSync(`echo "${pass}" | ${binToUse} -f > "${pwFile}" 2>/dev/null && chmod 600 "${pwFile}"`);
+          if (fs.existsSync(pwFile) && fs.statSync(pwFile).size > 0) {
+            spawnArgs.push(`-passwd=${pwFile}`);
+          }
+        } catch (e) {}
+      }
+    }
+
+    const spawnEnv = Object.assign({}, process.env);
+    if (!spawnEnv.DISPLAY) spawnEnv.DISPLAY = ':1';
+    if (!spawnEnv.WAYLAND_DISPLAY) spawnEnv.WAYLAND_DISPLAY = 'wayland-1';
+    if (!spawnEnv.XDG_RUNTIME_DIR) spawnEnv.XDG_RUNTIME_DIR = `/run/user/${process.getuid ? process.getuid() : 1000}`;
+    const userLocalBin = path.join(os.homedir(), '.local', 'bin');
+    if (!spawnEnv.PATH) spawnEnv.PATH = `${userLocalBin}:/usr/local/bin:/usr/bin:/bin`;
+    else if (!spawnEnv.PATH.includes(userLocalBin)) {
+      spawnEnv.PATH = `${userLocalBin}:${spawnEnv.PATH}`;
     }
 
     // Detach and run standalone window
     const child = spawn(viewer.path, spawnArgs, {
       detached: true,
       stdio: 'ignore',
-      env: process.env
+      env: spawnEnv
     });
     child.unref();
 
@@ -382,6 +439,7 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       ok: true,
       node: m.name,
       host,
+      port: targetPort,
       protocol,
       viewer: viewer.name,
       pid: child.pid
@@ -493,16 +551,27 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     if (!host) throw new Error(`Node '${m.name}' has no reachable IP address.`);
 
     let user = '';
+    let pass = '';
     for (const a of filteredArgs) {
       if (a.startsWith('--user=')) user = a.split('=')[1];
+      if (a.startsWith('--password=')) pass = a.split('=')[1];
     }
-    if (!user && vault) {
+    if (vault) {
       try {
         const saved = vault.get(`desktop_creds_${m.id}`) || {};
-        user = saved.username || '';
+        if (!user) user = saved.username || '';
+        if (!pass) pass = saved.password || '';
       } catch (e) {}
     }
     if (!user) user = (m.os === 'macos' ? '' : 'root');
+    if (!pass) pass = crypto.randomBytes(6).toString('hex') + '!';
+
+    // Save auto-configured creds to vault
+    if (vault) {
+      try {
+        vault.set(`desktop_creds_${m.id}`, { username: user, password: pass });
+      } catch(e) {}
+    }
 
     const defaultKey = path.join(os.homedir(), '.ssh', 'id_ed25519');
     const keyPath = fs.existsSync(defaultKey) ? defaultKey : path.join(os.homedir(), '.ssh', 'id_rsa');
@@ -513,16 +582,41 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
         echo "Configuring XRDP on Debian/Ubuntu..."
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -y
-        apt-get install -y xrdp xfce4 xfce4-goodies
+        apt-get install -y xrdp xfce4 xfce4-goodies ssl-cert
+        adduser xrdp ssl-cert 2>/dev/null || true
+        chmod 644 /etc/xrdp/key.pem 2>/dev/null || true
         echo "startxfce4" > ~/.xsession
+        echo "${user}:${pass}" | chpasswd
         systemctl enable --now xrdp
+        systemctl restart xrdp xrdp-sesman
       elif [ -f /etc/arch-release ]; then
-        echo "Configuring XRDP on Arch Linux..."
-        pacman -Sy --noconfirm xrdp
-        systemctl enable --now xrdp
+        echo "Configuring VNC Desktop on Arch Linux..."
+        pacman -Sy --noconfirm tigervnc xorg-server-xvfb xfce4 xfce4-goodies
+        mkdir -p ~/.vnc
+        echo "${pass}" | vncpasswd -f > ~/.vnc/passwd
+        chmod 600 ~/.vnc/passwd
+        cat << 'EOF' > /etc/systemd/system/ocloud-vnc.service
+[Unit]
+Description=Ocloud VNC Desktop Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/Xvnc :1 -geometry 1920x1080 -depth 24 -rfbport 5900 -rfbauth /root/.vnc/passwd -SecurityTypes VncAuth
+ExecStartPost=/bin/sh -c "sleep 1; DISPLAY=:1 /usr/bin/startxfce4 &"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl daemon-reload
+        systemctl enable --now ocloud-vnc.service
+        systemctl restart ocloud-vnc.service
       elif [ -f /etc/fedora-release ]; then
         echo "Configuring XRDP on Fedora..."
-        dnf install -y xrdp
+        dnf install -y xrdp xfce4
+        echo "${user}:${pass}" | chpasswd
         systemctl enable --now xrdp
       elif [ "$(uname)" = "Darwin" ]; then
         echo "Configuring macOS Screen Sharing..."
@@ -545,12 +639,26 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       timeout: 180000
     });
 
-    // Probe port after setup
-    const probe = await probePort(host, 3389, 2000);
+    // Probe both 3389 (RDP) and 5900 (VNC)
+    const [probeRdp, probeVnc] = await Promise.all([
+      probePort(host, 3389, 2000),
+      probePort(host, 5900, 2000)
+    ]);
+    const openPort = probeRdp.open ? 3389 : (probeVnc.open ? 5900 : null);
+    const isOpen = Boolean(openPort);
 
-    const res = { ok: true, node: m.name, host, port: 3389, open: probe.open, log: out.trim() };
+    const res = {
+      ok: true,
+      node: m.name,
+      host,
+      port: openPort || 3389,
+      open: isOpen,
+      username: user,
+      password: pass,
+      log: out.trim()
+    };
     if (isJson) console.log(JSON.stringify(res));
-    else console.log(`\x1b[32m✔ Remote desktop setup complete on ${m.name}! (Port 3389 ${probe.open ? 'OPEN' : 'Starting'})\x1b[0m\n${out.trim()}`);
+    else console.log(`\x1b[32m✔ Remote desktop setup complete on ${m.name}! (Port ${res.port} ${isOpen ? 'OPEN' : 'Starting'})\x1b[0m\n${out.trim()}`);
     return res;
   }
 

@@ -1196,7 +1196,7 @@ Item {
     if (user) args.push("--user=" + user);
     if (pass) args.push("--password=" + pass);
 
-    runCli(args, function(out, ok) {
+    runCliDirect(args, function(out, ok) {
       root.busyChanged(false, "");
       var msg = ok ? "Remote desktop breakout launched!" : ("Launch failed: " + out);
       root.actionCompleted("launchDesktop", ok, msg);
@@ -1209,7 +1209,7 @@ Item {
     var args = ["desktop", "terminal", nodeId, "--json"];
     if (user) args.push("--user=" + user);
 
-    runCli(args, function(out, ok) {
+    runCliDirect(args, function(out, ok) {
       var msg = ok ? "Terminal launched in Hyprland!" : ("Terminal launch failed: " + out);
       root.actionCompleted("launchTerminal", ok, msg);
       if (typeof callback === "function") callback(ok, out);
@@ -1224,7 +1224,7 @@ Item {
   }
 
   function installLocalViewers(callback) {
-    runCli(["desktop", "install-viewers", "--json"], function(out, ok) {
+    runCliDirect(["desktop", "install-viewers", "--json"], function(out, ok) {
       if (typeof callback === "function") callback(ok, out);
     }, 15000);
   }
@@ -1232,7 +1232,7 @@ Item {
   function bootstrapRemoteDesktop(nodeId, callback) {
     if (!nodeId) return;
     root.busyChanged(true, "Configuring Remote Desktop on " + nodeId + " over SSH...");
-    runCli(["desktop", "bootstrap", nodeId, "--json"], function(out, ok) {
+    runCliDirect(["desktop", "bootstrap", nodeId, "--json"], function(out, ok) {
       root.busyChanged(false, "");
       var msg = ok ? "Remote Desktop service configured and running!" : ("Setup failed: " + out);
       root.actionCompleted("bootstrapDesktop", ok, msg);

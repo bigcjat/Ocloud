@@ -139,7 +139,14 @@ Item {
     if (ocloud.bootstrapRemoteDesktop) {
       ocloud.bootstrapRemoteDesktop(currentMachine.id, function(ok, out) {
         if (ok) {
-          statusMessage = "Remote Desktop setup complete on " + currentMachine.name + "! Port 3389 active.";
+          try {
+            var res = JSON.parse(out);
+            if (res && res.password) {
+              passwordInput = res.password;
+              if (res.username) usernameInput = res.username;
+            }
+          } catch(e) {}
+          statusMessage = "Remote Desktop configured on " + currentMachine.name + "! Ready to connect.";
           statusIsError = false;
           refreshFleet();
         } else {
@@ -157,8 +164,15 @@ Item {
         var parsed = JSON.parse(jsonStr) || [];
         machines = parsed;
         if (selectedMachineIndex >= machines.length) selectedMachineIndex = 0;
-        if (currentMachine && currentMachine.savedUser) {
-          usernameInput = currentMachine.savedUser;
+        if (currentMachine) {
+          if (currentMachine.savedUser) {
+            usernameInput = currentMachine.savedUser;
+          } else if (currentMachine.os !== "macos") {
+            usernameInput = "root";
+          }
+          if (currentMachine.savedPass) {
+            passwordInput = currentMachine.savedPass;
+          }
         }
       } catch (e) {
         machines = [];
@@ -173,12 +187,13 @@ Item {
   onCurrentMachineChanged: {
     statusMessage = "";
     statusIsError = false;
-    if (currentMachine && currentMachine.savedUser) {
-      usernameInput = currentMachine.savedUser;
+    if (currentMachine) {
+      usernameInput = currentMachine.savedUser || (currentMachine.os === "macos" ? "" : "root");
+      passwordInput = currentMachine.savedPass || "";
     } else {
       usernameInput = "";
+      passwordInput = "";
     }
-    passwordInput = "";
   }
 
   RowLayout {
@@ -743,7 +758,7 @@ Item {
 
                     Text {
                       Layout.fillWidth: true
-                      text: "Ocloud has SSH access to this node. Click below to automatically install and start XRDP over SSH with 0 manual typing."
+                      text: "Ocloud has SSH access to this node. Click below to automatically configure and start Remote Desktop over SSH with 0 manual typing."
                       font.family: root.appFontFamily
                       font.pixelSize: 9
                       color: root.textColor
@@ -775,6 +790,76 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.bootstrapNodeDesktop()
+                      }
+                    }
+                  }
+                }
+
+                // macOS Screen Sharing Banner
+                Rectangle {
+                  Layout.fillWidth: true
+                  visible: (root.currentMachine && !root.currentMachine.portOpen && root.currentMachine.os === "macos")
+                  implicitHeight: macBannerCol.implicitHeight + 16
+                  radius: 4
+                  color: Qt.rgba(0.2, 0.4, 0.8, 0.12)
+                  border.color: "#3b82f6"
+                  border.width: 1
+
+                  ColumnLayout {
+                    id: macBannerCol
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 6
+
+                    RowLayout {
+                      spacing: 6
+                      Text { text: "ℹ"; font.pixelSize: 11; color: "#60a5fa" }
+                      Text {
+                        text: "Apple Screen Sharing is not active on this Mac."
+                        font.family: root.appFontFamily
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: "#93c5fd"
+                      }
+                    }
+
+                    Text {
+                      Layout.fillWidth: true
+                      text: "To connect, enable Screen Sharing on " + (root.currentMachine ? root.currentMachine.name : "Mac") + ":\nSystem Settings → General → Sharing → Turn on 'Screen Sharing'."
+                      font.family: root.appFontFamily
+                      font.pixelSize: 9
+                      color: root.textColor
+                      wrapMode: Text.WordWrap
+                    }
+
+                    RowLayout {
+                      Layout.fillWidth: true
+                      spacing: 8
+
+                      Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 28
+                        radius: 4
+                        color: macRefreshMouse.containsMouse ? "#2563eb" : "#3b82f6"
+                        RowLayout {
+                          anchors.centerIn: parent
+                          spacing: 6
+                          Text { text: "⟳"; font.pixelSize: 11; color: "#ffffff" }
+                          Text {
+                            text: "Check Port Status"
+                            font.family: root.appFontFamily
+                            font.pixelSize: 9
+                            font.bold: true
+                            color: "#ffffff"
+                          }
+                        }
+                        MouseArea {
+                          id: macRefreshMouse
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: root.refreshFleet()
+                        }
                       }
                     }
                   }
