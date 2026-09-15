@@ -1204,6 +1204,18 @@ Item {
     }, 30000);
   }
 
+  function launchDesktopTerminal(nodeId, user, callback) {
+    if (!nodeId) return;
+    var args = ["desktop", "terminal", nodeId, "--json"];
+    if (user) args.push("--user=" + user);
+
+    runCli(args, function(out, ok) {
+      var msg = ok ? "Terminal launched in Hyprland!" : ("Terminal launch failed: " + out);
+      root.actionCompleted("launchTerminal", ok, msg);
+      if (typeof callback === "function") callback(ok, out);
+    }, 15000);
+  }
+
   function saveDesktopCredentials(nodeId, user, pass, callback) {
     if (!nodeId) return;
     runCli(["desktop", "save-creds", nodeId, user || "", pass || "", "--json"], function(out, ok) {

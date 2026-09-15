@@ -24,20 +24,17 @@ Item {
   }
   readonly property var currentMachine: (machines && machines.length > selectedMachineIndex) ? machines[selectedMachineIndex] : null
 
-  property bool isConnected: false
   property bool isScanning: false
-  property bool fitToWindow: true
-  property bool audioEnabled: true
-  property string activeLatency: "24ms"
-  property string sessionResolution: "1920x1080 @ 60 Hz"
-
-  // Credentials for active connection
   property string usernameInput: ""
   property string passwordInput: ""
+  property bool showPassword: false
   property bool saveToVault: true
+  property string statusMessage: ""
+  property bool statusIsError: false
 
   function refreshFleet() {
     isScanning = true;
+    statusMessage = "";
     if (ocloud.fetchDesktopNodes) {
       ocloud.fetchDesktopNodes(function(ok, out) {
         isScanning = false;
@@ -45,26 +42,63 @@ Item {
     }
   }
 
-  function launchBreakout() {
+  function launchDesktop() {
     if (!currentMachine) return;
+    statusMessage = "Launching native remote desktop for " + currentMachine.name + "...";
+    statusIsError = false;
+
     if (ocloud.launchDesktopBreakout) {
       ocloud.launchDesktopBreakout(currentMachine.id, usernameInput, passwordInput, function(ok, out) {
-        if (ok && saveToVault && ocloud.saveDesktopCredentials) {
-          ocloud.saveDesktopCredentials(currentMachine.id, usernameInput, passwordInput);
+        try {
+          var res = JSON.parse(out);
+          if (res && !res.ok && res.error === "no_viewer") {
+            statusMessage = "Native viewer not installed: " + (res.installHint || "sudo pacman -S freerdp tigervnc");
+            statusIsError = true;
+            if (ocloud.showToast) ocloud.showToast("Viewer missing: " + (res.installHint || "sudo pacman -S freerdp"));
+            return;
+          }
+        } catch (e) {}
+
+        if (ok) {
+          statusMessage = "Launched native Wayland desktop session for " + currentMachine.name + "!";
+          statusIsError = false;
+          if (saveToVault && ocloud.saveDesktopCredentials) {
+            ocloud.saveDesktopCredentials(currentMachine.id, usernameInput, passwordInput);
+          }
+        } else {
+          statusMessage = "Launch failed: " + out;
+          statusIsError = true;
         }
       });
     }
   }
 
-  function toggleConnect() {
-    if (isConnected) {
-      isConnected = false;
-    } else {
-      if (!currentMachine) return;
-      isConnected = true;
-      if (saveToVault && ocloud.saveDesktopCredentials) {
-        ocloud.saveDesktopCredentials(currentMachine.id, usernameInput, passwordInput);
-      }
+  function launchTerminal() {
+    if (!currentMachine) return;
+    statusMessage = "Spawning native foot terminal for " + currentMachine.name + "...";
+    statusIsError = false;
+
+    if (ocloud.launchDesktopTerminal) {
+      ocloud.launchDesktopTerminal(currentMachine.id, usernameInput, function(ok, out) {
+        if (ok) {
+          statusMessage = "Terminal window tiled in Hyprland!";
+          statusIsError = false;
+        } else {
+          statusMessage = "Terminal launch failed: " + out;
+          statusIsError = true;
+        }
+      });
+    }
+  }
+
+  function saveCredentialsNow() {
+    if (!currentMachine) return;
+    if (ocloud.saveDesktopCredentials) {
+      ocloud.saveDesktopCredentials(currentMachine.id, usernameInput, passwordInput, function(ok) {
+        if (ocloud.showToast) ocloud.showToast("Credentials saved to Vault for " + currentMachine.name);
+        statusMessage = "Credentials saved securely to ~/.config/ocloud/vault.json";
+        statusIsError = false;
+      });
     }
   }
 
@@ -89,7 +123,8 @@ Item {
   }
 
   onCurrentMachineChanged: {
-    isConnected = false;
+    statusMessage = "";
+    statusIsError = false;
     if (currentMachine && currentMachine.savedUser) {
       usernameInput = currentMachine.savedUser;
     } else {
@@ -103,10 +138,10 @@ Item {
     spacing: 0
 
     // =========================================================
-    // LEFT PANE: MACHINE SELECTOR (270px)
+    // LEFT PANE: MACHINE SELECTOR (280px)
     // =========================================================
     Rectangle {
-      Layout.preferredWidth: 270
+      Layout.preferredWidth: 280
       Layout.fillHeight: true
       color: Qt.rgba(root.cardBg.r, root.cardBg.g, root.cardBg.b, 0.5)
       border.color: root.borderCol
@@ -116,10 +151,10 @@ Item {
         anchors.fill: parent
         spacing: 0
 
-        // List Header
+        // Header
         Rectangle {
           Layout.fillWidth: true
-          Layout.preferredHeight: 52
+          Layout.preferredHeight: 54
           color: "transparent"
           border.color: root.borderCol
           border.width: 1
@@ -135,7 +170,7 @@ Item {
               spacing: 2
 
               Text {
-                text: "REMOTE MACHINES"
+                text: "SOVEREIGN FLEET"
                 font.family: root.appFontFamily
                 font.pixelSize: 11
                 font.bold: true
@@ -144,7 +179,7 @@ Item {
               }
 
               Text {
-                text: machines.length + " devices on tailnet"
+                text: machines.length + " devices on Tailnet mesh"
                 font.family: root.appFontFamily
                 font.pixelSize: 9
                 color: root.mutedColor
@@ -243,7 +278,7 @@ Item {
                   }
                 }
 
-                // Machine details
+                // Details
                 ColumnLayout {
                   Layout.fillWidth: true
                   spacing: 2
@@ -253,62 +288,54 @@ Item {
                     spacing: 6
 
                     Rectangle {
-                      Layout.preferredWidth: 6
-                      Layout.preferredHeight: 6
+                      width: 6
+                      height: 6
                       radius: 3
-                      color: modelData.online ? "#10b981" : root.mutedColor
+                      color: modelData.online ? "#10b981" : "#565f89"
                     }
 
                     Text {
                       Layout.fillWidth: true
-                      text: modelData.name || "Node"
+                      text: modelData.name || "Unknown"
                       font.family: root.appFontFamily
                       font.pixelSize: 11
-                      font.bold: isSelected
-                      color: isSelected ? root.textColor : Qt.darker(root.textColor, 1.1)
+                      font.bold: true
+                      color: isSelected ? "#ffffff" : root.textColor
                       elide: Text.ElideRight
                     }
                   }
 
-                  Text {
-                    text: modelData.tailscaleIp || "Tailscale IP"
-                    font.family: root.appFontFamily
-                    font.pixelSize: 10
-                    color: root.mutedColor
-                  }
-                }
+                  RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
 
-                // Protocol badge
-                Rectangle {
-                  implicitWidth: protoText.implicitWidth + 10
-                  implicitHeight: 20
-                  radius: 3
-                  color: {
-                    var proto = (modelData.detectedProtocol || "").toLowerCase();
-                    if (proto === "rdp") return Qt.rgba(0.0, 0.6, 1.0, 0.15);
-                    if (proto === "vnc") return Qt.rgba(0.7, 0.3, 1.0, 0.15);
-                    return Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.08);
-                  }
-                  border.color: {
-                    var proto = (modelData.detectedProtocol || "").toLowerCase();
-                    if (proto === "rdp") return "#38bdf8";
-                    if (proto === "vnc") return "#c084fc";
-                    return root.borderCol;
-                  }
-                  border.width: 1
+                    Text {
+                      text: modelData.tailscaleIp || modelData.ipv4 || "No IP"
+                      font.family: root.appFontFamily
+                      font.pixelSize: 9
+                      color: root.mutedColor
+                    }
 
-                  Text {
-                    id: protoText
-                    anchors.centerIn: parent
-                    text: (modelData.detectedProtocol || "rdp").toUpperCase()
-                    font.family: root.appFontFamily
-                    font.pixelSize: 8
-                    font.bold: true
-                    color: {
-                      var proto = (modelData.detectedProtocol || "").toLowerCase();
-                      if (proto === "rdp") return "#38bdf8";
-                      if (proto === "vnc") return "#c084fc";
-                      return root.mutedColor;
+                    Item { Layout.fillWidth: true }
+
+                    // Protocol badge
+                    Rectangle {
+                      implicitWidth: protoBadge.implicitWidth + 8
+                      implicitHeight: 16
+                      radius: 2
+                      color: modelData.portOpen ? Qt.rgba(0.06, 0.72, 0.5, 0.15) : Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.05)
+                      border.color: modelData.portOpen ? "#10b981" : root.borderCol
+                      border.width: 1
+
+                      Text {
+                        id: protoBadge
+                        anchors.centerIn: parent
+                        text: (modelData.detectedProtocol ? modelData.detectedProtocol.toUpperCase() : "SSH") + (modelData.detectedPort ? " :" + modelData.detectedPort : "")
+                        font.family: root.appFontFamily
+                        font.pixelSize: 8
+                        font.bold: true
+                        color: modelData.portOpen ? "#10b981" : root.mutedColor
+                      }
                     }
                   }
                 }
@@ -319,7 +346,9 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.selectedMachineIndex = index
+                onClicked: {
+                  root.selectedMachineIndex = index;
+                }
               }
             }
           }
@@ -328,702 +357,813 @@ Item {
     }
 
     // =========================================================
-    // RIGHT PANE: DESKTOP VIEWPORT & TOP TOOLBAR
+    // RIGHT PANE: MACHINE CONTROL DECK
     // =========================================================
-    ColumnLayout {
+    Rectangle {
       Layout.fillWidth: true
       Layout.fillHeight: true
-      spacing: 0
+      color: "#08080c"
 
-      // TOP CONTROL TOOLBAR
-      Rectangle {
-        Layout.fillWidth: true
-        Layout.preferredHeight: 52
-        color: root.cardBg
-        border.color: root.borderCol
-        border.width: 1
+      ColumnLayout {
+        anchors.fill: parent
+        spacing: 0
 
-        RowLayout {
-          anchors.fill: parent
-          anchors.leftMargin: 16
-          anchors.rightMargin: 16
-          spacing: 12
+        // 1. TOP HEADER DECK
+        Rectangle {
+          Layout.fillWidth: true
+          Layout.preferredHeight: 70
+          color: Qt.rgba(root.cardBg.r, root.cardBg.g, root.cardBg.b, 0.8)
+          border.color: root.borderCol
+          border.width: 1
 
-          // Active Machine Title & Badge
           RowLayout {
-            spacing: 10
+            anchors.fill: parent
+            anchors.leftMargin: 20
+            anchors.rightMargin: 20
+            spacing: 16
 
+            // Big Machine Emblem
             Rectangle {
-              Layout.preferredWidth: 8
-              Layout.preferredHeight: 8
-              radius: 4
-              color: root.isConnected ? "#10b981" : (root.currentMachine && root.currentMachine.online ? "#38bdf8" : root.mutedColor)
+              Layout.preferredWidth: 44
+              Layout.preferredHeight: 44
+              radius: 6
+              color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.15)
+              border.color: root.accentColor
+              border.width: 1
+
+              ThemeIcon {
+                anchors.centerIn: parent
+                width: 24
+                height: 24
+                source: {
+                  if (!root.currentMachine) return "icons/server.svg";
+                  var osType = (root.currentMachine.os || "").toLowerCase();
+                  if (osType === "macos") return "icons/apple.svg";
+                  if (osType === "windows") return "icons/device-desktop.svg";
+                  if (root.currentMachine.name && root.currentMachine.name.indexOf("companion") !== -1) return "icons/archlinux.svg";
+                  if (root.currentMachine.name && root.currentMachine.name.indexOf("runner") !== -1) return "icons/debian.svg";
+                  return "icons/server.svg";
+                }
+                color: root.accentColor
+              }
             }
 
+            // Title & IP Badges
             ColumnLayout {
-              spacing: 1
-
-              Text {
-                text: root.currentMachine ? root.currentMachine.name : "Select Machine"
-                font.family: root.appFontFamily
-                font.pixelSize: 13
-                font.bold: true
-                color: root.textColor
-              }
-
-              Text {
-                text: root.currentMachine ? ((root.currentMachine.tailscaleIp || "") + " • " + (root.currentMachine.os || "").toUpperCase() + " • " + (root.isConnected ? "CONNECTED" : "READY")) : "No machine selected"
-                font.family: root.appFontFamily
-                font.pixelSize: 9
-                color: root.mutedColor
-              }
-            }
-          }
-
-          Item { Layout.fillWidth: true }
-
-          // TOOLBAR ACTIONS
-          RowLayout {
-            spacing: 8
-            visible: !!root.currentMachine
-
-            // 1. BREAKOUT BUTTON (STAR OF THE SHOW)
-            Rectangle {
-              implicitWidth: boText.implicitWidth + 24
-              implicitHeight: 32
-              radius: 4
-              color: boMouse.containsMouse ? Qt.darker(root.accentColor, 1.2) : root.accentColor
+              Layout.fillWidth: true
+              spacing: 4
 
               RowLayout {
-                anchors.centerIn: parent
-                spacing: 6
-
-                ThemeIcon {
-                  Layout.preferredWidth: 14
-                  Layout.preferredHeight: 14
-                  source: "icons/external-link.svg"
-                  color: "#ffffff"
-                }
+                spacing: 10
 
                 Text {
-                  id: boText
-                  text: "Breakout Window"
+                  text: root.currentMachine ? root.currentMachine.name : "Select Machine"
                   font.family: root.appFontFamily
-                  font.pixelSize: 11
+                  font.pixelSize: 17
                   font.bold: true
                   color: "#ffffff"
                 }
+
+                // Online badge
+                Rectangle {
+                  implicitWidth: onTxt.implicitWidth + 10
+                  implicitHeight: 20
+                  radius: 3
+                  color: (root.currentMachine && root.currentMachine.online) ? Qt.rgba(0.06, 0.72, 0.5, 0.2) : Qt.rgba(0.9, 0.2, 0.2, 0.2)
+                  border.color: (root.currentMachine && root.currentMachine.online) ? "#10b981" : "#ef4444"
+                  border.width: 1
+
+                  RowLayout {
+                    anchors.centerIn: parent
+                    spacing: 4
+                    Rectangle {
+                      width: 5
+                      height: 5
+                      radius: 2.5
+                      color: (root.currentMachine && root.currentMachine.online) ? "#10b981" : "#ef4444"
+                    }
+                    Text {
+                      id: onTxt
+                      text: (root.currentMachine && root.currentMachine.online) ? "ONLINE" : "OFFLINE"
+                      font.family: root.appFontFamily
+                      font.pixelSize: 9
+                      font.bold: true
+                      color: (root.currentMachine && root.currentMachine.online) ? "#10b981" : "#ef4444"
+                    }
+                  }
+                }
               }
 
-              MouseArea {
-                id: boMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.launchBreakout()
+              RowLayout {
+                spacing: 10
+
+                Text {
+                  text: root.currentMachine ? (root.currentMachine.tailscaleIp || root.currentMachine.ipv4 || "No IP") : ""
+                  font.family: root.appFontFamily
+                  font.pixelSize: 11
+                  color: root.accentColor
+                  font.bold: true
+                }
+
+                Text {
+                  text: "•"
+                  color: root.mutedColor
+                  font.pixelSize: 10
+                }
+
+                Text {
+                  text: (root.currentMachine ? (root.currentMachine.providerName || root.currentMachine.os || "Linux") : "")
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  color: root.mutedColor
+                }
+
+                Text {
+                  text: "•"
+                  color: root.mutedColor
+                  font.pixelSize: 10
+                }
+
+                Text {
+                  text: "🔒 WireGuard Mesh"
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  color: "#10b981"
+                }
               }
             }
 
-            // 2. SEND KEYS DROPDOWN
+            // Copy IP button
             Rectangle {
-              implicitWidth: keysText.implicitWidth + 20
+              implicitWidth: copyText.implicitWidth + 20
               implicitHeight: 32
               radius: 4
-              color: keysMouse.containsMouse ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.1) : "transparent"
+              color: copyMouse.containsMouse ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.1) : "transparent"
               border.color: root.borderCol
               border.width: 1
 
               RowLayout {
                 anchors.centerIn: parent
-                spacing: 4
-
+                spacing: 6
+                Text { text: "📋"; font.pixelSize: 11 }
                 Text {
-                  id: keysText
-                  text: "⌨️ Send Keys ▾"
+                  id: copyText
+                  text: "Copy IP"
                   font.family: root.appFontFamily
-                  font.pixelSize: 11
+                  font.pixelSize: 10
                   color: root.textColor
                 }
               }
 
               MouseArea {
-                id: keysMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: keyMenu.open()
-              }
-
-              Menu {
-                id: keyMenu
-                y: parent.height + 4
-
-                MenuItem {
-                  text: "Ctrl + Alt + Delete"
-                  onTriggered: {
-                    if (ocloud.showToast) ocloud.showToast("Sent Ctrl+Alt+Del to remote session");
-                  }
-                }
-                MenuItem {
-                  text: "Alt + Tab"
-                  onTriggered: {
-                    if (ocloud.showToast) ocloud.showToast("Sent Alt+Tab to remote session");
-                  }
-                }
-                MenuItem {
-                  text: "Super / Windows Key"
-                  onTriggered: {
-                    if (ocloud.showToast) ocloud.showToast("Sent Super key to remote session");
-                  }
-                }
-                MenuItem {
-                  text: "Ctrl + Esc (Start Menu)"
-                  onTriggered: {
-                    if (ocloud.showToast) ocloud.showToast("Sent Ctrl+Esc to remote session");
-                  }
-                }
-                MenuItem {
-                  text: "Alt + F4 (Close Active)"
-                  onTriggered: {
-                    if (ocloud.showToast) ocloud.showToast("Sent Alt+F4 to remote session");
-                  }
-                }
-              }
-            }
-
-            // 3. CLIPBOARD SYNC
-            Rectangle {
-              implicitWidth: 32
-              implicitHeight: 32
-              radius: 4
-              color: clipMouse.containsMouse ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.1) : "transparent"
-              border.color: root.borderCol
-              border.width: 1
-
-              Text {
-                anchors.centerIn: parent
-                text: "📋"
-                font.pixelSize: 12
-              }
-
-              MouseArea {
-                id: clipMouse
+                id: copyMouse
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                  if (ocloud.showToast) ocloud.showToast("Clipboard synchronized with " + root.currentMachine.name);
+                  if (root.currentMachine && root.currentMachine.tailscaleIp) {
+                    if (ocloud.copyToClipboard) ocloud.copyToClipboard(root.currentMachine.tailscaleIp);
+                    if (ocloud.showToast) ocloud.showToast("Copied " + root.currentMachine.tailscaleIp + " to clipboard");
+                  }
                 }
-              }
-            }
-
-            // 4. AUDIO TOGGLE
-            Rectangle {
-              implicitWidth: 32
-              implicitHeight: 32
-              radius: 4
-              color: audioMouse.containsMouse ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.1) : "transparent"
-              border.color: root.borderCol
-              border.width: 1
-
-              Text {
-                anchors.centerIn: parent
-                text: root.audioEnabled ? "🔊" : "🔇"
-                font.pixelSize: 12
-              }
-
-              MouseArea {
-                id: audioMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.audioEnabled = !root.audioEnabled
-              }
-            }
-
-            // 5. SCALE TOGGLE
-            Rectangle {
-              implicitWidth: 32
-              implicitHeight: 32
-              radius: 4
-              color: scaleMouse.containsMouse ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.1) : "transparent"
-              border.color: root.borderCol
-              border.width: 1
-
-              Text {
-                anchors.centerIn: parent
-                text: root.fitToWindow ? "⛶" : "1:1"
-                font.family: root.appFontFamily
-                font.pixelSize: 10
-                font.bold: true
-                color: root.textColor
-              }
-
-              MouseArea {
-                id: scaleMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.fitToWindow = !root.fitToWindow
-              }
-            }
-
-            // 6. CONNECT / DISCONNECT
-            Rectangle {
-              implicitWidth: connText.implicitWidth + 20
-              implicitHeight: 32
-              radius: 4
-              color: root.isConnected
-                ? (connMouse.containsMouse ? "#ef4444" : Qt.rgba(0.9, 0.2, 0.2, 0.2))
-                : (connMouse.containsMouse ? Qt.darker(root.accentColor, 1.2) : Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.2))
-              border.color: root.isConnected ? "#ef4444" : root.accentColor
-              border.width: 1
-
-              Text {
-                id: connText
-                anchors.centerIn: parent
-                text: root.isConnected ? "Disconnect" : "Connect"
-                font.family: root.appFontFamily
-                font.pixelSize: 11
-                font.bold: true
-                color: root.isConnected ? (connMouse.containsMouse ? "#ffffff" : "#ef4444") : root.accentColor
-              }
-
-              MouseArea {
-                id: connMouse
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.toggleConnect()
               }
             }
           }
         }
-      }
 
-      // CENTER VIEWPORT
-      Rectangle {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        color: "#08080c"
+        // Status / Feedback Banner (if any)
+        Rectangle {
+          Layout.fillWidth: true
+          Layout.preferredHeight: 34
+          visible: root.statusMessage.length > 0
+          color: root.statusIsError ? Qt.rgba(0.9, 0.2, 0.2, 0.2) : Qt.rgba(0.06, 0.72, 0.5, 0.2)
+          border.color: root.statusIsError ? "#ef4444" : "#10b981"
+          border.width: 1
 
-        // =========================================================
-        // STATE A: ACTIVE CONNECTED DESKTOP VIEW
-        // =========================================================
-        Item {
-          anchors.fill: parent
-          visible: root.isConnected
-
-          // Desktop Background / Simulated Display Canvas
-          Rectangle {
+          RowLayout {
             anchors.fill: parent
-            color: "#0d1117"
+            anchors.leftMargin: 20
+            anchors.rightMargin: 20
+            spacing: 10
 
-            // Wallpaper graphic preview
-            ColumnLayout {
-              anchors.centerIn: parent
-              spacing: 12
-
-              ThemeIcon {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.preferredWidth: 64
-                Layout.preferredHeight: 64
-                source: {
-                  var osType = (root.currentMachine && root.currentMachine.os) ? root.currentMachine.os.toLowerCase() : "";
-                  if (osType === "macos") return "icons/apple.svg";
-                  if (osType === "windows") return "icons/device-desktop.svg";
-                  return "icons/server.svg";
-                }
-                color: Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.15)
-              }
-
-              Text {
-                Layout.alignment: Qt.AlignHCenter
-                text: "Live Remote Desktop: " + (root.currentMachine ? root.currentMachine.name : "")
-                font.family: root.appFontFamily
-                font.pixelSize: 16
-                font.bold: true
-                color: root.textColor
-              }
-
-              Text {
-                Layout.alignment: Qt.AlignHCenter
-                text: "Streaming active over Tailscale WireGuard Mesh (" + (root.currentMachine ? root.currentMachine.tailscaleIp : "") + ")"
-                font.family: root.appFontFamily
-                font.pixelSize: 11
-                color: root.mutedColor
-              }
-
-              Rectangle {
-                Layout.alignment: Qt.AlignHCenter
-                implicitWidth: popBtnText.implicitWidth + 24
-                implicitHeight: 34
-                radius: 4
-                color: popMouse.containsMouse ? Qt.darker(root.accentColor, 1.2) : root.accentColor
-
-                RowLayout {
-                  anchors.centerIn: parent
-                  spacing: 8
-
-                  ThemeIcon {
-                    Layout.preferredWidth: 14
-                    Layout.preferredHeight: 14
-                    source: "icons/external-link.svg"
-                    color: "#ffffff"
-                  }
-
-                  Text {
-                    id: popBtnText
-                    text: "Pop Out to Tiling / Fullscreen Window"
-                    font.family: root.appFontFamily
-                    font.pixelSize: 11
-                    font.bold: true
-                    color: "#ffffff"
-                  }
-                }
-
-                MouseArea {
-                  id: popMouse
-                  anchors.fill: parent
-                  hoverEnabled: true
-                  cursorShape: Qt.PointingHandCursor
-                  onClicked: root.launchBreakout()
-                }
-              }
+            Text {
+              text: root.statusIsError ? "▲" : "✔"
+              color: root.statusIsError ? "#ef4444" : "#10b981"
+              font.bold: true
+              font.pixelSize: 12
             }
 
-            // Bottom info bar inside viewport
+            Text {
+              Layout.fillWidth: true
+              text: root.statusMessage
+              font.family: root.appFontFamily
+              font.pixelSize: 11
+              color: root.statusIsError ? "#fca5a5" : "#6ee7b7"
+              elide: Text.ElideRight
+            }
+
             Rectangle {
-              anchors.bottom: parent.bottom
-              anchors.left: parent.left
-              anchors.right: parent.right
-              height: 28
-              color: Qt.rgba(0, 0, 0, 0.7)
-
-              RowLayout {
+              implicitWidth: 16
+              implicitHeight: 16
+              radius: 8
+              color: "transparent"
+              Text { anchors.centerIn: parent; text: "✕"; color: root.mutedColor; font.pixelSize: 10 }
+              MouseArea {
                 anchors.fill: parent
-                anchors.margins: 6
-                spacing: 16
-
-                Text {
-                  text: "Resolution: " + root.sessionResolution
-                  font.family: root.appFontFamily
-                  font.pixelSize: 10
-                  color: root.mutedColor
-                }
-
-                Text {
-                  text: "Latency: " + root.activeLatency
-                  font.family: root.appFontFamily
-                  font.pixelSize: 10
-                  color: "#10b981"
-                }
-
-                Text {
-                  text: "Encryption: WireGuard Curve25519"
-                  font.family: root.appFontFamily
-                  font.pixelSize: 10
-                  color: root.mutedColor
-                }
-
-                Item { Layout.fillWidth: true }
-
-                Text {
-                  text: "Protocol: " + ((root.currentMachine && root.currentMachine.detectedProtocol) ? root.currentMachine.detectedProtocol.toUpperCase() : "RDP")
-                  font.family: root.appFontFamily
-                  font.pixelSize: 10
-                  font.bold: true
-                  color: root.accentColor
-                }
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.statusMessage = ""
               }
             }
           }
         }
 
-        // =========================================================
-        // STATE B: STANDBY / READY TO CONNECT CARD
-        // =========================================================
+        // 2. MAIN SCROLLABLE CONTROL DECK
         ScrollView {
-          anchors.fill: parent
-          visible: !root.isConnected
+          Layout.fillWidth: true
+          Layout.fillHeight: true
           contentWidth: availableWidth
           clip: true
 
-          Item {
-            width: parent.width
-            implicitHeight: standbyCol.implicitHeight + 60
+          ColumnLayout {
+            width: parent.width - 40
+            x: 20
+            spacing: 20
 
-            ColumnLayout {
-              id: standbyCol
-              anchors.horizontalCenter: parent.horizontalCenter
-              width: Math.min(parent.width - 60, 680)
-              y: 30
-              spacing: 20
+            Item { height: 6 }
 
-              // Machine Overview Card
+            // =========================================================
+            // LAUNCHPAD: PRIMARY ACTIONS
+            // =========================================================
+            Text {
+              text: "HYPRLAND LAUNCHPAD"
+              font.family: root.appFontFamily
+              font.pixelSize: 11
+              font.bold: true
+              color: root.mutedColor
+              font.letterSpacing: 1.1
+            }
+
+            RowLayout {
+              Layout.fillWidth: true
+              spacing: 16
+
+              // CARD A: NATIVE WAYLAND REMOTE DESKTOP
               Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: cardLayout.implicitHeight + 40
+                Layout.preferredHeight: 170
                 radius: 6
-                color: root.cardBg
+                color: Qt.rgba(root.cardBg.r, root.cardBg.g, root.cardBg.b, 0.7)
                 border.color: root.borderCol
                 border.width: 1
 
                 ColumnLayout {
-                  id: cardLayout
                   anchors.fill: parent
-                  anchors.margins: 24
-                  spacing: 16
+                  anchors.margins: 16
+                  spacing: 10
 
                   RowLayout {
-                    spacing: 14
+                    Layout.fillWidth: true
+                    spacing: 10
 
                     Rectangle {
-                      Layout.preferredWidth: 48
-                      Layout.preferredHeight: 48
-                      radius: 8
-                      color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.15)
-
+                      Layout.preferredWidth: 32
+                      Layout.preferredHeight: 32
+                      radius: 4
+                      color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.2)
                       ThemeIcon {
                         anchors.centerIn: parent
-                        width: 26
-                        height: 26
-                        source: {
-                          var osType = (root.currentMachine && root.currentMachine.os) ? root.currentMachine.os.toLowerCase() : "";
-                          if (osType === "macos") return "icons/apple.svg";
-                          if (osType === "windows") return "icons/device-desktop.svg";
-                          return "icons/server.svg";
-                        }
+                        width: 16
+                        height: 16
+                        source: "icons/device-desktop.svg"
                         color: root.accentColor
                       }
                     }
 
                     ColumnLayout {
-                      spacing: 4
+                      Layout.fillWidth: true
+                      spacing: 2
 
                       Text {
-                        text: root.currentMachine ? ("Ready to Connect: " + root.currentMachine.name) : "Select a Machine"
+                        text: "Native Remote Desktop"
                         font.family: root.appFontFamily
-                        font.pixelSize: 16
+                        font.pixelSize: 13
                         font.bold: true
-                        color: root.textColor
+                        color: "#ffffff"
                       }
 
                       Text {
-                        text: "Direct peer-to-peer session over Tailscale WireGuard Mesh. Zero Google servers, zero telemetry."
+                        text: (root.currentMachine && root.currentMachine.os === "macos")
+                          ? "Apple Screen Sharing over VNC (Port 5900)"
+                          : "Native Remote Desktop Protocol (Port 3389)"
                         font.family: root.appFontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 10
                         color: root.mutedColor
                       }
                     }
                   }
 
-                  Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: root.borderCol
-                  }
-
-                  // Specs Grid
-                  GridLayout {
-                    Layout.fillWidth: true
-                    columns: 2
-                    rowSpacing: 10
-                    columnSpacing: 20
-
-                    ColumnLayout {
-                      spacing: 2
-                      Text { text: "TARGET PROTOCOL"; font.family: root.appFontFamily; font.pixelSize: 9; color: root.mutedColor; font.bold: true }
-                      Text {
-                        text: {
-                          var p = (root.currentMachine && root.currentMachine.detectedProtocol) ? root.currentMachine.detectedProtocol.toUpperCase() : "RDP";
-                          if (p === "RDP") return "Remote Desktop Protocol (RDP :3389)";
-                          if (p === "VNC") return "Apple Screen Sharing (VNC :5900)";
-                          return "Waypipe / Xpra Direct (:22)";
-                        }
-                        font.family: root.appFontFamily
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: root.textColor
-                      }
-                    }
-
-                    ColumnLayout {
-                      spacing: 2
-                      Text { text: "TAILSCALE MESH IP"; font.family: root.appFontFamily; font.pixelSize: 9; color: root.mutedColor; font.bold: true }
-                      Text {
-                        text: (root.currentMachine && root.currentMachine.tailscaleIp) ? root.currentMachine.tailscaleIp : "Not discovered"
-                        font.family: root.appFontFamily
-                        font.pixelSize: 12
-                        font.bold: true
-                        color: root.accentColor
-                      }
-                    }
-
-                    ColumnLayout {
-                      spacing: 2
-                      Text { text: "SECURITY GUARANTEE"; font.family: root.appFontFamily; font.pixelSize: 9; color: root.mutedColor; font.bold: true }
-                      Text { text: "Peer-to-Peer WireGuard (Zero Third-Party)"; font.family: root.appFontFamily; font.pixelSize: 12; color: "#10b981" }
-                    }
-
-                    ColumnLayout {
-                      spacing: 2
-                      Text { text: "AUDIO & CLIPBOARD"; font.family: root.appFontFamily; font.pixelSize: 9; color: root.mutedColor; font.bold: true }
-                      Text { text: "Bidirectional Sync Enabled"; font.family: root.appFontFamily; font.pixelSize: 12; color: root.textColor }
-                    }
-                  }
-
-                  Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: root.borderCol
-                  }
-
-                  // Optional Credentials Input
                   Text {
-                    text: "CONNECTION CREDENTIALS (SAVED IN OCLOUD VAULT)"
+                    Layout.fillWidth: true
+                    text: "Spawns a hardware-accelerated 60 FPS Wayland window that tiles directly into Hyprland beside Ocloud."
                     font.family: root.appFontFamily
                     font.pixelSize: 10
-                    font.bold: true
-                    color: root.mutedColor
+                    color: root.textColor
+                    wrapMode: Text.WordWrap
                   }
 
-                  RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 12
+                  Item { Layout.fillHeight: true }
 
-                    ColumnLayout {
-                      Layout.fillWidth: true
-                      spacing: 4
-                      Text { text: "Username / Account"; font.family: root.appFontFamily; font.pixelSize: 10; color: root.mutedColor }
-                      AppTextField {
-                        Layout.fillWidth: true
-                        placeholderText: (root.currentMachine && root.currentMachine.os === "macos") ? "Mac Username" : "Administrator / User"
-                        text: root.usernameInput
-                        onTextChanged: root.usernameInput = text
-                      }
-                    }
-
-                    ColumnLayout {
-                      Layout.fillWidth: true
-                      spacing: 4
-                      Text { text: "Password"; font.family: root.appFontFamily; font.pixelSize: 10; color: root.mutedColor }
-                      AppTextField {
-                        Layout.fillWidth: true
-                        echoMode: TextInput.Password
-                        placeholderText: "••••••••"
-                        text: root.passwordInput
-                        onTextChanged: root.passwordInput = text
-                      }
-                    }
-                  }
-
-                  // Action Buttons
-                  RowLayout {
-                    Layout.fillWidth: true
-                    Layout.topMargin: 8
-                    spacing: 12
-
-                    // Connect in-window button
-                    Rectangle {
-                      Layout.fillWidth: true
-                      implicitHeight: 38
-                      radius: 4
-                      color: connMainMouse.containsMouse ? Qt.darker(root.accentColor, 1.2) : root.accentColor
-
-                      RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 8
-
-                        Text {
-                          text: "⚡ Connect In-Window Desktop"
-                          font.family: root.appFontFamily
-                          font.pixelSize: 12
-                          font.bold: true
-                          color: "#ffffff"
-                        }
-                      }
-
-                      MouseArea {
-                        id: connMainMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.toggleConnect()
-                      }
-                    }
-
-                    // Breakout Window Button
-                    Rectangle {
-                      Layout.fillWidth: true
-                      implicitHeight: 38
-                      radius: 4
-                      color: boMainMouse.containsMouse ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.12) : "transparent"
-                      border.color: root.accentColor
-                      border.width: 1
-
-                      RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 8
-
-                        ThemeIcon {
-                          Layout.preferredWidth: 14
-                          Layout.preferredHeight: 14
-                          source: "icons/external-link.svg"
-                          color: root.accentColor
-                        }
-
-                        Text {
-                          text: "↗ Launch in Breakout Window"
-                          font.family: root.appFontFamily
-                          font.pixelSize: 12
-                          font.bold: true
-                          color: root.accentColor
-                        }
-                      }
-
-                      MouseArea {
-                        id: boMainMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.launchBreakout()
-                      }
-                    }
-                  }
-
-                  // OS Setup Hint Banner
+                  // Launch Button
                   Rectangle {
                     Layout.fillWidth: true
-                    implicitHeight: hintText.implicitHeight + 16
+                    Layout.preferredHeight: 36
                     radius: 4
-                    color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.06)
-                    border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.2)
+                    color: rdBtnMouse.containsMouse ? Qt.darker(root.accentColor, 1.2) : root.accentColor
+
+                    RowLayout {
+                      anchors.centerIn: parent
+                      spacing: 8
+                      ThemeIcon {
+                        Layout.preferredWidth: 14
+                        Layout.preferredHeight: 14
+                        source: "icons/external-link.svg"
+                        color: "#ffffff"
+                      }
+                      Text {
+                        text: "Launch in Hyprland"
+                        font.family: root.appFontFamily
+                        font.pixelSize: 11
+                        font.bold: true
+                        color: "#ffffff"
+                      }
+                    }
+
+                    MouseArea {
+                      id: rdBtnMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.launchDesktop()
+                    }
+                  }
+                }
+              }
+
+              // CARD B: NATIVE WAYLAND SSH TERMINAL (foot)
+              Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 170
+                radius: 6
+                color: Qt.rgba(root.cardBg.r, root.cardBg.g, root.cardBg.b, 0.7)
+                border.color: root.borderCol
+                border.width: 1
+
+                ColumnLayout {
+                  anchors.fill: parent
+                  anchors.margins: 16
+                  spacing: 10
+
+                  RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    Rectangle {
+                      Layout.preferredWidth: 32
+                      Layout.preferredHeight: 32
+                      radius: 4
+                      color: Qt.rgba(0.06, 0.72, 0.5, 0.2)
+                      ThemeIcon {
+                        anchors.centerIn: parent
+                        width: 16
+                        height: 16
+                        source: "icons/terminal.svg"
+                        color: "#10b981"
+                      }
+                    }
+
+                    ColumnLayout {
+                      Layout.fillWidth: true
+                      spacing: 2
+
+                      Text {
+                        text: "Native Wayland Terminal"
+                        font.family: root.appFontFamily
+                        font.pixelSize: 13
+                        font.bold: true
+                        color: "#ffffff"
+                      }
+
+                      Text {
+                        text: "Direct SSH over WireGuard (Port 22)"
+                        font.family: root.appFontFamily
+                        font.pixelSize: 10
+                        color: root.mutedColor
+                      }
+                    }
+                  }
+
+                  Text {
+                    Layout.fillWidth: true
+                    text: "Instantly tiles a native GPU-accelerated foot terminal session connected to this node."
+                    font.family: root.appFontFamily
+                    font.pixelSize: 10
+                    color: root.textColor
+                    wrapMode: Text.WordWrap
+                  }
+
+                  Item { Layout.fillHeight: true }
+
+                  // Launch Button
+                  Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 36
+                    radius: 4
+                    color: termBtnMouse.containsMouse ? "#059669" : "#10b981"
+
+                    RowLayout {
+                      anchors.centerIn: parent
+                      spacing: 8
+                      Text { text: "💻"; font.pixelSize: 12 }
+                      Text {
+                        text: "Launch Terminal (foot)"
+                        font.family: root.appFontFamily
+                        font.pixelSize: 11
+                        font.bold: true
+                        color: "#ffffff"
+                      }
+                    }
+
+                    MouseArea {
+                      id: termBtnMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.launchTerminal()
+                    }
+                  }
+                }
+              }
+            }
+
+            // =========================================================
+            // HARDWARE / ARCH LINUX VIEWER STATUS BANNER
+            // =========================================================
+            Rectangle {
+              Layout.fillWidth: true
+              implicitHeight: viewerCol.implicitHeight + 24
+              radius: 6
+              color: (root.currentMachine && root.currentMachine.viewer)
+                ? Qt.rgba(0.06, 0.72, 0.5, 0.08)
+                : Qt.rgba(0.95, 0.6, 0.1, 0.08)
+              border.color: (root.currentMachine && root.currentMachine.viewer) ? "#10b981" : "#f59e0b"
+              border.width: 1
+
+              ColumnLayout {
+                id: viewerCol
+                anchors.fill: parent
+                anchors.margins: 14
+                spacing: 8
+
+                RowLayout {
+                  Layout.fillWidth: true
+                  spacing: 8
+
+                  Text {
+                    text: (root.currentMachine && root.currentMachine.viewer) ? "✔" : "ℹ"
+                    color: (root.currentMachine && root.currentMachine.viewer) ? "#10b981" : "#f59e0b"
+                    font.bold: true
+                    font.pixelSize: 12
+                  }
+
+                  Text {
+                    text: (root.currentMachine && root.currentMachine.viewer)
+                      ? "Native Wayland Client Detected: " + root.currentMachine.viewer + " (" + (root.currentMachine.viewerPath || "/usr/bin") + ")"
+                      : "Native Wayland viewer not installed yet on host"
+                    font.family: root.appFontFamily
+                    font.pixelSize: 11
+                    font.bold: true
+                    color: (root.currentMachine && root.currentMachine.viewer) ? "#10b981" : "#f59e0b"
+                  }
+                }
+
+                Text {
+                  Layout.fillWidth: true
+                  visible: !(root.currentMachine && root.currentMachine.viewer)
+                  text: "For instant Hyprland window tiling with true 60 FPS performance, install FreeRDP and TigerVNC on your Omarchy Arch Linux host:"
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  color: root.textColor
+                  wrapMode: Text.WordWrap
+                }
+
+                RowLayout {
+                  Layout.fillWidth: true
+                  visible: !(root.currentMachine && root.currentMachine.viewer)
+                  spacing: 8
+
+                  Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 30
+                    radius: 4
+                    color: "#000000"
+                    border.color: root.borderCol
+                    border.width: 1
+
+                    RowLayout {
+                      anchors.fill: parent
+                      anchors.leftMargin: 10
+                      anchors.rightMargin: 10
+                      Text {
+                        text: "sudo pacman -S --needed freerdp tigervnc"
+                        font.family: root.appFontFamily
+                        font.pixelSize: 10
+                        color: "#38bdf8"
+                      }
+                    }
+                  }
+
+                  Rectangle {
+                    implicitWidth: 80
+                    Layout.preferredHeight: 30
+                    radius: 4
+                    color: copyPkgMouse.containsMouse ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.2) : Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.1)
+                    border.color: root.borderCol
                     border.width: 1
 
                     Text {
-                      id: hintText
-                      anchors.fill: parent
-                      anchors.margins: 10
+                      anchors.centerIn: parent
+                      text: "Copy"
                       font.family: root.appFontFamily
                       font.pixelSize: 10
-                      color: root.mutedColor
-                      wrapMode: Text.WordWrap
-                      text: {
-                        var osType = (root.currentMachine && root.currentMachine.os) ? root.currentMachine.os.toLowerCase() : "";
-                        if (osType === "windows") {
-                          return "💡 Windows Tip: Enable 'Remote Desktop' in Settings > System > Remote Desktop. No third-party software needed.";
-                        } else if (osType === "macos") {
-                          return "💡 Mac Tip: Enable 'Screen Sharing' in System Settings > General > Sharing, and allow VNC viewers under Computer Settings.";
-                        } else {
-                          return "💡 Linux Tip: Enable 'Remote Desktop' in GNOME Settings, or connect via standard Waypipe / Xpra / FreeRDP.";
-                        }
+                      color: root.textColor
+                    }
+
+                    MouseArea {
+                      id: copyPkgMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: {
+                        if (ocloud.copyToClipboard) ocloud.copyToClipboard("sudo pacman -S --needed freerdp tigervnc");
+                        if (ocloud.showToast) ocloud.showToast("Command copied: sudo pacman -S --needed freerdp tigervnc");
                       }
                     }
                   }
                 }
               }
             }
+
+            // =========================================================
+            // ENCRYPTED VAULT CREDENTIALS
+            // =========================================================
+            Text {
+              text: "AUTHENTICATION & VAULT"
+              font.family: root.appFontFamily
+              font.pixelSize: 11
+              font.bold: true
+              color: root.mutedColor
+              font.letterSpacing: 1.1
+            }
+
+            Rectangle {
+              Layout.fillWidth: true
+              implicitHeight: vaultCol.implicitHeight + 28
+              radius: 6
+              color: Qt.rgba(root.cardBg.r, root.cardBg.g, root.cardBg.b, 0.7)
+              border.color: root.borderCol
+              border.width: 1
+
+              ColumnLayout {
+                id: vaultCol
+                anchors.fill: parent
+                anchors.margins: 16
+                spacing: 12
+
+                RowLayout {
+                  Layout.fillWidth: true
+                  spacing: 8
+
+                  ThemeIcon {
+                    Layout.preferredWidth: 14
+                    Layout.preferredHeight: 14
+                    source: "icons/lock.svg"
+                    color: root.accentColor
+                  }
+
+                  Text {
+                    text: "Encrypted Node Credentials"
+                    font.family: root.appFontFamily
+                    font.pixelSize: 12
+                    font.bold: true
+                    color: "#ffffff"
+                  }
+
+                  Item { Layout.fillWidth: true }
+
+                  Text {
+                    text: "~/.config/ocloud/vault.json"
+                    font.family: root.appFontFamily
+                    font.pixelSize: 9
+                    color: root.mutedColor
+                  }
+                }
+
+                RowLayout {
+                  Layout.fillWidth: true
+                  spacing: 12
+
+                  // Username Input
+                  ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Text {
+                      text: "Username"
+                      font.family: root.appFontFamily
+                      font.pixelSize: 10
+                      color: root.mutedColor
+                    }
+
+                    Rectangle {
+                      Layout.fillWidth: true
+                      Layout.preferredHeight: 34
+                      radius: 4
+                      color: "#050508"
+                      border.color: uInput.activeFocus ? root.accentColor : root.borderCol
+                      border.width: 1
+
+                      TextInput {
+                        id: uInput
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        verticalAlignment: TextInput.AlignVCenter
+                        text: root.usernameInput
+                        font.family: root.appFontFamily
+                        font.pixelSize: 11
+                        color: root.textColor
+                        selectByMouse: true
+                        onTextChanged: root.usernameInput = text
+                      }
+                    }
+                  }
+
+                  // Password Input
+                  ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
+
+                    Text {
+                      text: "Password / Key"
+                      font.family: root.appFontFamily
+                      font.pixelSize: 10
+                      color: root.mutedColor
+                    }
+
+                    Rectangle {
+                      Layout.fillWidth: true
+                      Layout.preferredHeight: 34
+                      radius: 4
+                      color: "#050508"
+                      border.color: pInput.activeFocus ? root.accentColor : root.borderCol
+                      border.width: 1
+
+                      RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        spacing: 6
+
+                        TextInput {
+                          id: pInput
+                          Layout.fillWidth: true
+                          verticalAlignment: TextInput.AlignVCenter
+                          text: root.passwordInput
+                          echoMode: root.showPassword ? TextInput.Normal : TextInput.Password
+                          font.family: root.appFontFamily
+                          font.pixelSize: 11
+                          color: root.textColor
+                          selectByMouse: true
+                          onTextChanged: root.passwordInput = text
+                        }
+
+                        Text {
+                          text: root.showPassword ? "👁" : "🔒"
+                          font.pixelSize: 11
+                          MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.showPassword = !root.showPassword
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  // Save button
+                  ColumnLayout {
+                    spacing: 4
+                    Text { text: " "; font.pixelSize: 10 }
+                    Rectangle {
+                      implicitWidth: saveBtnTxt.implicitWidth + 20
+                      Layout.preferredHeight: 34
+                      radius: 4
+                      color: saveMouse.containsMouse ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.15) : "transparent"
+                      border.color: root.accentColor
+                      border.width: 1
+
+                      Text {
+                        id: saveBtnTxt
+                        anchors.centerIn: parent
+                        text: "Save to Vault"
+                        font.family: root.appFontFamily
+                        font.pixelSize: 11
+                        font.bold: true
+                        color: root.accentColor
+                      }
+
+                      MouseArea {
+                        id: saveMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.saveCredentialsNow()
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            // =========================================================
+            // ZERO-INSTALL SETUP GUIDE
+            // =========================================================
+            Text {
+              text: "TARGET HOST ZERO-INSTALL CONFIGURATION"
+              font.family: root.appFontFamily
+              font.pixelSize: 11
+              font.bold: true
+              color: root.mutedColor
+              font.letterSpacing: 1.1
+            }
+
+            Rectangle {
+              Layout.fillWidth: true
+              implicitHeight: guideCol.implicitHeight + 28
+              radius: 6
+              color: Qt.rgba(root.cardBg.r, root.cardBg.g, root.cardBg.b, 0.7)
+              border.color: root.borderCol
+              border.width: 1
+
+              ColumnLayout {
+                id: guideCol
+                anchors.fill: parent
+                anchors.margins: 16
+                spacing: 8
+
+                Text {
+                  text: (root.currentMachine && root.currentMachine.os === "macos")
+                    ? "macOS Screen Sharing (Zero-Install Setup)"
+                    : ((root.currentMachine && root.currentMachine.os === "windows")
+                      ? "Windows Native Remote Desktop (Zero-Install Setup)"
+                      : "Linux Headless / GUI Setup")
+                  font.family: root.appFontFamily
+                  font.pixelSize: 12
+                  font.bold: true
+                  color: "#ffffff"
+                }
+
+                Text {
+                  Layout.fillWidth: true
+                  font.family: root.appFontFamily
+                  font.pixelSize: 10
+                  color: root.textColor
+                  wrapMode: Text.WordWrap
+                  lineHeight: 1.3
+                  text: {
+                    if (!root.currentMachine) return "";
+                    var osType = (root.currentMachine.os || "").toLowerCase();
+                    if (osType === "macos") {
+                      return "1. On your Mac, open 'System Settings > General > Sharing'.\n" +
+                             "2. Toggle 'Screen Sharing' to ON.\n" +
+                             "3. Click the (i) info button to verify your macOS account is authorized.\n" +
+                             "4. Port 5900 will automatically be open across your Tailscale mesh with no software installed.";
+                    }
+                    if (osType === "windows") {
+                      return "1. On your Windows PC, open 'Settings > System > Remote Desktop'.\n" +
+                             "2. Toggle 'Enable Remote Desktop' to ON.\n" +
+                             "3. Ensure your Windows account has a password set.\n" +
+                             "4. Port 3389 will automatically be open across your Tailscale mesh.";
+                    }
+                    return "1. For terminal access: SSH is already enabled on port 22. Click 'Launch Terminal (foot)' to tile immediately.\n" +
+                           "2. For GNOME Desktop: Open 'Settings > Sharing > Remote Desktop' and enable RDP on port 3389.\n" +
+                           "3. For Xpra/Waypipe: Spawns directly over your Tailscale WireGuard IP.";
+                  }
+                }
+              }
+            }
+
+            Item { height: 16 }
           }
         }
       }

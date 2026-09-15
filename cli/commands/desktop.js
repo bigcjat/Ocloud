@@ -119,11 +119,28 @@ async function discoverMachines(registry) {
 /**
  * Finds the best installed client viewer for a protocol.
  */
+/**
+ * Finds the best installed client viewer for a protocol.
+ */
 function findInstalledViewer(protocol) {
   const candidates = protocol === 'rdp'
     ? ['wlfreerdp', 'xfreerdp', 'sdl-freerdp', 'remmina', 'xpra']
     : ['vncviewer', 'tigervnc', 'remmina', 'xpra'];
 
+  for (const bin of candidates) {
+    try {
+      const out = execSync(`command -v ${bin} 2>/dev/null`, { encoding: 'utf8' }).trim();
+      if (out) return { name: bin, path: out };
+    } catch (e) {}
+  }
+  return null;
+}
+
+/**
+ * Finds the best installed Wayland/X11 terminal.
+ */
+function findInstalledTerminal() {
+  const candidates = ['foot', 'kitty', 'alacritty', 'ghostty', 'wezterm', 'xterm'];
   for (const bin of candidates) {
     try {
       const out = execSync(`command -v ${bin} 2>/dev/null`, { encoding: 'utf8' }).trim();
@@ -186,6 +203,16 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
         m.portOpen = false;
         m.latencyMs = 0;
       }
+
+      // Check viewer availability on host
+      const viewer = findInstalledViewer(m.detectedProtocol);
+      m.viewer = viewer ? viewer.name : null;
+      m.viewerPath = viewer ? viewer.path : null;
+      m.viewerInstallCmd = m.detectedProtocol === 'rdp' ? 'sudo pacman -S freerdp' : 'sudo pacman -S tigervnc';
+
+      // Check terminal availability
+      const term = findInstalledTerminal();
+      m.terminal = term ? term.name : null;
 
       // Retrieve saved credentials if available
       if (vault) {
@@ -352,7 +379,49 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
   }
 
   // ==========================================
-  // 4. SAVE CREDENTIALS IN VAULT
+  // 4. LAUNCH NATIVE SSH TERMINAL (foot / kitty)
+  // ==========================================
+  if (subcmd === 'terminal' || subcmd === 'ssh') {
+    const target = filteredArgs[0];
+    if (!target) throw new Error('Usage: ocloud desktop terminal <node> [--user=U]');
+
+    const machines = await discoverMachines(registry);
+    const m = machines.find((item) => item.id === target || item.name.toLowerCase() === target.toLowerCase());
+    if (!m) throw new Error(`Node '${target}' not found in fleet or tailnet.`);
+
+    const host = m.tailscaleIp || m.ipv4;
+    if (!host) throw new Error(`Node '${m.name}' has no reachable IP address.`);
+
+    let user = '';
+    for (const a of filteredArgs) {
+      if (a.startsWith('--user=')) user = a.split('=')[1];
+    }
+    if (!user && vault) {
+      try {
+        const saved = vault.get(`desktop_creds_${m.id}`) || {};
+        user = saved.username || '';
+      } catch (e) {}
+    }
+    if (!user) user = (m.os === 'macos' ? '' : 'root');
+
+    const term = findInstalledTerminal();
+    if (!term) throw new Error('No native Wayland terminal found (foot, kitty, alacritty).');
+
+    const sshTarget = user ? `${user}@${host}` : host;
+    const child = spawn(term.path, ['-e', 'ssh', '-o', 'StrictHostKeyChecking=no', sshTarget], {
+      detached: true,
+      stdio: 'ignore'
+    });
+    child.unref();
+
+    const res = { ok: true, node: m.name, host, user, terminal: term.name, pid: child.pid };
+    if (isJson) console.log(JSON.stringify(res));
+    else console.log(`\x1b[32m✔ Launched native terminal for ${sshTarget} via ${term.name} (PID: ${child.pid})\x1b[0m`);
+    return res;
+  }
+
+  // ==========================================
+  // 5. SAVE CREDENTIALS IN VAULT
   // ==========================================
   if (subcmd === 'save-creds') {
     const target = filteredArgs[0];
