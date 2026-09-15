@@ -357,7 +357,8 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     // Detach and run standalone window
     const child = spawn(viewer.path, spawnArgs, {
       detached: true,
-      stdio: 'ignore'
+      stdio: 'ignore',
+      env: process.env
     });
     child.unref();
 
@@ -410,7 +411,8 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     const sshTarget = user ? `${user}@${host}` : host;
     const child = spawn(term.path, ['-e', 'ssh', '-o', 'StrictHostKeyChecking=no', sshTarget], {
       detached: true,
-      stdio: 'ignore'
+      stdio: 'ignore',
+      env: process.env
     });
     child.unref();
 
