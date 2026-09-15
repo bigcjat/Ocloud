@@ -75,7 +75,7 @@ FloatingWindow {
   readonly property var tabModel: [
     { id: "accounts", name: "Cloud Accounts", shortName: "Accounts", iconSvg: "icons/cloud.svg", count: serverList.length + cloudAccountsCount },
     { id: "workloads", name: "Workloads & Docker", shortName: "Docker", iconSvg: "icons/docker.svg", count: 0 },
-    { id: "apps", name: "App Streaming", shortName: "Apps", iconSvg: "icons/terminal.svg", count: 0 },
+    { id: "apps", name: "Remote Desktop", shortName: "Desktops", iconSvg: "icons/device-desktop.svg", count: 0 },
     { id: "backups", name: "Automated Backups", shortName: "Backups", iconSvg: "icons/archive.svg", count: 0 },
     { id: "settings", name: "Settings & Preferences", shortName: "Settings", iconSvg: "icons/settings.svg", count: 0 }
   ]
@@ -617,7 +617,7 @@ FloatingWindow {
 
           CloudAccountsTab { id: cloudAccountsView }
           WorkloadsTab { id: workloadsView }
-          AppSuiteTab { id: appSuiteView }
+          RemoteDesktopTab { id: remoteDesktopView }
           BackupTab { id: backupView }
           SettingsTab { id: settingsView }
         }

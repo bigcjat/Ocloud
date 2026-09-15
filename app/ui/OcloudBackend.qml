@@ -24,6 +24,8 @@ Item {
   signal storagePluginsUpdated(string pluginsJson)
   signal storageMounted(string name, string path)
   signal settingsUpdated(string settingsJson)
+  signal desktopNodesUpdated(string nodesJson)
+  signal desktopActionCompleted(string action, bool success, string msg)
 
   // ==========================================
   // CACHED STATE & PATHS
@@ -1166,6 +1168,47 @@ Item {
 
   function openContainerShell(serverName, ip, containerName) {
     openTerminal(containerName, ip, "root", "docker exec -it " + containerName + " /bin/sh || docker exec -it " + containerName + " /bin/bash");
+  }
+
+  // ==========================================
+  // SOVEREIGN REMOTE DESKTOP
+  // ==========================================
+  function fetchDesktopNodes(callback) {
+    runCli(["desktop", "list", "--json"], function(out, ok) {
+      if (ok && out) {
+        root.desktopNodesUpdated(out.trim());
+      }
+      if (typeof callback === "function") callback(ok, out);
+    }, 25000);
+  }
+
+  function probeDesktopNode(nodeId, callback) {
+    if (!nodeId) return;
+    runCli(["desktop", "probe", nodeId, "--json"], function(out, ok) {
+      if (typeof callback === "function") callback(ok, out);
+    }, 15000);
+  }
+
+  function launchDesktopBreakout(nodeId, user, pass, callback) {
+    if (!nodeId) return;
+    root.busyChanged(true, "Launching standalone remote desktop for " + nodeId + "...");
+    var args = ["desktop", "launch", nodeId, "--json"];
+    if (user) args.push("--user=" + user);
+    if (pass) args.push("--password=" + pass);
+
+    runCli(args, function(out, ok) {
+      root.busyChanged(false, "");
+      var msg = ok ? "Remote desktop breakout launched!" : ("Launch failed: " + out);
+      root.actionCompleted("launchDesktop", ok, msg);
+      if (typeof callback === "function") callback(ok, out);
+    }, 30000);
+  }
+
+  function saveDesktopCredentials(nodeId, user, pass, callback) {
+    if (!nodeId) return;
+    runCli(["desktop", "save-creds", nodeId, user || "", pass || "", "--json"], function(out, ok) {
+      if (typeof callback === "function") callback(ok, out);
+    }, 10000);
   }
 
   // ==========================================

@@ -16,6 +16,7 @@ const { cmdDocs } = require('./commands/docs');
 const { cmdSettings } = require('./commands/settings');
 const { cmdBridge } = require('./commands/bridge');
 const { cmdWorkload } = require('./commands/workload');
+const { cmdDesktop } = require('./commands/desktop');
 
 async function main() {
   // Initialize Core Subsystems
@@ -43,6 +44,8 @@ async function main() {
       await cmdNode(subcmd || 'list', rest, context);
     } else if (command === 'workload' || command === 'docker' || command === 'container') {
       await cmdWorkload(subcmd || 'templates', rest, context);
+    } else if (command === 'desktop' || command === 'rdp' || command === 'vnc' || command === 'remotedesktop') {
+      await cmdDesktop(subcmd || 'list', rest, context);
     } else if (command === 'storage') {
       await cmdStorage(subcmd || 'status', rest, context);
     } else if (command === 'backup') {
