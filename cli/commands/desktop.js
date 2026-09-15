@@ -441,6 +441,103 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     return res;
   }
 
+  // ==========================================
+  // 6. INSTALL LOCAL WAYLAND VIEWERS (1-Click)
+  // ==========================================
+  if (subcmd === 'install-viewers') {
+    const term = findInstalledTerminal();
+    if (!term) throw new Error('No native Wayland terminal found to run installer.');
+
+    const installCmd = "echo '==> Ocloud Sovereign Remote Desktop: Installing FreeRDP & TigerVNC...'; echo ''; sudo pacman -S --needed freerdp tigervnc; echo ''; echo '==> Installation complete! Press Enter to close.'; read -r";
+    const child = spawn(term.path, ['-e', 'sh', '-c', installCmd], {
+      detached: true,
+      stdio: 'ignore',
+      env: process.env
+    });
+    child.unref();
+
+    const res = { ok: true, terminal: term.name, pid: child.pid };
+    if (isJson) console.log(JSON.stringify(res));
+    else console.log(`\x1b[32m✔ Launched viewer installer in ${term.name} (PID: ${child.pid})\x1b[0m`);
+    return res;
+  }
+
+  // ==========================================
+  // 7. BOOTSTRAP REMOTE DESKTOP OVER SSH (1-Click)
+  // ==========================================
+  if (subcmd === 'bootstrap' || subcmd === 'bootstrap-rdp') {
+    const target = filteredArgs[0];
+    if (!target) throw new Error('Usage: ocloud desktop bootstrap <node> [--user=U]');
+
+    const machines = await discoverMachines(registry);
+    const m = machines.find((item) => item.id === target || item.name.toLowerCase() === target.toLowerCase());
+    if (!m) throw new Error(`Node '${target}' not found in fleet or tailnet.`);
+
+    const host = m.tailscaleIp || m.ipv4;
+    if (!host) throw new Error(`Node '${m.name}' has no reachable IP address.`);
+
+    let user = '';
+    for (const a of filteredArgs) {
+      if (a.startsWith('--user=')) user = a.split('=')[1];
+    }
+    if (!user && vault) {
+      try {
+        const saved = vault.get(`desktop_creds_${m.id}`) || {};
+        user = saved.username || '';
+      } catch (e) {}
+    }
+    if (!user) user = (m.os === 'macos' ? 'chris' : 'root');
+
+    const defaultKey = path.join(os.homedir(), '.ssh', 'id_ed25519');
+    const keyPath = fs.existsSync(defaultKey) ? defaultKey : path.join(os.homedir(), '.ssh', 'id_rsa');
+
+    const setupScript = `
+      set -e
+      if [ -f /etc/debian_version ]; then
+        echo "Configuring XRDP on Debian/Ubuntu..."
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -y
+        apt-get install -y xrdp xfce4 xfce4-goodies
+        echo "startxfce4" > ~/.xsession
+        systemctl enable --now xrdp
+      elif [ -f /etc/arch-release ]; then
+        echo "Configuring XRDP on Arch Linux..."
+        pacman -Sy --noconfirm xrdp
+        systemctl enable --now xrdp
+      elif [ -f /etc/fedora-release ]; then
+        echo "Configuring XRDP on Fedora..."
+        dnf install -y xrdp
+        systemctl enable --now xrdp
+      elif [ "$(uname)" = "Darwin" ]; then
+        echo "Configuring macOS Screen Sharing..."
+        sudo launchctl enable system/com.apple.screensharing || true
+      fi
+    `;
+
+    const sshArgs = [
+      '-o', 'StrictHostKeyChecking=no',
+      '-o', 'ConnectTimeout=10',
+      '-o', 'BatchMode=yes'
+    ];
+    if (fs.existsSync(keyPath)) {
+      sshArgs.push('-i', keyPath);
+    }
+    sshArgs.push(`${user}@${host}`, setupScript);
+
+    const out = execSync(`ssh ${sshArgs.map(a => `"${a}"`).join(' ')}`, {
+      encoding: 'utf8',
+      timeout: 180000
+    });
+
+    // Probe port after setup
+    const probe = await probePort(host, 3389, 2000);
+
+    const res = { ok: true, node: m.name, host, port: 3389, open: probe.open, log: out.trim() };
+    if (isJson) console.log(JSON.stringify(res));
+    else console.log(`\x1b[32m✔ Remote desktop setup complete on ${m.name}! (Port 3389 ${probe.open ? 'OPEN' : 'Starting'})\x1b[0m\n${out.trim()}`);
+    return res;
+  }
+
   throw new Error(`Unknown desktop subcommand: ${subcmd}`);
 }
 

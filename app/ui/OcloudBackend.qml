@@ -1223,6 +1223,23 @@ Item {
     }, 10000);
   }
 
+  function installLocalViewers(callback) {
+    runCli(["desktop", "install-viewers", "--json"], function(out, ok) {
+      if (typeof callback === "function") callback(ok, out);
+    }, 15000);
+  }
+
+  function bootstrapRemoteDesktop(nodeId, callback) {
+    if (!nodeId) return;
+    root.busyChanged(true, "Configuring Remote Desktop on " + nodeId + " over SSH...");
+    runCli(["desktop", "bootstrap", nodeId, "--json"], function(out, ok) {
+      root.busyChanged(false, "");
+      var msg = ok ? "Remote Desktop service configured and running!" : ("Setup failed: " + out);
+      root.actionCompleted("bootstrapDesktop", ok, msg);
+      if (typeof callback === "function") callback(ok, out);
+    }, 180000);
+  }
+
   // ==========================================
   // BACKUPS
   // ==========================================

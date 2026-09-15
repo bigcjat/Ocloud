@@ -102,6 +102,40 @@ Item {
     }
   }
 
+  function installViewersNow() {
+    statusMessage = "Opening terminal to install FreeRDP & TigerVNC...";
+    statusIsError = false;
+    if (ocloud.installLocalViewers) {
+      ocloud.installLocalViewers(function(ok, out) {
+        if (ok) {
+          statusMessage = "Terminal opened. Complete installation in foot, then refresh fleet.";
+          statusIsError = false;
+        } else {
+          statusMessage = "Failed to launch installer: " + out;
+          statusIsError = true;
+        }
+      });
+    }
+  }
+
+  function bootstrapNodeDesktop() {
+    if (!currentMachine) return;
+    statusMessage = "Configuring Remote Desktop on " + currentMachine.name + " over SSH...";
+    statusIsError = false;
+    if (ocloud.bootstrapRemoteDesktop) {
+      ocloud.bootstrapRemoteDesktop(currentMachine.id, function(ok, out) {
+        if (ok) {
+          statusMessage = "Remote Desktop setup complete on " + currentMachine.name + "! Port 3389 active.";
+          statusIsError = false;
+          refreshFleet();
+        } else {
+          statusMessage = "Setup failed on " + currentMachine.name + ": " + out;
+          statusIsError = true;
+        }
+      });
+    }
+  }
+
   Connections {
     target: ocloud
     function onDesktopNodesUpdated(jsonStr) {
@@ -665,6 +699,73 @@ Item {
                   wrapMode: Text.WordWrap
                 }
 
+                // 1-Click Remote Setup Banner if port is closed
+                Rectangle {
+                  Layout.fillWidth: true
+                  visible: (root.currentMachine && !root.currentMachine.portOpen && root.currentMachine.os !== "macos")
+                  implicitHeight: bstrapCol.implicitHeight + 16
+                  radius: 4
+                  color: Qt.rgba(0.95, 0.6, 0.1, 0.12)
+                  border.color: "#f59e0b"
+                  border.width: 1
+
+                  ColumnLayout {
+                    id: bstrapCol
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    spacing: 6
+
+                    RowLayout {
+                      spacing: 6
+                      Text { text: "⚠️"; font.pixelSize: 11 }
+                      Text {
+                        text: "Remote Desktop port is not running on this server."
+                        font.family: root.appFontFamily
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: "#fbbf24"
+                      }
+                    }
+
+                    Text {
+                      Layout.fillWidth: true
+                      text: "Ocloud has SSH access to this node. Click below to automatically install and start XRDP over SSH with 0 manual typing."
+                      font.family: root.appFontFamily
+                      font.pixelSize: 9
+                      color: root.textColor
+                      wrapMode: Text.WordWrap
+                    }
+
+                    Rectangle {
+                      Layout.fillWidth: true
+                      Layout.preferredHeight: 32
+                      radius: 4
+                      color: bstrapMouse.containsMouse ? Qt.darker("#f59e0b", 1.2) : "#f59e0b"
+
+                      RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 6
+                        Text { text: "⚡"; font.pixelSize: 11 }
+                        Text {
+                          text: "1-Click Auto-Configure Remote Desktop (SSH)"
+                          font.family: root.appFontFamily
+                          font.pixelSize: 10
+                          font.bold: true
+                          color: "#000000"
+                        }
+                      }
+
+                      MouseArea {
+                        id: bstrapMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.bootstrapNodeDesktop()
+                      }
+                    }
+                  }
+                }
+
                 Rectangle {
                   Layout.fillWidth: true
                   Layout.preferredHeight: 34
@@ -850,33 +951,41 @@ Item {
                 RowLayout {
                   Layout.fillWidth: true
                   visible: !(root.currentMachine && root.currentMachine.viewer)
-                  spacing: 6
+                  spacing: 8
 
+                  // 1-Click Install Button
                   Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 28
+                    Layout.preferredHeight: 30
                     radius: 4
-                    color: "#000000"
-                    border.color: root.borderCol
-                    border.width: 1
+                    color: instBtnMouse.containsMouse ? "#0284c7" : "#0ea5e9"
 
                     RowLayout {
-                      anchors.fill: parent
-                      anchors.leftMargin: 8
-                      anchors.rightMargin: 8
+                      anchors.centerIn: parent
+                      spacing: 6
+                      Text { text: "⚡"; font.pixelSize: 10 }
                       Text {
-                        text: "sudo pacman -S --needed freerdp tigervnc"
+                        text: "1-Click Install Viewers (foot)"
                         font.family: root.appFontFamily
-                        font.pixelSize: 9
-                        color: "#38bdf8"
-                        elide: Text.ElideRight
+                        font.pixelSize: 10
+                        font.bold: true
+                        color: "#ffffff"
                       }
+                    }
+
+                    MouseArea {
+                      id: instBtnMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.installViewersNow()
                     }
                   }
 
+                  // Copy command button
                   Rectangle {
                     implicitWidth: 60
-                    Layout.preferredHeight: 28
+                    Layout.preferredHeight: 30
                     radius: 4
                     color: copyPkgMouse.containsMouse ? Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.2) : Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.1)
                     border.color: root.borderCol
