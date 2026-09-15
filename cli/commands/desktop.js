@@ -124,8 +124,8 @@ async function discoverMachines(registry) {
  */
 function findInstalledViewer(protocol) {
   const candidates = protocol === 'rdp'
-    ? ['wlfreerdp', 'xfreerdp', 'sdl-freerdp', 'remmina', 'xpra']
-    : ['vncviewer', 'tigervnc', 'remmina', 'xpra'];
+    ? ['wlfreerdp', 'xfreerdp', 'sdl-freerdp', 'remmina']
+    : ['vncviewer', 'tigervnc', 'wlvncc', 'remmina'];
 
   for (const bin of candidates) {
     try {
