@@ -624,6 +624,7 @@ EOF
       fi
     `;
 
+    const b64 = Buffer.from(setupScript.trim(), 'utf8').toString('base64');
     const sshArgs = [
       '-o', 'StrictHostKeyChecking=no',
       '-o', 'ConnectTimeout=10',
@@ -632,9 +633,9 @@ EOF
     if (fs.existsSync(keyPath)) {
       sshArgs.push('-i', keyPath);
     }
-    sshArgs.push(`${user}@${host}`, setupScript);
+    sshArgs.push(`${user}@${host}`, `echo "${b64}" | base64 -d | bash`);
 
-    const out = execSync(`ssh ${sshArgs.map(a => `"${a}"`).join(' ')}`, {
+    const out = execSync(`ssh ${sshArgs.join(' ')}`, {
       encoding: 'utf8',
       timeout: 180000
     });
