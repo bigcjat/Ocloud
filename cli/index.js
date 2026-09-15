@@ -15,6 +15,7 @@ const { cmdGui } = require('./commands/gui');
 const { cmdDocs } = require('./commands/docs');
 const { cmdSettings } = require('./commands/settings');
 const { cmdBridge } = require('./commands/bridge');
+const { cmdWorkload } = require('./commands/workload');
 
 async function main() {
   // Initialize Core Subsystems
@@ -40,6 +41,8 @@ async function main() {
       await cmdVm(subcmd || 'list', rest, context);
     } else if (command === 'node') {
       await cmdNode(subcmd || 'list', rest, context);
+    } else if (command === 'workload' || command === 'docker' || command === 'container') {
+      await cmdWorkload(subcmd || 'templates', rest, context);
     } else if (command === 'storage') {
       await cmdStorage(subcmd || 'status', rest, context);
     } else if (command === 'backup') {
@@ -63,7 +66,7 @@ async function main() {
     } else if (command === 'settings' || command === 'config' || command === 'preference') {
       await cmdSettings(subcmd, rest);
     } else {
-      console.log('Usage: ocloud [status | providers | catalog | vm | node | storage | backup | vault | app | settings | mcp | docs | gui | bridge]');
+      console.log('Usage: ocloud [status | providers | catalog | vm | node | workload | storage | backup | vault | app | settings | mcp | docs | gui | bridge]');
     }
   } catch (err) {
     console.error(`\x1b[31mError:\x1b[0m ${err.message}`);

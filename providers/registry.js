@@ -17,6 +17,7 @@ class PluginRegistry {
   constructor() {
     this.computePlugins = new Map();
     this.storagePlugins = new Map();
+    this.workloadPlugins = new Map();
     this.quarantinedPlugins = new Map();
     this._initialized = false;
     this.vault = null;
@@ -27,6 +28,7 @@ class PluginRegistry {
     this.vault = vault;
     this.computePlugins.clear();
     this.storagePlugins.clear();
+    this.workloadPlugins.clear();
     this.quarantinedPlugins.clear();
 
     // 1. Built-in plugins directory
@@ -94,6 +96,8 @@ class PluginRegistry {
 
     if (manifest.type === 'compute') {
       this.computePlugins.set(manifest.id, { manifest, driver: null });
+    } else if (manifest.category === 'workload' || manifest.type === 'workload') {
+      this.workloadPlugins.set(manifest.id, { manifest, driver: null });
     } else {
       this.storagePlugins.set(manifest.id, { manifest, driver: null });
     }
@@ -155,6 +159,8 @@ class PluginRegistry {
 
     if (manifest.type === 'compute') {
       this.computePlugins.set(manifest.id, { manifest, driver: driverInstance });
+    } else if (manifest.category === 'workload' || manifest.type === 'workload') {
+      this.workloadPlugins.set(manifest.id, { manifest, driver: driverInstance });
     } else {
       this.storagePlugins.set(manifest.id, { manifest, driver: driverInstance });
     }
@@ -314,6 +320,46 @@ class PluginRegistry {
 
   getStoragePlugin(id) {
     return this.storagePlugins.get(id) || null;
+  }
+
+  // ------------------------------------------------------------- Workload APIs
+  listWorkloadPlugins() {
+    const list = [];
+    for (const [id, item] of this.workloadPlugins.entries()) {
+      list.push(item.manifest);
+    }
+    return list;
+  }
+
+  getWorkloadPlugin(id) {
+    return this.workloadPlugins.get(id) || null;
+  }
+
+  saveCustomWorkloadPlugin(manifest) {
+    if (!manifest.id || !manifest.name) {
+      throw new Error("Plugin must have id and name");
+    }
+    manifest.category = "workload";
+    manifest.isCustom = true;
+    const userWorkloadDir = path.join(os.homedir(), '.config', 'ocloud', 'plugins', 'workload');
+    if (!fs.existsSync(userWorkloadDir)) {
+      fs.mkdirSync(userWorkloadDir, { recursive: true });
+    }
+    const targetPath = path.join(userWorkloadDir, `${manifest.id}.json`);
+    fs.writeFileSync(targetPath, JSON.stringify(manifest, null, 2), 'utf8');
+    this._normalizeManifest(manifest, userWorkloadDir);
+    this.workloadPlugins.set(manifest.id, { manifest, driver: null });
+    return manifest;
+  }
+
+  deleteCustomWorkloadPlugin(id) {
+    const userWorkloadDir = path.join(os.homedir(), '.config', 'ocloud', 'plugins', 'workload');
+    const targetPath = path.join(userWorkloadDir, `${id}.json`);
+    if (fs.existsSync(targetPath)) {
+      fs.unlinkSync(targetPath);
+    }
+    this.workloadPlugins.delete(id);
+    return true;
   }
 }
 

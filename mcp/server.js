@@ -8,6 +8,7 @@ const { execSync, spawn } = require('child_process');
 const { Vault } = require('../security/vault');
 const registry = require('../providers/registry');
 const { PluginAuditor } = require('../security/plugin_auditor');
+const { cmdWorkload } = require('../cli/commands/workload');
 
 // Initialize Core Subsystems
 const vault = new Vault();
@@ -273,6 +274,119 @@ const TOOLS = [
         files: {
           type: 'object',
           description: 'Key-value map of filename to content (e.g. { "plugin.json": "...", "driver.js": "..." })'
+        }
+      }
+    }
+  },
+  {
+    name: 'ocloud_workload_templates',
+    description: 'List all available built-in and user-custom workload container templates (e.g. Ollama, PostgreSQL, Vaultwarden, Uptime Kuma) with their images, ports, and metadata.',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'ocloud_workload_status',
+    description: 'Check if Docker daemon is installed and actively running on a target cloud VM.',
+    inputSchema: {
+      type: 'object',
+      required: ['server'],
+      properties: {
+        server: {
+          type: 'string',
+          description: 'Target server ID or name (e.g. "omarchy-companion" or "runner-891")'
+        }
+      }
+    }
+  },
+  {
+    name: 'ocloud_workload_bootstrap',
+    description: '1-click unattended installation and startup of Docker engine on a bare target cloud VM.',
+    inputSchema: {
+      type: 'object',
+      required: ['server'],
+      properties: {
+        server: {
+          type: 'string',
+          description: 'Target server ID or name'
+        }
+      }
+    }
+  },
+  {
+    name: 'ocloud_workload_list',
+    description: 'List all running and stopped Docker containers on a target server, including their IDs, images, live status, and Tailscale connection URLs.',
+    inputSchema: {
+      type: 'object',
+      required: ['server'],
+      properties: {
+        server: {
+          type: 'string',
+          description: 'Target server ID or name'
+        }
+      }
+    }
+  },
+  {
+    name: 'ocloud_workload_deploy',
+    description: 'Deploy and launch a container on a target server with optional private Tailscale mesh binding (zero public internet exposure).',
+    inputSchema: {
+      type: 'object',
+      required: ['server', 'template_or_image'],
+      properties: {
+        server: {
+          type: 'string',
+          description: 'Target server ID or name'
+        },
+        template_or_image: {
+          type: 'string',
+          description: 'Workload plugin ID (e.g. "ollama", "postgresql", "uptime_kuma") or raw Docker image tag (e.g. "redis:alpine")'
+        },
+        name: {
+          type: 'string',
+          description: 'Custom container name (optional)'
+        },
+        ports: {
+          type: 'string',
+          description: 'Port mappings, comma-separated (e.g. "8080:80" or "5432:5432")'
+        },
+        tailscale: {
+          type: 'boolean',
+          default: true,
+          description: 'If true, binds ports exclusively to the server Tailscale mesh IP for private, zero-internet exposure'
+        },
+        env: {
+          type: 'object',
+          description: 'Key-value environment variables'
+        },
+        volumes: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Volume mount specs (e.g. ["mydata:/data"])'
+        }
+      }
+    }
+  },
+  {
+    name: 'ocloud_workload_action',
+    description: 'Control a Docker container on a server: start, stop, restart, delete, or fetch logs.',
+    inputSchema: {
+      type: 'object',
+      required: ['server', 'container_id', 'action'],
+      properties: {
+        server: {
+          type: 'string',
+          description: 'Target server ID or name'
+        },
+        container_id: {
+          type: 'string',
+          description: 'Container ID or container name'
+        },
+        action: {
+          type: 'string',
+          enum: ['start', 'stop', 'restart', 'delete', 'logs'],
+          description: 'Action to perform'
         }
       }
     }
@@ -648,6 +762,42 @@ async function handleToolCall(name, args = {}) {
         }
         return { success: true, path: dirPath, audit: audit.status };
       }
+    }
+
+    case 'ocloud_workload_templates': {
+      return await cmdWorkload('templates', ['--json'], { registry, vault });
+    }
+
+    case 'ocloud_workload_status': {
+      return await cmdWorkload('status', [args.server, '--json'], { registry, vault });
+    }
+
+    case 'ocloud_workload_bootstrap': {
+      return await cmdWorkload('bootstrap', [args.server, '--json'], { registry, vault });
+    }
+
+    case 'ocloud_workload_list': {
+      return await cmdWorkload('list', [args.server, '--json'], { registry, vault });
+    }
+
+    case 'ocloud_workload_deploy': {
+      const cliArgs = [args.server, args.template_or_image];
+      if (args.name) cliArgs.push(`--name=${args.name}`);
+      if (args.ports) cliArgs.push(`--ports=${args.ports}`);
+      if (args.tailscale === false) cliArgs.push('--public');
+      else cliArgs.push('--tailscale');
+      if (args.volumes && Array.isArray(args.volumes)) cliArgs.push(`--volumes=${args.volumes.join(',')}`);
+      if (args.env && typeof args.env === 'object') {
+        for (const [k, v] of Object.entries(args.env)) {
+          cliArgs.push(`--env=${k}=${v}`);
+        }
+      }
+      cliArgs.push('--json');
+      return await cmdWorkload('deploy', cliArgs, { registry, vault });
+    }
+
+    case 'ocloud_workload_action': {
+      return await cmdWorkload('action', [args.server, args.container_id, args.action, '--json'], { registry, vault });
     }
 
     default:
