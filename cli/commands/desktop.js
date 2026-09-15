@@ -452,7 +452,7 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     const term = findInstalledTerminal();
     if (!term) throw new Error('No native Wayland terminal found to run installer.');
 
-    const installCmd = "echo '==> Ocloud Sovereign Remote Desktop: Installing FreeRDP & TigerVNC...'; echo ''; sudo pacman -S --needed freerdp tigervnc; echo ''; echo '==> Installation complete! Press Enter to close.'; read -r";
+    const installCmd = "echo '==> Ocloud Remote Desktop: Installing FreeRDP & TigerVNC...'; echo ''; sudo pacman -S --needed freerdp tigervnc; echo ''; echo '==> Installation complete! Press Enter to close.'; read -r";
     const child = spawn(term.path, ['-e', 'sh', '-c', installCmd], {
       detached: true,
       stdio: 'ignore',
