@@ -346,12 +346,6 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     } else if (viewer.name === 'vncviewer' || viewer.name === 'tigervnc') {
       spawnArgs = [`${host}:5900`];
       if (user) spawnArgs.push(`-user=${user}`);
-    } else if (viewer.name === 'xpra') {
-      if (protocol === 'vnc') {
-        spawnArgs = ['attach', `vnc://${host}:5900`];
-      } else {
-        spawnArgs = ['shadow', `ssh://${user || 'root'}@${host}`];
-      }
     }
 
     // Detach and run standalone window
@@ -486,7 +480,7 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
         user = saved.username || '';
       } catch (e) {}
     }
-    if (!user) user = (m.os === 'macos' ? 'chris' : 'root');
+    if (!user) user = (m.os === 'macos' ? '' : 'root');
 
     const defaultKey = path.join(os.homedir(), '.ssh', 'id_ed25519');
     const keyPath = fs.existsSync(defaultKey) ? defaultKey : path.join(os.homedir(), '.ssh', 'id_rsa');

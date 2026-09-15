@@ -205,7 +205,7 @@ Item {
               spacing: 2
 
               Text {
-                text: "SOVEREIGN FLEET"
+                text: "MACHINES"
                 font.family: root.appFontFamily
                 font.pixelSize: 11
                 font.bold: true
@@ -214,7 +214,7 @@ Item {
               }
 
               Text {
-                text: machines.length + " nodes on mesh"
+                text: machines.length + " devices"
                 font.family: root.appFontFamily
                 font.pixelSize: 9
                 color: root.mutedColor
@@ -622,10 +622,10 @@ Item {
             Item { height: 4 }
 
             // =========================================================
-            // LAUNCHPAD: RESPONSIVE CARDS (Stacked vertically to never overlap!)
+            // ACTION CARDS
             // =========================================================
             Text {
-              text: "HYPRLAND LAUNCHPAD"
+              text: "CONNECT"
               font.family: root.appFontFamily
               font.pixelSize: 10
               font.bold: true
@@ -1015,10 +1015,10 @@ Item {
             }
 
             // =========================================================
-            // ENCRYPTED VAULT CREDENTIALS (Responsive)
+            // CREDENTIALS
             // =========================================================
             Text {
-              text: "AUTHENTICATION & VAULT"
+              text: "CREDENTIALS"
               font.family: root.appFontFamily
               font.pixelSize: 10
               font.bold: true
