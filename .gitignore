@@ -8,7 +8,9 @@ __pycache__/
 config.json
 *.enc
 *.vault
-*vault*.json
+vault.json
+*.vault.json
+!providers/plugins/workload/vaultwarden.json
 
 # Credentials, tokens, keys
 *.pem
