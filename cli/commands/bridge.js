@@ -14,6 +14,7 @@ const { cmdCatalog } = require('./catalog');
 const { cmdApp } = require('./app');
 const { cmdDocs } = require('./docs');
 const { cmdSettings } = require('./settings');
+const { cmdWorkload } = require('./workload');
 
 async function runCommandWithContext(argv, context) {
   const command = argv[0] || 'status';
@@ -30,6 +31,8 @@ async function runCommandWithContext(argv, context) {
     await cmdVm(subcmd || 'list', rest, context);
   } else if (command === 'node') {
     await cmdNode(subcmd || 'list', rest, context);
+  } else if (command === 'workload' || command === 'container' || command === 'docker') {
+    await cmdWorkload(subcmd || 'templates', rest, context);
   } else if (command === 'storage') {
     await cmdStorage(subcmd || 'status', rest, context);
   } else if (command === 'backup') {

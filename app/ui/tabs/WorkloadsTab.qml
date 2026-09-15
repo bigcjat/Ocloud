@@ -56,13 +56,18 @@ Item {
       }
     }
     function onActionCompleted(action, success, msg) {
-      if (action === "bootstrapDocker" || action === "deployContainer" || action === "containerAction") {
+      if (action === "bootstrapDocker" || action === "deployContainer" || action === "containerAction" || action === "saveCustomWorkload" || action === "deleteCustomWorkload") {
         refreshCurrentServer();
       }
+    }
+    function onStatusUpdated(jsonStr) {
+      if (ocloud.fetchWorkloadPlugins) ocloud.fetchWorkloadPlugins();
+      refreshCurrentServer();
     }
   }
 
   Component.onCompleted: {
+    if (ocloud.fetchWorkloadPlugins) ocloud.fetchWorkloadPlugins();
     refreshCurrentServer();
   }
 
