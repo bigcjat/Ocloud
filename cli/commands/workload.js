@@ -194,7 +194,7 @@ async function cmdWorkload(subcmd, args = [], context = {}) {
         echo "Detected Debian/Ubuntu node..."
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -y
-        apt-get install -y docker.io docker-compose-plugin
+        apt-get install -y docker.io docker-compose || apt-get install -y docker.io
         systemctl enable --now docker
       elif [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]; then
         echo "Detected RHEL/Fedora node..."

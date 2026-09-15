@@ -14,6 +14,8 @@ Item {
   signal busyChanged(bool busy, string message)
   signal inspectFinished(string serverId, string detailsJson)
   signal dockerContainersUpdated(string containersJson)
+  signal workloadPluginsUpdated(string pluginsJson)
+  signal nodeDockerStatusUpdated(string serverId, bool installed, bool running, string version)
   signal networkSharesUpdated(string sharesJson)
   signal networkSharesScanned(string sharesJson)
   signal catalogUpdated(string providerId, string catalogJson)
@@ -33,6 +35,7 @@ Item {
   property string cachedCloudAccounts: "[]"
   property string cachedStoragePlugins: "[]"
   property string cachedComputePlugins: "[]"
+  property string cachedWorkloadPlugins: "[]"
   property string cachedDriveCapacities: "{}"
   property string cachedNetworkShares: "[]"
   property string cachedCatalog: "{}"
@@ -887,17 +890,18 @@ Item {
     });
   }
 
-  function openTerminal(name, ip, user) {
+  function openTerminal(name, ip, user, execCmd) {
     var u = user || "root";
     var targetIp = ip || "";
     if (!targetIp) return;
     var sshKey = root.homeDir + "/.ssh/id_ed25519";
     var title = "SSH: " + name + " (" + targetIp + ")";
+    var remote = execCmd ? ("-t \"" + u + "@" + targetIp + "\" \"" + execCmd + "\"") : ("\"" + u + "@" + targetIp + "\"");
     var termCmd = [
       "foot",
       "-T", title,
       "bash", "-c",
-      "ssh -i \"" + sshKey + "\" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 \"" + u + "@" + targetIp + "\" || (echo ''; echo '❌ SSH connection closed or failed. Press Enter to close...'; read _)"
+      "ssh -i \"" + sshKey + "\" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 " + remote + " || (echo ''; echo '❌ SSH connection closed or failed. Press Enter to close...'; read _)"
     ];
     Quickshell.execDetached(termCmd);
   }
@@ -1067,32 +1071,99 @@ Item {
   // ==========================================
   // WORKLOADS & CONTAINERS
   // ==========================================
+  function fetchWorkloadPlugins() {
+    runCli(["workload", "templates", "--json"], function(out, ok) {
+      if (ok && out) {
+        cachedWorkloadPlugins = out.trim();
+        root.workloadPluginsUpdated(cachedWorkloadPlugins);
+      }
+    });
+  }
+
+  function checkNodeDocker(serverId) {
+    if (!serverId) return;
+    runCli(["workload", "status", serverId, "--json"], function(out, ok) {
+      try {
+        var data = JSON.parse(out);
+        root.nodeDockerStatusUpdated(serverId, data.installed || false, data.running || false, data.version || "");
+      } catch (e) {
+        root.nodeDockerStatusUpdated(serverId, false, false, "");
+      }
+    });
+  }
+
+  function bootstrapNodeDocker(serverId) {
+    if (!serverId) return;
+    root.busyChanged(true, "Bootstrapping Docker engine on " + serverId + " (this may take 1-2 minutes)...");
+    runCli(["workload", "bootstrap", serverId, "--json"], function(out, ok) {
+      root.busyChanged(false, "");
+      root.actionCompleted("bootstrapDocker", ok, ok ? "Docker engine installed successfully!" : ("Bootstrap failed: " + out));
+      checkNodeDocker(serverId);
+      fetchDockerContainers(serverId);
+    });
+  }
+
   function fetchDockerContainers(serverId) {
     if (!serverId) return;
-    runCli(["vm", "exec", serverId, "docker ps -a --format '{{json .}}' 2>/dev/null || true"], function(out, ok) {
+    runCli(["workload", "list", serverId, "--json"], function(out, ok) {
       var list = [];
       if (ok && out) {
-        var lines = out.trim().split("\n");
-        for (var i = 0; i < lines.length; i++) {
-          var l = lines[i].trim();
-          if (l.length > 0) {
-            try { list.push(JSON.parse(l)); } catch(e) {}
-          }
-        }
+        try { list = JSON.parse(out); } catch(e) {}
       }
       root.dockerContainersUpdated(JSON.stringify(list));
+    });
+  }
+
+  function deployDockerContainer(serverId, config, callback) {
+    if (!serverId || !config) return;
+    root.busyChanged(true, "Deploying container " + (config.name || config.image || "") + "...");
+    var args = ["workload", "deploy", serverId, config.image || config.templateId || ""];
+    if (config.name) args.push("--name=" + config.name);
+    if (config.ports) args.push("--ports=" + config.ports);
+    if (config.tailscale === false) args.push("--public");
+    else args.push("--tailscale");
+    if (config.volumes) args.push("--volumes=" + config.volumes);
+    if (config.env) {
+      for (var k in config.env) {
+        args.push("--env=" + k + "=" + config.env[k]);
+      }
+    }
+    args.push("--json");
+    runCli(args, function(out, ok) {
+      root.busyChanged(false, "");
+      root.actionCompleted("deployContainer", ok, ok ? "Container deployed successfully!" : ("Deploy failed: " + out));
+      fetchDockerContainers(serverId);
+      if (typeof callback === "function") callback(ok, out);
     });
   }
 
   function containerAction(serverId, containerId, action) {
     if (!serverId || !containerId) return;
     var act = action || "restart";
-    root.busyChanged(true, "Performing " + act + " on container " + containerId + "...");
-    runCli(["vm", "exec", serverId, "docker " + act + " " + containerId], function(out, ok) {
+    root.busyChanged(true, "Performing " + act + " on " + containerId + "...");
+    runCli(["workload", "action", serverId, containerId, act, "--json"], function(out, ok) {
       root.busyChanged(false, "");
       root.actionCompleted("containerAction", ok, out);
       fetchDockerContainers(serverId);
     });
+  }
+
+  function saveCustomWorkload(manifest, callback) {
+    runCli(["workload", "save-template", JSON.stringify(manifest), "--json"], function(out, ok) {
+      fetchWorkloadPlugins();
+      if (typeof callback === "function") callback(ok, out);
+    });
+  }
+
+  function deleteCustomWorkload(id, callback) {
+    runCli(["workload", "delete-template", id, "--json"], function(out, ok) {
+      fetchWorkloadPlugins();
+      if (typeof callback === "function") callback(ok, out);
+    });
+  }
+
+  function openContainerShell(serverName, ip, containerName) {
+    openTerminal(containerName, ip, "root", "docker exec -it " + containerName + " /bin/sh || docker exec -it " + containerName + " /bin/bash");
   }
 
   // ==========================================
