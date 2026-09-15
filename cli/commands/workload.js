@@ -65,6 +65,8 @@ function execRemote(server, remoteScript, options = {}) {
 
   const sshArgs = [
     '-p', port,
+    '-q',
+    '-o', 'LogLevel=QUIET',
     '-o', 'StrictHostKeyChecking=no',
     '-o', 'ConnectTimeout=10',
     '-o', 'BatchMode=yes'
