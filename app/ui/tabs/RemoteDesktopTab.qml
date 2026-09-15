@@ -1213,7 +1213,7 @@ Item {
             // ZERO-INSTALL SETUP GUIDE
             // =========================================================
             Text {
-              text: "TARGET ZERO-INSTALL SETUP"
+              text: "SETUP GUIDE"
               font.family: root.appFontFamily
               font.pixelSize: 10
               font.bold: true
