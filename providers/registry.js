@@ -332,7 +332,8 @@ class PluginRegistry {
   }
 
   getWorkloadPlugin(id) {
-    return this.workloadPlugins.get(id) || null;
+    const item = this.workloadPlugins.get(id);
+    return (item && item.manifest) ? item.manifest : null;
   }
 
   saveCustomWorkloadPlugin(manifest) {

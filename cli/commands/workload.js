@@ -305,7 +305,8 @@ async function cmdWorkload(subcmd, args = [], context = {}) {
     }
 
     // Check if workloadTarget matches a registered workload plugin
-    const plugin = registry.getWorkloadPlugin ? registry.getWorkloadPlugin(workloadTarget) : null;
+    const rawPlugin = registry.getWorkloadPlugin ? registry.getWorkloadPlugin(workloadTarget) : null;
+    const plugin = (rawPlugin && rawPlugin.manifest) ? rawPlugin.manifest : rawPlugin;
     const pConf = (plugin && plugin.workload) || {};
 
     let image = pConf.image || workloadTarget;
@@ -336,7 +337,7 @@ async function cmdWorkload(subcmd, args = [], context = {}) {
     }
 
     if (!name) {
-      name = (plugin ? plugin.id : workloadTarget.split(/[/:]/).pop()).replace(/[^a-zA-Z0-9_-]/g, '-');
+      name = (plugin && plugin.id ? plugin.id : String(workloadTarget).split(/[/:]/).pop()).replace(/[^a-zA-Z0-9_-]/g, '-');
     }
 
     // Build docker run command with optional Tailscale binding
