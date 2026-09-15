@@ -120,7 +120,7 @@ Item {
   }
 
   function installViewersNow() {
-    statusMessage = "Opening terminal to install FreeRDP & TigerVNC...";
+    statusMessage = "Opening terminal to install FreeRDP, TigerVNC & Remmina...";
     statusIsError = false;
     if (ocloud.installLocalViewers) {
       ocloud.installLocalViewers(function(ok, out) {
@@ -1148,8 +1148,8 @@ Item {
                       hoverEnabled: true
                       cursorShape: Qt.PointingHandCursor
                       onClicked: {
-                        if (ocloud.copyToClipboard) ocloud.copyToClipboard("sudo pacman -S --needed freerdp tigervnc");
-                        if (ocloud.showToast) ocloud.showToast("Command copied: sudo pacman -S --needed freerdp tigervnc");
+                        if (ocloud.copyToClipboard) ocloud.copyToClipboard("sudo pacman -S --needed freerdp tigervnc remmina libvncserver");
+                        if (ocloud.showToast) ocloud.showToast("Command copied: sudo pacman -S --needed freerdp tigervnc remmina libvncserver");
                       }
                     }
                   }

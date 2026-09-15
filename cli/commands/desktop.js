@@ -131,9 +131,12 @@ function findInstalledViewer(protocol) {
     }
     return null;
   }
+  // For VNC, especially macOS with high-resolution Retina displays,
+  // prioritize Remmina if available because it provides native hardware-accelerated
+  // Scale-to-Fit (scale=1) without cropping or scrollbars.
   const candidates = protocol === 'rdp'
     ? ['xfreerdp', 'wlfreerdp', 'sdl-freerdp', 'remmina']
-    : ['vncviewer', 'tigervnc', 'wlvncc', 'remmina'];
+    : ['remmina', 'vncviewer', 'tigervnc', 'wlvncc'];
 
   const searchDirs = [
     path.join(os.homedir(), '.local', 'bin'),
@@ -533,6 +536,46 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
           } catch (e) {}
         }
       }
+    } else if (viewer.name === 'remmina') {
+      const port = targetPort || m.detectedPort || (protocol === 'rdp' ? 3389 : 5900);
+      const safeId = String(m.id || 'node').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const remminaDir = path.join(os.tmpdir(), 'ocloud_remmina');
+      try { fs.mkdirSync(remminaDir, { recursive: true }); } catch (e) {}
+      const profilePath = path.join(remminaDir, `${safeId}.remmina`);
+
+      let encPass = '';
+      if (pass) {
+        try {
+          const cp = require('child_process');
+          const enc = cp.spawnSync(viewer.path, ['--encrypt-password'], {
+            input: pass + '\n',
+            encoding: 'utf8',
+            env: Object.assign({}, process.env, { DBUS_SESSION_BUS_ADDRESS: '' })
+          });
+          if (enc.status === 0 && enc.stdout) {
+            encPass = enc.stdout.trim().split('\n').pop().trim();
+          }
+        } catch (e) {}
+      }
+
+      const protoUpper = protocol === 'rdp' ? 'RDP' : 'VNC';
+      const profileLines = [
+        '[remmina]',
+        `protocol=${protoUpper}`,
+        `server=${host}:${port}`,
+        `name=${m.name}`,
+        'scale=1',
+        'viewmode=1',
+        'window_maximize=1',
+        'colordepth=32',
+        'quality=9',
+        'disableclipboard=0'
+      ];
+      if (user) profileLines.push(`username=${user}`);
+      if (encPass) profileLines.push(`password=${encPass}`);
+
+      fs.writeFileSync(profilePath, profileLines.join('\n') + '\n', { mode: 0o600 });
+      spawnArgs = ['-c', profilePath];
     } else if (viewer.name === 'xpra') {
       const displayNum = targetPort && targetPort !== 5900 && targetPort !== 3389 ? String(targetPort).replace(':', '') : '200';
       const xpraUser = user || 'root';
@@ -765,7 +808,7 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
     const term = findInstalledTerminal();
     if (!term) throw new Error('No native Wayland terminal found to run installer.');
 
-    const installCmd = "echo '==> Ocloud Remote Desktop: Installing FreeRDP & TigerVNC...'; echo ''; if sudo pacman -S --needed freerdp tigervnc; then echo ''; echo '==> Installation successful! Press Enter to close.'; else echo ''; echo '==> Installation failed (incorrect password or cancelled). Press Enter to close.'; fi; read -r";
+    const installCmd = "echo '==> Ocloud Remote Desktop: Installing FreeRDP, TigerVNC & Remmina...'; echo ''; if sudo pacman -S --needed freerdp tigervnc remmina libvncserver; then echo ''; echo '==> Installation successful! Press Enter to close.'; else echo ''; echo '==> Installation failed (incorrect password or cancelled). Press Enter to close.'; fi; read -r";
     const child = spawn(term.path, ['-e', 'sh', '-c', installCmd], {
       detached: true,
       stdio: 'ignore',
