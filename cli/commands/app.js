@@ -147,7 +147,7 @@ const BUILTIN_APPS = [
   { id: 'teams', name: 'Microsoft Teams', cmd: 'teams-for-linux', category: 'Work & Office', tag: 'ENTERPRISE', desc: 'Enterprise chat, channels, meetings, and always-available status.', icon: 'users.svg', featured: false },
   { id: 'thunderbird', name: 'Thunderbird', cmd: 'thunderbird', category: 'Work & Office', tag: 'EMAIL', desc: 'Corporate email archive, background indexing, and calendar sync.', icon: 'mail.svg', featured: true },
   { id: 'zoom', name: 'Zoom', cmd: 'zoom', category: 'Work & Office', tag: 'MEETINGS', desc: 'Video conferencing and client calling standby.', icon: 'video.svg', featured: false },
-  { id: 'mattermost', name: 'Mattermost', cmd: 'mattermost-desktop', category: 'Work & Office', tag: 'TEAM', desc: 'Open source sovereign team collaboration platform.', icon: 'message-circle.svg', featured: false },
+  { id: 'mattermost', name: 'Mattermost', cmd: 'mattermost-desktop', category: 'Work & Office', tag: 'TEAM', desc: 'Open source team collaboration platform.', icon: 'message-circle.svg', featured: false },
 
   // Creative & Media
   { id: 'obs', name: 'OBS Studio', cmd: 'obs', category: 'Creative & Media', tag: 'BROADCAST', desc: 'Live video broadcasting and recording with datacenter uplink bandwidth.', icon: 'camera.svg', featured: true },

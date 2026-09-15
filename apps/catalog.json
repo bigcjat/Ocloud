@@ -120,7 +120,7 @@
       "aliases": ["mattermost"],
       "category": "Work & Office",
       "tag": "TEAM",
-      "desc": "Open source sovereign team collaboration platform.",
+      "desc": "Open source team collaboration platform.",
       "minRamMb": 512,
       "packages": {
         "debian": ["mattermost-desktop"],

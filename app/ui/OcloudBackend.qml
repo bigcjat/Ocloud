@@ -1171,7 +1171,7 @@ Item {
   }
 
   // ==========================================
-  // SOVEREIGN REMOTE DESKTOP
+  // REMOTE DESKTOP
   // ==========================================
   function fetchDesktopNodes(callback) {
     runCli(["desktop", "list", "--json"], function(out, ok) {

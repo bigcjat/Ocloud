@@ -7,7 +7,7 @@
   "rcloneType": "s3",
   "defaultRemoteName": "ovh-s3",
   "defaultMount": "~/OVH-Storage",
-  "badge": "European Sovereign",
+  "badge": "EU Datacenter",
   "badgeColor": "#000E9C",
   "brandColor": "#000E9C",
   "tagline": "S3-compatible High Performance Object Storage hosted in European OVHcloud datacenters.",
