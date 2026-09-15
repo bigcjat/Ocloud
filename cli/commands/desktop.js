@@ -392,7 +392,8 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       spawnArgs = [
         `/v:${host}`,
         '/cert:ignore',
-        '/dynamic-resolution',
+        '/size:1920x1080',
+        '/network:auto',
         '+clipboard',
         '/sound:sys:pulse',
         '+auto-reconnect'
@@ -582,10 +583,12 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
         echo "Configuring XRDP on Debian/Ubuntu..."
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -y
-        apt-get install -y xrdp xfce4 xfce4-goodies ssl-cert
+        apt-get install -y xrdp xfce4 xfce4-goodies ssl-cert dbus-x11
         adduser xrdp ssl-cert 2>/dev/null || true
         chmod 644 /etc/xrdp/key.pem 2>/dev/null || true
-        echo "startxfce4" > ~/.xsession
+        killall -9 xfce4-session Xorg 2>/dev/null || true
+        rm -rf /tmp/.X11-unix/* /tmp/.xorgxrdp*
+        echo "exec dbus-run-session startxfce4" > ~/.xsession
         echo "${user}:${pass}" | chpasswd
         systemctl enable --now xrdp
         systemctl restart xrdp xrdp-sesman
@@ -604,7 +607,7 @@ After=network.target
 Type=simple
 User=root
 ExecStart=/usr/bin/Xvnc :1 -geometry 1920x1080 -depth 24 -rfbport 5900 -rfbauth /root/.vnc/passwd -SecurityTypes VncAuth
-ExecStartPost=/bin/sh -c "sleep 1; DISPLAY=:1 /usr/bin/startxfce4 &"
+ExecStartPost=/bin/sh -c "sleep 1; DISPLAY=:1 exec dbus-run-session /usr/bin/startxfce4 &"
 Restart=always
 
 [Install]
