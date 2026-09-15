@@ -22,13 +22,32 @@ async function resolveServer(target, registry) {
     } catch (e) {}
   }
 
-  if (!target) {
-    return allServers.find((s) => s.status === 'running') || allServers[0] || null;
+  const s = !target 
+    ? (allServers.find((srv) => srv.status === 'running') || allServers[0] || null)
+    : allServers.find((item) => String(item.id) === String(target) || (item.name && item.name.toLowerCase() === target.toLowerCase()));
+
+  if (s && !s.tailscale_ip) {
+    try {
+      const { execSync } = require('child_process');
+      const tsRaw = execSync('tailscale status --json', { timeout: 1500, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+      const tsData = JSON.parse(tsRaw);
+      if (tsData && tsData.Peer) {
+        const sName = (s.name || '').toLowerCase();
+        for (const p of Object.values(tsData.Peer)) {
+          const ipv4 = (p.TailscaleIPs || []).find((ip) => ip.includes('.'));
+          if (ipv4) {
+            const h = (p.HostName || '').toLowerCase();
+            const d = (p.DNSName || '').split('.')[0].toLowerCase();
+            if (h === sName || d === sName) {
+              s.tailscale_ip = ipv4;
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {}
   }
 
-  const s = allServers.find(
-    (item) => String(item.id) === String(target) || (item.name && item.name.toLowerCase() === target.toLowerCase())
-  );
   return s || null;
 }
 
