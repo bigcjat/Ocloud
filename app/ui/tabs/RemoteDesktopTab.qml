@@ -708,9 +708,12 @@ Item {
                     }
 
                     Text {
-                      text: (root.currentMachine && root.currentMachine.os === "macos")
-                        ? "Apple Screen Sharing over VNC (Port 5900)"
-                        : "Native Remote Desktop Protocol (Port 3389)"
+                      text: {
+                        if (!root.currentMachine) return "Remote Desktop";
+                        if (root.currentMachine.os === "macos") return "Apple Screen Sharing over VNC (Port 5900)";
+                        if (root.currentMachine.detectedProtocol === "vnc") return "TigerVNC Remote Desktop (Port " + (root.currentMachine.detectedPort || 5900) + ")";
+                        return "Remote Desktop Protocol (Port " + (root.currentMachine.detectedPort || 3389) + ")";
+                      }
                       font.family: root.appFontFamily
                       font.pixelSize: 9
                       color: root.mutedColor
