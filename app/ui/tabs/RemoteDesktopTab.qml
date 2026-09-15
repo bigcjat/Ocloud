@@ -44,6 +44,16 @@ Item {
 
   function launchDesktop() {
     if (!currentMachine) return;
+    if (!currentMachine.portOpen) {
+      if (currentMachine.os === "macos") {
+        statusMessage = "Port 5900 is closed on " + currentMachine.name + ". Enable Screen Sharing in macOS System Settings → General → Sharing.";
+      } else {
+        statusMessage = "Remote Desktop port is closed on " + currentMachine.name + ". Configure Remote Desktop on this server first.";
+      }
+      statusIsError = true;
+      if (ocloud.showToast) ocloud.showToast(statusMessage);
+      return;
+    }
     if (currentMachine.os === "macos" && !usernameInput.trim()) {
       statusMessage = "macOS requires your macOS user account name. Enter it in the Credentials field above.";
       statusIsError = true;
@@ -58,6 +68,12 @@ Item {
         try {
           var res = JSON.parse(out);
           if (res && !res.ok) {
+            if (res.error === "port_closed") {
+              statusMessage = res.instructions || res.message || "Port is closed on remote machine.";
+              statusIsError = true;
+              if (ocloud.showToast) ocloud.showToast(statusMessage);
+              return;
+            }
             if (res.error === "no_viewer") {
               statusMessage = "Viewer missing: " + (res.installHint || "sudo pacman -S freerdp tigervnc");
               statusIsError = true;
@@ -384,21 +400,39 @@ Item {
 
                     // Protocol badge
                     Rectangle {
-                      implicitWidth: protoBadge.implicitWidth + 6
-                      implicitHeight: 14
+                      implicitWidth: protoBadge.implicitWidth + 8
+                      implicitHeight: 15
                       radius: 2
-                      color: modelData.portOpen ? Qt.rgba(0.06, 0.72, 0.5, 0.15) : Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.05)
-                      border.color: modelData.portOpen ? "#10b981" : root.borderCol
+                      color: {
+                        if (modelData.portOpen) return Qt.rgba(0.06, 0.72, 0.5, 0.15);
+                        if (modelData.os === "macos") return Qt.rgba(0.95, 0.6, 0.1, 0.15);
+                        return Qt.rgba(root.textColor.r, root.textColor.g, root.textColor.b, 0.05);
+                      }
+                      border.color: {
+                        if (modelData.portOpen) return "#10b981";
+                        if (modelData.os === "macos") return "#f59e0b";
+                        return root.borderCol;
+                      }
                       border.width: 1
 
                       Text {
                         id: protoBadge
                         anchors.centerIn: parent
-                        text: (modelData.detectedProtocol ? modelData.detectedProtocol.toUpperCase() : "SSH")
+                        text: {
+                          if (modelData.portOpen) {
+                            return (modelData.detectedProtocol ? modelData.detectedProtocol.toUpperCase() : "VNC") + " :" + (modelData.detectedPort || 5900);
+                          }
+                          if (modelData.os === "macos") return "SHARING OFF";
+                          return "PORT CLOSED";
+                        }
                         font.family: root.appFontFamily
                         font.pixelSize: 7
                         font.bold: true
-                        color: modelData.portOpen ? "#10b981" : root.mutedColor
+                        color: {
+                          if (modelData.portOpen) return "#10b981";
+                          if (modelData.os === "macos") return "#f59e0b";
+                          return root.mutedColor;
+                        }
                       }
                     }
                   }
@@ -802,33 +836,39 @@ Item {
                 Rectangle {
                   Layout.fillWidth: true
                   visible: (root.currentMachine && !root.currentMachine.portOpen && root.currentMachine.os === "macos")
-                  implicitHeight: macBannerCol.implicitHeight + 16
-                  radius: 4
-                  color: Qt.rgba(0.2, 0.4, 0.8, 0.12)
-                  border.color: "#3b82f6"
+                  implicitHeight: macBannerCol.implicitHeight + 20
+                  radius: 6
+                  color: Qt.rgba(0.95, 0.6, 0.1, 0.12)
+                  border.color: "#f59e0b"
                   border.width: 1
 
                   ColumnLayout {
                     id: macBannerCol
                     anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 6
+                    anchors.margins: 12
+                    spacing: 8
 
                     RowLayout {
-                      spacing: 6
-                      Text { text: "ℹ"; font.pixelSize: 11; color: "#60a5fa" }
+                      spacing: 8
+                      Text { text: "⚠️"; font.pixelSize: 13 }
                       Text {
-                        text: "Apple Screen Sharing is not active on this Mac."
+                        text: "Port 5900 Closed — Screen Sharing is OFF on this Mac"
                         font.family: root.appFontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: 11
                         font.bold: true
-                        color: "#93c5fd"
+                        color: "#fbbf24"
                       }
                     }
 
                     Text {
                       Layout.fillWidth: true
-                      text: "To connect, enable Screen Sharing on " + (root.currentMachine ? root.currentMachine.name : "Mac") + ":\nSystem Settings → General → Sharing → Turn on 'Screen Sharing'."
+                      text: "macOS requires Screen Sharing to be explicitly turned on in System Settings before remote connections can be accepted.\n\n" +
+                            "How to enable on " + (root.currentMachine ? root.currentMachine.name : "your Mac") + ":\n" +
+                            "  1. Open System Settings\n" +
+                            "  2. Click General in the sidebar → Sharing\n" +
+                            "  3. Switch 'Screen Sharing' to ON\n" +
+                            "  4. Click the (i) icon to ensure your user account has access\n" +
+                            "  5. Click 'Check Port 5900 Status' below"
                       font.family: root.appFontFamily
                       font.pixelSize: 9
                       color: root.textColor
@@ -841,7 +881,7 @@ Item {
 
                       Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 28
+                        Layout.preferredHeight: 30
                         radius: 4
                         color: macRefreshMouse.containsMouse ? "#2563eb" : "#3b82f6"
                         RowLayout {
@@ -849,7 +889,7 @@ Item {
                           spacing: 6
                           Text { text: "⟳"; font.pixelSize: 11; color: "#ffffff" }
                           Text {
-                            text: "Check Port Status"
+                            text: "Check Port 5900 Status Now"
                             font.family: root.appFontFamily
                             font.pixelSize: 9
                             font.bold: true
@@ -872,7 +912,14 @@ Item {
                   Layout.fillWidth: true
                   Layout.preferredHeight: 34
                   radius: 4
-                  color: rdBtnMouse.containsMouse ? Qt.darker(root.accentColor, 1.2) : root.accentColor
+                  color: {
+                    if (root.currentMachine && !root.currentMachine.portOpen) {
+                      return rdBtnMouse.containsMouse ? Qt.rgba(0.95, 0.6, 0.1, 0.3) : Qt.rgba(0.95, 0.6, 0.1, 0.18);
+                    }
+                    return rdBtnMouse.containsMouse ? Qt.darker(root.accentColor, 1.2) : root.accentColor;
+                  }
+                  border.color: (root.currentMachine && !root.currentMachine.portOpen) ? "#f59e0b" : "transparent"
+                  border.width: (root.currentMachine && !root.currentMachine.portOpen) ? 1 : 0
 
                   RowLayout {
                     anchors.centerIn: parent
@@ -880,15 +927,22 @@ Item {
                     ThemeIcon {
                       Layout.preferredWidth: 13
                       Layout.preferredHeight: 13
-                      source: "icons/external-link.svg"
-                      color: "#ffffff"
+                      source: (root.currentMachine && !root.currentMachine.portOpen) ? "icons/alert-circle.svg" : "icons/external-link.svg"
+                      color: (root.currentMachine && !root.currentMachine.portOpen) ? "#fbbf24" : "#ffffff"
                     }
                     Text {
-                      text: "Launch in Hyprland"
+                      text: {
+                        if (!root.currentMachine) return "Launch in Hyprland";
+                        if (!root.currentMachine.portOpen) {
+                          if (root.currentMachine.os === "macos") return "Screen Sharing OFF (Port 5900 Closed)";
+                          return "Port Closed (Configure Server First)";
+                        }
+                        return "Launch in Hyprland";
+                      }
                       font.family: root.appFontFamily
                       font.pixelSize: 11
                       font.bold: true
-                      color: "#ffffff"
+                      color: (root.currentMachine && !root.currentMachine.portOpen) ? "#fbbf24" : "#ffffff"
                     }
                   }
 

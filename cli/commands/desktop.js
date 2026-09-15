@@ -249,9 +249,16 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       console.log('━'.repeat(75));
       for (const m of enriched) {
         const statusDot = m.online ? '\x1b[32m●\x1b[0m' : '\x1b[90m○\x1b[0m';
-        const portStatus = m.portOpen
-          ? `\x1b[32m${m.detectedProtocol.toUpperCase()}:${m.detectedPort} OPEN (${m.latencyMs}ms)\x1b[0m`
-          : `\x1b[90m${m.detectedProtocol.toUpperCase()}:${m.detectedPort} (offline)\x1b[0m`;
+        let portStatus = '';
+        if (m.portOpen) {
+          portStatus = `\x1b[32m${m.detectedProtocol.toUpperCase()}:${m.detectedPort} OPEN (${m.latencyMs}ms)\x1b[0m`;
+        } else if (m.os === 'macos') {
+          portStatus = `\x1b[33mVNC:5900 CLOSED (Screen Sharing OFF)\x1b[0m`;
+        } else if (m.online) {
+          portStatus = `\x1b[33m${m.detectedProtocol.toUpperCase()}:${m.detectedPort} CLOSED\x1b[0m`;
+        } else {
+          portStatus = `\x1b[90m${m.detectedProtocol.toUpperCase()}:${m.detectedPort} (offline)\x1b[0m`;
+        }
         const clientStatus = m.viewer ? `\x1b[32m${m.viewer}\x1b[0m` : '\x1b[33mNot Installed\x1b[0m';
         console.log(`  ${statusDot} \x1b[1m${m.name.padEnd(26)}\x1b[0m ${(m.tailscaleIp || m.ipv4 || 'No IP').padEnd(16)} ${portStatus.padEnd(38)} Viewer: ${clientStatus}`);
       }
@@ -285,13 +292,38 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       probePort(host, 22, 1500)
     ]);
 
+    const portOpen = rdpRes.open || vncRes.open;
+    let instructions = null;
+    if (!portOpen) {
+      if (m.os === 'macos') {
+        instructions = [
+          `Port 5900 (Apple Screen Sharing / VNC) is CLOSED on ${m.name}.`,
+          'macOS has Screen Sharing disabled by default.',
+          'To fix and allow remote connections from Omarchy:',
+          '  1. On your Mac, open "System Settings"',
+          '  2. Go to "General" → "Sharing"',
+          '  3. Turn ON "Screen Sharing" (and "Remote Login" for SSH)',
+          '  4. Click (i) beside Screen Sharing to ensure your user account has access',
+          '  5. Re-run: ocloud desktop probe "' + m.name + '"'
+        ].join('\n');
+      } else {
+        instructions = [
+          `Remote desktop ports (RDP:3389, VNC:5900) are CLOSED on ${m.name}.`,
+          `Run "ocloud desktop bootstrap ${m.name}" to auto-install and configure over SSH.`
+        ].join('\n');
+      }
+    }
+
     const res = {
       node: m.name,
       host,
+      os: m.os,
       rdp: rdpRes,
       vnc: vncRes,
       ssh: sshRes,
-      recommendedProtocol: rdpRes.open ? 'rdp' : (vncRes.open ? 'vnc' : (m.os === 'macos' ? 'vnc' : 'rdp'))
+      portOpen,
+      recommendedProtocol: rdpRes.open ? 'rdp' : (vncRes.open ? 'vnc' : (m.os === 'macos' ? 'vnc' : 'rdp')),
+      instructions
     };
 
     if (isJson) console.log(JSON.stringify(res, null, 2));
@@ -300,7 +332,11 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
       console.log(`  RDP (3389): ${rdpRes.open ? '\x1b[32mOPEN\x1b[0m' : '\x1b[90mCLOSED\x1b[0m'} (${rdpRes.ms}ms)`);
       console.log(`  VNC (5900): ${vncRes.open ? '\x1b[32mOPEN\x1b[0m' : '\x1b[90mCLOSED\x1b[0m'} (${vncRes.ms}ms)`);
       console.log(`  SSH (22):   ${sshRes.open ? '\x1b[32mOPEN\x1b[0m' : '\x1b[90mCLOSED\x1b[0m'} (${sshRes.ms}ms)`);
-      console.log(`  Target Protocol: \x1b[1;36m${res.recommendedProtocol.toUpperCase()}\x1b[0m\n`);
+      if (!portOpen && instructions) {
+        console.log(`\n\x1b[33m⚠️  ${instructions}\x1b[0m\n`);
+      } else {
+        console.log(`  Target Protocol: \x1b[1;36m${res.recommendedProtocol.toUpperCase()}\x1b[0m\n`);
+      }
     }
     return res;
   }
@@ -354,11 +390,55 @@ async function cmdDesktop(subcmd, args = [], context = {}) {
         protocol = 'vnc';
         targetPort = 5900;
       } else {
-        protocol = m.os === 'windows' ? 'rdp' : (m.os === 'macos' ? 'vnc' : 'rdp');
-        targetPort = protocol === 'rdp' ? 3389 : 5900;
+        // Neither port is open! DO NOT SPAWN DEAD VIEWER!
+        const instructions = m.os === 'macos'
+          ? [
+              `Port 5900 (Apple Screen Sharing) is CLOSED on ${m.name} (${host}).`,
+              'Apple Screen Sharing is turned off by default in macOS.',
+              'To enable Screen Sharing on your Mac:',
+              '  1. Open System Settings on your Mac',
+              '  2. Navigate to General → Sharing',
+              '  3. Turn ON "Screen Sharing" (and "Remote Login" for SSH)',
+              '  4. Click the (i) info icon beside Screen Sharing to verify allowed users',
+              '  5. Re-run: ocloud desktop launch "' + m.name + '"'
+            ].join('\n')
+          : [
+              `Remote desktop ports (RDP:3389, VNC:5900) are CLOSED on ${m.name} (${host}).`,
+              `Run "ocloud desktop bootstrap ${m.name}" to auto-install and configure over SSH.`
+            ].join('\n');
+
+        if (isJson) {
+          console.log(JSON.stringify({
+            ok: false,
+            error: 'port_closed',
+            node: m.name,
+            host,
+            os: m.os,
+            port: m.os === 'macos' ? 5900 : 3389,
+            message: m.os === 'macos' ? 'Screen Sharing is turned off in macOS System Settings.' : 'Remote desktop port is closed.',
+            instructions
+          }));
+        } else {
+          console.log(`\x1b[31m✖ Port Closed: Cannot connect to ${m.name}\x1b[0m\n\n${instructions}\n`);
+        }
+        process.exitCode = 1;
+        throw new Error(m.os === 'macos' ? `Port 5900 closed on ${m.name}. Screen Sharing is turned off in macOS System Settings.` : `Remote desktop port is closed on ${m.name}.`);
       }
     } else {
       targetPort = protocol === 'rdp' ? 3389 : 5900;
+      const portCheck = await probePort(host, targetPort, 1500);
+      if (!portCheck.open) {
+        const instructions = (m.os === 'macos' && targetPort === 5900)
+          ? `Port 5900 is closed on ${m.name}. Enable Screen Sharing in macOS System Settings → General → Sharing.`
+          : `Port ${targetPort} (${protocol.toUpperCase()}) is closed on ${m.name}.`;
+        if (isJson) {
+          console.log(JSON.stringify({ ok: false, error: 'port_closed', node: m.name, host, instructions }));
+        } else {
+          console.log(`\x1b[31m✖ Port Closed: ${instructions}\x1b[0m`);
+        }
+        process.exitCode = 1;
+        throw new Error(instructions);
+      }
     }
 
     const viewer = findInstalledViewer(protocol);
