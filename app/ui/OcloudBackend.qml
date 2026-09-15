@@ -1105,7 +1105,9 @@ Item {
 
   function fetchDockerContainers(serverId) {
     if (!serverId) return;
+    console.log("[OcloudBackend] fetchDockerContainers triggered for", serverId);
     runCli(["workload", "list", serverId, "--json"], function(out, ok) {
+      console.log("[OcloudBackend] fetchDockerContainers received out len:", (out || "").length, "ok:", ok);
       var list = [];
       if (ok && out) {
         try { list = JSON.parse(out); } catch(e) {}

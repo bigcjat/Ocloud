@@ -26,6 +26,7 @@ Item {
   property bool loadingContainers: false
 
   function refreshCurrentServer() {
+    console.log("[WorkloadsTab] refreshCurrentServer triggered. currentServer:", currentServer ? (currentServer.name + " (" + currentServer.id + ")") : "null", "loading:", loadingContainers);
     if (!currentServer || loadingContainers) return;
     loadingContainers = true;
     var srvId = String(currentServer.id);
