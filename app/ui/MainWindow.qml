@@ -73,10 +73,8 @@ FloatingWindow {
   property string busyMessage: ""
 
   readonly property var tabModel: [
-    { id: "fleet", name: "Compute Nodes", shortName: "Fleet", iconSvg: "icons/server.svg", count: serverList.length },
+    { id: "accounts", name: "Cloud Accounts", shortName: "Accounts", iconSvg: "icons/cloud.svg", count: serverList.length + cloudAccountsCount },
     { id: "workloads", name: "Workloads & Docker", shortName: "Docker", iconSvg: "icons/docker.svg", count: 0 },
-    { id: "storage", name: "Storage & Drives", shortName: "Storage", iconSvg: "icons/hard-drive.svg", count: mountedDrivesCount },
-    { id: "accounts", name: "Cloud Accounts", shortName: "Accounts", iconSvg: "icons/user-circle.svg", count: cloudAccountsCount },
     { id: "apps", name: "App Streaming", shortName: "Apps", iconSvg: "icons/terminal.svg", count: 0 },
     { id: "backups", name: "Automated Backups", shortName: "Backups", iconSvg: "icons/archive.svg", count: 0 },
     { id: "settings", name: "Settings & Preferences", shortName: "Settings", iconSvg: "icons/settings.svg", count: 0 }
@@ -109,13 +107,11 @@ FloatingWindow {
     return symbol + totalHourly.toFixed(4) + " / hr (" + symbol + totalMonthly.toFixed(2) + " / mo)";
   }
 
-  Shortcut { sequence: "Alt+1"; onActivated: activeTab = "fleet" }
+  Shortcut { sequence: "Alt+1"; onActivated: activeTab = "accounts" }
   Shortcut { sequence: "Alt+2"; onActivated: activeTab = "workloads" }
-  Shortcut { sequence: "Alt+3"; onActivated: activeTab = "storage" }
-  Shortcut { sequence: "Alt+4"; onActivated: activeTab = "accounts" }
-  Shortcut { sequence: "Alt+5"; onActivated: activeTab = "apps" }
-  Shortcut { sequence: "Alt+6"; onActivated: activeTab = "backups" }
-  Shortcut { sequence: "Alt+7"; onActivated: activeTab = "settings" }
+  Shortcut { sequence: "Alt+3"; onActivated: activeTab = "apps" }
+  Shortcut { sequence: "Alt+4"; onActivated: activeTab = "backups" }
+  Shortcut { sequence: "Alt+5"; onActivated: activeTab = "settings" }
 
   function reloadAll() {
     ocloud.refreshStatusAsync();
@@ -495,7 +491,7 @@ FloatingWindow {
               // Pinned Count (Full view) - Clean quiet muted text, no chunky light-on-light pill
               Text {
                 id: badgeText
-                visible: !window.isHalf && modelData.count > 0 && (modelData.id === "fleet" || modelData.id === "storage" || modelData.id === "accounts")
+                visible: !window.isHalf && modelData.count > 0 && modelData.id === "accounts"
                 anchors.right: parent.right
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
@@ -521,7 +517,7 @@ FloatingWindow {
 
                 // Dot badge for rail mode
                 Rectangle {
-                  visible: modelData.count > 0 && (modelData.id === "fleet" || modelData.id === "storage" || modelData.id === "accounts")
+                  visible: modelData.count > 0 && modelData.id === "accounts"
                   anchors.top: parent.top
                   anchors.right: parent.right
                   anchors.topMargin: 6
@@ -611,20 +607,16 @@ FloatingWindow {
         StackLayout {
           anchors.fill: parent
           currentIndex: {
-            if (activeTab === "fleet") return 0;
+            if (activeTab === "accounts" || activeTab === "fleet" || activeTab === "storage") return 0;
             if (activeTab === "workloads") return 1;
-            if (activeTab === "storage") return 2;
-            if (activeTab === "accounts") return 3;
-            if (activeTab === "apps") return 4;
-            if (activeTab === "backups") return 5;
-            if (activeTab === "settings") return 6;
+            if (activeTab === "apps") return 2;
+            if (activeTab === "backups") return 3;
+            if (activeTab === "settings") return 4;
             return 0;
           }
 
-          FleetTab { id: fleetView }
-          WorkloadsTab { id: workloadsView }
-          StorageTab { id: storageView }
           CloudAccountsTab { id: cloudAccountsView }
+          WorkloadsTab { id: workloadsView }
           AppSuiteTab { id: appSuiteView }
           BackupTab { id: backupView }
           SettingsTab { id: settingsView }
